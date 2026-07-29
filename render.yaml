@@ -30,18 +30,10 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
-      # Фото пишутся в S3-совместимое хранилище (например Cloudflare R2,
-      # бесплатный план) — локальный диск тоже эфемерный.
-      - key: STORAGE_DRIVER
-        value: s3
-      - key: S3_ENDPOINT
-        sync: false
-      - key: S3_BUCKET
-        sync: false
-      - key: S3_KEY
-        sync: false
-      - key: S3_SECRET
-        sync: false
+      # Фото — на локальном диске контейнера (STORAGE_DRIVER=local по
+      # умолчанию, см. server/src/config.js). Диск Render free эфемерный:
+      # после сна/передеплоя старые фото пропадают, но очки/аккаунты (они в
+      # Neon) не затрагиваются — осознанный компромисс для бесплатного хостинга.
       # Заполнить публичным доменом сервиса после первого деплоя
       # (например https://handforge.onrender.com или свой домен).
       - key: CORS_ORIGIN
