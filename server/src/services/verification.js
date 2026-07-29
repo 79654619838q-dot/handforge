@@ -340,6 +340,7 @@ export const publicUser = (u) => ({
   username: u.username,
   role: u.role,
   avatarColor: u.avatarColor,
+  avatarUrl: u.avatarUrl,
   points: u.points,
   xp: u.xp,
   level: u.level,

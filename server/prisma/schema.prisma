@@ -17,6 +17,7 @@ model User {
   passwordHash        String
   role                String   @default("PLAYER") // PLAYER | MODERATOR | ADMIN
   avatarColor         String   @default("#F2C43D")
+  avatarUrl           String?  // своя фотка (/avatars/...) или пресет из Poker (/poker/images/avatars/...)
 
   points              Int      @default(0)
   xp                  Int      @default(0)

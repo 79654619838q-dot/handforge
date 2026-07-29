@@ -1,12 +1,80 @@
 import { Router } from "express";
 import { z } from "zod";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { prisma, fromJson, toJson } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
+import { uploadAvatar } from "../middleware/upload.js";
+import { makeAvatar } from "../lib/image.js";
 import { publicUser } from "../services/verification.js";
 import { levelProgress } from "../services/scoring.js";
+import { badRequest } from "../lib/errors.js";
 
 export const profileRouter = Router();
 profileRouter.use(requireAuth);
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const AVATAR_STORAGE_DIR = path.resolve(process.cwd(), "storage/avatars");
+// Один репозиторий, Poker живёт рядом (../../../poker от server/src/routes) —
+// переиспользуем ту же библиотеку картинок, что и в лобби покера, вместо
+// того чтобы копировать файлы или заводить вторую галерею аватарок.
+const POKER_AVATAR_DIRS = [
+  path.join(__dirname, "../../../poker/public/images/avatars"),
+  path.join(__dirname, "../../../poker/public/images/avatar"),
+];
+const AVATAR_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+
+profileRouter.get("/avatar-presets", async (_req, res) => {
+  const seen = new Set();
+  const presets = [];
+  for (const dir of POKER_AVATAR_DIRS) {
+    let files;
+    try {
+      files = await fs.readdir(dir);
+    } catch {
+      continue;
+    }
+    const folder = path.basename(dir);
+    for (const f of files) {
+      if (!AVATAR_EXTENSIONS.has(path.extname(f).toLowerCase())) continue;
+      if (seen.has(f)) continue;
+      seen.add(f);
+      presets.push({ id: f, url: `/poker/images/${folder}/${encodeURIComponent(f)}` });
+    }
+  }
+  res.json({ presets });
+});
+
+profileRouter.post("/avatar-preset", async (req, res, next) => {
+  try {
+    const { url } = z.object({ url: z.string() }).parse(req.body);
+    if (!/^\/poker\/images\/avatars?\/[^/]+$/.test(url)) throw badRequest("BAD_AVATAR", "Некорректная аватарка");
+
+    const user = await prisma.user.update({ where: { id: req.user.id }, data: { avatarUrl: url } });
+    res.json({ user: publicUser(user) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+profileRouter.post("/avatar", uploadAvatar, async (req, res, next) => {
+  try {
+    if (!req.file) throw badRequest("NO_FILE", "Файл не передан");
+
+    const jpeg = await makeAvatar(req.file.buffer);
+    await fs.mkdir(AVATAR_STORAGE_DIR, { recursive: true });
+    await fs.writeFile(path.join(AVATAR_STORAGE_DIR, `${req.user.id}.jpg`), jpeg);
+
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { avatarUrl: `/avatars/${req.user.id}.jpg?v=${Date.now()}` },
+    });
+    res.json({ user: publicUser(user) });
+  } catch (err) {
+    next(err);
+  }
+});
 
 profileRouter.get("/", async (req, res, next) => {
   try {

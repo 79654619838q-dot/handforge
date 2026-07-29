@@ -13,3 +13,14 @@ export const uploadPhoto = multer({
     cb(null, true);
   },
 }).single("photo");
+
+export const uploadAvatar = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED.includes(file.mimetype)) {
+      return cb(new Error("Недопустимый формат файла"));
+    }
+    cb(null, true);
+  },
+}).single("avatar");

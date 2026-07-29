@@ -94,6 +94,9 @@ export const api = {
   profile: () => request("/profile"),
   updateProfile: (body) => request("/profile", { method: "PATCH", body }),
   profileStats: () => request("/profile/stats"),
+  avatarPresets: () => request("/profile/avatar-presets"),
+  setAvatarPreset: (url) => request("/profile/avatar-preset", { method: "POST", body: { url } }),
+  uploadAvatar: (formData) => request("/profile/avatar", { method: "POST", formData }),
 
   gameStatus: () => request("/game/status"),
 

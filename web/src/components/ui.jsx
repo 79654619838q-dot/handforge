@@ -18,11 +18,16 @@ export const Difficulty = ({ value }) => (
   </span>
 );
 
-export const Avatar = ({ name, color = "#F2C43D" }) => (
-  <span className="avatar" style={{ background: color }}>
-    {initials(name)}
-  </span>
-);
+export const Avatar = ({ name, color = "#F2C43D", url }) =>
+  url ? (
+    <span className="avatar" style={{ padding: 0, overflow: "hidden" }}>
+      <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+    </span>
+  ) : (
+    <span className="avatar" style={{ background: color }}>
+      {initials(name)}
+    </span>
+  );
 
 /** Фото доступно только владельцу — грузим с токеном и отдаём blob. */
 export function AuthImage({ url, alt = "", fit = "cover" }) {

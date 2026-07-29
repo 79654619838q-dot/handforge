@@ -118,6 +118,15 @@ export async function prepareForAI(buffer) {
     .toBuffer();
 }
 
+/** Аватарка профиля: квадрат, обрезка по центру. */
+export async function makeAvatar(buffer) {
+  return sharp(buffer, { failOn: "none" })
+    .rotate()
+    .resize(320, 320, { fit: "cover" })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+}
+
 /** Превью для истории и админки. */
 export async function makeThumb(buffer) {
   return sharp(buffer, { failOn: "none" })

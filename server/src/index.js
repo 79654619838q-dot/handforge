@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import path from "node:path";
 import { config, hasAI } from "./config.js";
 import { apiLimiter } from "./middleware/rateLimit.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
@@ -23,6 +24,10 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({ origin: config.corsOrigin.split(","), credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 app.use(apiLimiter);
+
+// Аватарки видны всем (в лидерборде, за покерным столом и т.п.), поэтому
+// раздаём их без авторизации — в отличие от приватных фото заданий.
+app.use("/avatars", express.static(path.resolve(process.cwd(), "storage/avatars")));
 
 app.get("/health", (_req, res) =>
   res.json({ ok: true, ai: hasAI() ? "enabled" : "mock", time: new Date().toISOString() })

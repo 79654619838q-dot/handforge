@@ -19,7 +19,7 @@ leaderboardRouter.get("/", async (req, res, next) => {
         where: { banned: false, riskScore: { lt: 40 } },
         orderBy: { points: "desc" },
         take: limit,
-        select: { id: true, username: true, avatarColor: true, points: true, level: true, submissionsApproved: true },
+        select: { id: true, username: true, avatarColor: true, avatarUrl: true, points: true, level: true, submissionsApproved: true },
       });
       const above = await prisma.user.count({
         where: { points: { gt: req.user.points }, banned: false, riskScore: { lt: 40 } },
@@ -43,7 +43,7 @@ leaderboardRouter.get("/", async (req, res, next) => {
 
     const users = await prisma.user.findMany({
       where: { id: { in: grouped.map((g) => g.userId) }, banned: false, riskScore: { lt: 40 } },
-      select: { id: true, username: true, avatarColor: true, level: true },
+      select: { id: true, username: true, avatarColor: true, avatarUrl: true, level: true },
     });
     const map = new Map(users.map((u) => [u.id, u]));
 

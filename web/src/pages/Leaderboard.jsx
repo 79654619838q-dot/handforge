@@ -36,7 +36,7 @@ export default function Leaderboard() {
           {data.entries.map((e, i) => (
             <div key={e.id} className={`list-row stagger ${e.id === user.id ? "me" : ""}`} style={{ "--i": i }}>
               <span className={`rank ${e.rank <= 3 ? "top" : ""}`}>{e.rank}</span>
-              <Avatar name={e.username} color={e.avatarColor} />
+              <Avatar name={e.username} color={e.avatarColor} url={e.avatarUrl} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 500 }}>{e.username}</div>
                 <div className="mono muted" style={{ fontSize: 11 }}>ур. {e.level}</div>
