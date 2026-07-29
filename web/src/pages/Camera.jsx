@@ -37,6 +37,16 @@ export default function Camera() {
 
     (async () => {
       try {
+        // Запрашиваем камеру СРАЗУ, не дожидаясь сетевых запросов — iOS Safari
+        // привязывает разрешение на камеру к жесту пользователя и может молча
+        // отказать (чёрный экран, без ошибки), если между открытием экрана и
+        // getUserMedia прошло слишком много времени (например, бесплатный
+        // сервер после сна просыпается 30-60 сек).
+        const streamPromise = navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+
         const { assignment: a } = await api.activeAssignment();
         if (!a || a.id !== assignmentId) throw new Error("Задание неактивно");
         if (cancelled) return;
@@ -46,10 +56,13 @@ export default function Camera() {
         if (cancelled) return;
         setCaptureToken(session.captureToken);
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-          audio: false,
-        });
+        // На iOS Safari getUserMedia иногда не резолвится и не реджектится
+        // вовсе (зависает) — без этого таймаута экран остался бы чёрным
+        // навсегда вместо явной ошибки с кнопкой "попробовать снова".
+        const stream = await Promise.race([
+          streamPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 12000)),
+        ]);
         if (cancelled) return stream.getTracks().forEach((t) => t.stop());
 
         streamRef.current = stream;
@@ -60,6 +73,9 @@ export default function Camera() {
         if (cancelled) return;
         if (err?.name === "NotAllowedError" || err?.name === "NotFoundError") {
           setState("denied");
+        } else if (err?.message === "TIMEOUT") {
+          setState("error");
+          setError("Камера не откликнулась. Проверьте разрешение камеры для сайта и попробуйте снова.");
         } else {
           setState("error");
           setError(err.message || "Не удалось открыть камеру");
