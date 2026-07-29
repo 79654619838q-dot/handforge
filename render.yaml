@@ -8,8 +8,8 @@ services:
       npm install --prefix server &&
       npm install --prefix web && npm run build --prefix web &&
       npm install --prefix poker &&
-      npm install --prefix hub
-    preDeployCommand: npm run db:push --prefix server
+      npm install --prefix hub &&
+      npm run db:push --prefix server
     startCommand: npm run start --prefix hub
     envVars:
       - key: NODE_VERSION
