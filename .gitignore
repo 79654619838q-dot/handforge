@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+*.log
+server/storage/photos/
+server/prisma/dev.db
+server/prisma/dev.db-journal
+poker/data/ledgers/
+.DS_Store
+
+# Инструменты разработки, не часть приложения
+.claude/
+.mcp.json
+.playwright-mcp/
+claude-skills/

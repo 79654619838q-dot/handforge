@@ -1,0 +1,48 @@
+services:
+  - name: handforge
+    type: web
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: >
+      npm install --prefix server &&
+      npm install --prefix web && npm run build --prefix web &&
+      npm install --prefix poker &&
+      npm install --prefix hub
+    preDeployCommand: npm run db:push --prefix server
+    startCommand: npm run start --prefix hub
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      # Общий секрет для PhotoQuest (server/) и Poker (poker/server.js) —
+      # оба процесса живут в одном контейнере и читают одну и ту же
+      # переменную окружения, поэтому единый вход работает без доп. настройки.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      # Postgres (например Neon, бесплатный план) — Render free не даёт
+      # постоянный диск, SQLite не переживёт рестарт контейнера.
+      - key: DATABASE_URL
+        sync: false
+      # Ключ ИИ для проверки фото — Anthropic ИЛИ OpenRouter, минимум один.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # Фото пишутся в S3-совместимое хранилище (например Cloudflare R2,
+      # бесплатный план) — локальный диск тоже эфемерный.
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_KEY
+        sync: false
+      - key: S3_SECRET
+        sync: false
+      # Заполнить публичным доменом сервиса после первого деплоя
+      # (например https://handforge.onrender.com или свой домен).
+      - key: CORS_ORIGIN
+        sync: false

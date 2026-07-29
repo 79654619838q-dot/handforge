@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <title>HandForge Race — Стол</title>
+    <script src="js/auth-gate.js"></script>
+    <script>
+        // Реальная высота видимой области экрана телефона (без адресной строки
+        // браузера/веб-вью). Пишем в CSS-переменную --vh и используем её вместо
+        // vh/dvh, т.к. в некоторых мобильных веб-вью (например, встроенный
+        // браузер ВКонтакте) dvh не поддерживается, а обычный 100vh считается
+        // от "полного" экрана и обрезает контент снизу.
+        (function () {
+            function setVH() {
+                document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px');
+            }
+            setVH();
+            window.addEventListener('resize', setVH);
+            window.addEventListener('orientationchange', setVH);
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', setVH);
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="css/style.css?v=1785238800">
+</head>
+<body class="game-page">
+    <a href="/" style="position:fixed;top:6px;left:6px;z-index:9999;background:rgba(0,0,0,0.55);color:#d4af37;border:1px solid rgba(212,175,55,0.5);border-radius:6px;padding:4px 9px;font-family:sans-serif;font-size:11px;text-decoration:none;">← Меню</a>
+    <div class="app">
+        <div class="tourney-hud" id="tourneyHud" style="display:none;">
+            <div class="tourney-hud-level">Уровень <span id="tourneyLevel">1</span></div>
+            <div class="tourney-hud-blinds" id="tourneyBlinds">—/—</div>
+            <div class="tourney-hud-timer">След. уровень: <span id="tourneyTimeLeft">—:—</span></div>
+            <div class="tourney-hud-reg" id="tourneyRegStatus"></div>
+        </div>
+
+        <div class="seat-picker-overlay" id="seatPickerOverlay" style="display:none;">
+            <div class="seat-picker-card">
+                <h2 id="seatPickerTitle">Выберите место за столом</h2>
+                <p id="seatPickerHint">Свободные места подсвечены — нажмите, чтобы сесть.</p>
+                <div class="seat-picker-grid" id="seatPickerGrid"></div>
+            </div>
+        </div>
+
+        <div class="buyin-overlay" id="buyinOverlay" style="display:none;">
+            <div class="seat-picker-card">
+                <h2>Сколько фишек закупить?</h2>
+                <p id="buyinHint">От 200 до 8000</p>
+                <input type="number" id="buyinInput" class="buyin-input" value="2000" min="1" step="1">
+                <div class="buyin-actions">
+                    <button id="buyinCancelBtn" class="btn-small">← Назад к местам</button>
+                    <button id="buyinConfirmBtn" class="btn-gold">Сесть за стол</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="topbar">
+            <div class="topbar-content" id="topbarContent">
+                <div class="brand">
+                    <img src="images/logo.png" alt="HandForge" class="brand-logo">
+                    <div class="brand-text">
+                        <h1>HandForge <span>Race</span></h1>
+                        <p id="roomIdLabel">Стол: ---</p>
+                    </div>
+                    <span class="mode-tag" id="modeTag" style="display:none;"></span>
+                </div>
+
+                <div class="hud">
+                    <div class="hud-item">
+                        <span class="hud-label">Игроков</span>
+                        <span class="hud-value" id="playersCountHud">—</span>
+                    </div>
+                    <div class="hud-item">
+                        <span class="hud-label">Раздача</span>
+                        <span class="hud-value" id="handNumber">—</span>
+                    </div>
+                    <div class="hud-item">
+                        <span class="hud-label">Банк</span>
+                        <span class="hud-value" id="potSize">0</span>
+                    </div>
+                    <div class="hud-item">
+                        <span class="hud-label">Этап</span>
+                        <span class="hud-value" id="stageLabel">Ожидание</span>
+                    </div>
+                    <div class="hud-item" id="blindsHud" style="display:none;">
+                        <span class="hud-label" id="blindsHudLabel">Блайнды</span>
+                        <span class="hud-value" id="blindsHudValue">—/—</span>
+                    </div>
+                    <div class="hud-item" id="dealerHud" style="display:none;">
+                        <span class="hud-label">Дилер</span>
+                        <span class="hud-value" id="dealerHudValue">—</span>
+                    </div>
+                </div>
+
+                <button id="toggleLogBtn" class="ghost-btn" title="Лог / История / Чат">☰</button>
+                <button id="leaveSeatBtn" class="ghost-btn" style="display:none;">Встать (наблюдатель)</button>
+                <button id="leaveBtn" class="ghost-btn">Выйти из турнира</button>
+            </div>
+
+            <button id="topbarCollapseBtn" class="topbar-collapse-btn ghost-btn" title="Показать/скрыть шапку">⌄</button>
+        </div>
+
+        <div class="table-wrap">
+            <div class="felt" id="felt">
+                <div class="rail"></div>
+
+                <div class="board-area">
+                    <div class="pot-chip" id="potChip">Банк: 0</div>
+                    <div class="board-row">
+                        <div class="table-watermark-side"></div>
+                        <div class="board-cards" id="boardCards"></div>
+                        <div class="table-watermark-side"></div>
+                    </div>
+                    <button class="runout-reveal" id="runoutBtn" style="display:none;">Показать оставшиеся карты</button>
+                </div>
+
+                <div class="seats" id="seats"></div>
+
+                <div class="waiting-panel" id="waitingPanel">
+                    <button class="waiting-panel-close" id="waitingPanelCloseBtn" title="Закрыть">✕</button>
+                    <h2>Ожидание игроков...</h2>
+                    <p id="waitingText">Нужно минимум 2 игрока</p>
+                    <button id="startGameBtn" class="btn-gold" style="display: none;">Начать турнир</button>
+                </div>
+
+                <div class="pro-pick-waiting" id="proPickWaitingPanel" style="display:none;">
+                    <p id="proPickWaitingText">Игроки выбирают карты…</p>
+                    <div class="pro-pick-waiting-list" id="proPickWaitingList"></div>
+                </div>
+            </div>
+
+            <div class="log-panel" id="logPanel">
+                <div class="log-tabs">
+                    <div class="log-tab active" data-tab="log">Лог</div>
+                    <div class="log-tab" data-tab="history">История</div>
+                    <div class="log-tab" data-tab="chat">Чат</div>
+                    <div class="log-tab" id="playersTab" data-tab="players" style="display:none;">Игроки</div>
+                    <button id="closeLogBtn" class="log-panel-close" title="Закрыть">✕</button>
+                </div>
+
+                <div class="log-view" id="logView">
+                    <div class="log" id="logList"></div>
+                </div>
+                <div class="log-view" id="historyView" style="display:none; flex:1; overflow-y:auto;">
+                    <div id="historyList"></div>
+                </div>
+                <div class="log-view" id="chatView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+                    <div class="chat-log" id="chatLog"></div>
+                    <div class="chat-form">
+                        <input type="text" id="chatInput" placeholder="Сообщение...">
+                        <button id="sendChatBtn" class="btn-small">➤</button>
+                    </div>
+                </div>
+                <div class="log-view" id="playersView" style="display:none; flex:1; overflow-y:auto;">
+                    <p class="players-tab-hint">Все, кто заходил за этот стол — закуп, текущий/финальный стек и профит.</p>
+                    <div id="playersStatsList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-backdrop" id="logBackdrop"></div>
+
+        <div class="action-bar" id="actionBar" style="display:none;">
+            <div class="hero-info">
+                <span class="hero-value hero-timer" id="timerValue">—</span>
+                <span><span class="hero-label">Ход</span><span class="hero-value" id="turnLabel">—</span></span>
+            </div>
+
+            <div class="your-cards" id="yourCards" style="display:none;"></div>
+
+            <div class="actions">
+                <div class="raise-group" id="raiseGroup">
+                    <input type="range" id="raiseRange" min="0" max="1000" value="40">
+                    <input type="number" id="raiseInput" value="40" min="0">
+                    <div class="raise-presets">
+                        <button type="button" id="raiseX2" class="raise-preset-btn">×2</button>
+                        <button type="button" id="raiseX3" class="raise-preset-btn">×3</button>
+                        <button type="button" id="raiseX4" class="raise-preset-btn">×4</button>
+                    </div>
+                </div>
+                <button id="foldBtn" class="act-btn fold">Фолд</button>
+                <button id="checkBtn" class="act-btn check">Чек</button>
+                <button id="callBtn" class="act-btn call">Колл</button>
+                <button id="raiseBtn" class="act-btn raise">Рейз</button>
+                <button id="allInBtn" class="act-btn allin">Олл-ин</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="pro-pick-open-btn" id="proPickOpenBtn" style="display:none;">
+        <span id="proPickOpenLabel">Выбрать карту</span>
+        <span class="pro-pick-open-timer" id="proPickOpenTimer">60</span>
+    </button>
+
+    <div class="pro-pick-overlay" id="proPickOverlay" style="display:none;">
+        <div class="pro-pick-card">
+            <div class="pro-pick-header">
+                <span id="proPickTitle">Выберите карту</span>
+                <span class="pro-pick-timer" id="proPickTimer">60</span>
+                <button class="pro-pick-close-btn" id="proPickCloseBtn" title="Свернуть и посмотреть на стол">✕</button>
+            </div>
+            <p class="pro-pick-hint" id="proPickHint">Шаг 1 — выберите масть</p>
+
+            <div class="pro-pick-suits" id="proPickSuits">
+                <button class="pro-pick-suit-btn" data-suit="♠">♠</button>
+                <button class="pro-pick-suit-btn suit-red" data-suit="♥">♥</button>
+                <button class="pro-pick-suit-btn suit-red" data-suit="♦">♦</button>
+                <button class="pro-pick-suit-btn" data-suit="♣">♣</button>
+            </div>
+
+            <div class="pro-pick-ranks" id="proPickRanks" style="display:none;">
+                <button class="pro-pick-back-btn" id="proPickBackBtn">← Назад к мастям</button>
+                <div class="pro-pick-rank-group" id="proPickGroup1"></div>
+                <div class="pro-pick-rank-group" id="proPickGroup2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tournament-over-overlay" id="tournamentOverOverlay" style="display:none;">
+        <div class="tournament-over-card">
+            <button class="tournament-over-close" id="closeTournamentOverlay" title="Закрыть">✕</button>
+            <h2 id="tournamentOverTitle">Турнир завершён</h2>
+            <p id="tournamentOverText"></p>
+            <button class="btn-gold" id="backToLobbyBtn">В лобби</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/poker.js?v=1785237999"></script>
+    <script src="js/game.js?v=1785239600"></script>
+</body>
+</html>

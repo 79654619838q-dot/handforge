@@ -1,0 +1,209 @@
+// Схема PhotoQuest. Прод — PostgreSQL (Render free даёт эфемерный диск,
+// SQLite-файл не переживёт рестарт/деплой). Для локальной разработки без
+// своего Postgres — см. DATABASE_URL в README/.env.example.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  email               String?  @unique
+  username            String   @unique
+  passwordHash        String
+  role                String   @default("PLAYER") // PLAYER | MODERATOR | ADMIN
+  avatarColor         String   @default("#F2C43D")
+
+  points              Int      @default(0)
+  xp                  Int      @default(0)
+  level               Int      @default(1)
+  streak              Int      @default(0)
+  bestStreak          Int      @default(0)
+  submissionsTotal    Int      @default(0)
+  submissionsApproved Int      @default(0)
+
+  riskScore           Int      @default(0)
+  banned              Boolean  @default(false)
+  banReason           String?
+
+  settings            String   @default("{}") // JSON
+  lastActiveAt        DateTime @default(now())
+  createdAt           DateTime @default(now())
+
+  assignments      Assignment[]
+  submissions      Submission[]
+  achievements     UserAchievement[]
+  notifications    Notification[]
+  fraudEvents      FraudEvent[]
+  captureSessions  CaptureSession[]
+
+  @@index([points])
+}
+
+model Task {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  category     String   // TRANSPORT | PEOPLE | ARCHITECTURE | SIGNS | NATURE | ANIMALS | STREET_OBJECTS | TEXT_AND_NUMBERS
+  mode         String   @default("SHARED") // SHARED — доступно всем всегда | EXCLUSIVE — исчезает у всех после первого зачёта
+  difficulty   Int      @default(2) // 1..5
+  points       Int      @default(60)
+  timeLimitSec Int      @default(43200)
+  criteria     String   // JSON: что именно проверяет ИИ
+  source       String   @default("AI") // AI | MANUAL
+  active       Boolean  @default(true)
+  usedCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  assignments Assignment[]
+  submissions Submission[]
+
+  @@index([active, difficulty])
+}
+
+model Assignment {
+  id        String   @id @default(cuid())
+  userId    String
+  taskId    String
+  status    String   @default("ACTIVE") // ACTIVE | DONE | FAILED | EXPIRED | CANCELLED
+  nonce     String   @unique
+  attempts  Int      @default(0)
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  closedAt  DateTime?
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task            Task             @relation(fields: [taskId], references: [id])
+  submissions     Submission[]
+  captureSessions CaptureSession[]
+
+  @@index([userId, status])
+}
+
+model CaptureSession {
+  id           String   @id @default(cuid())
+  userId       String
+  assignmentId String
+  token        String   @unique
+  usedAt       DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+}
+
+model Submission {
+  id           String   @id @default(cuid())
+  userId       String
+  taskId       String
+  assignmentId String
+
+  photoKey   String
+  width      Int
+  height     Int
+  bytes      Int
+  phash      String   // 64-битный dHash в hex
+  blurScore  Float    @default(0)
+  brightness Float    @default(0)
+  exif       String?  // JSON
+
+  status     String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  reasonCode String?  // NO_MATCH | BLURRY | DUPLICATE | SCREEN_PHOTO | AI_GENERATED | EDITED | LOW_QUALITY | EXPIRED
+  aiVerdict  String?  // JSON — сырой ответ модели
+  confidence Float    @default(0)
+  score      Int      @default(0)
+  breakdown  String?  // JSON — из чего сложились очки
+  clientMeta String?  // JSON
+  latencyMs  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  // "Удалить" в очереди админа — только чистит очередь модератора, фото
+  // и запись остаются нетронутыми, чтобы игрок по-прежнему видел их в
+  // своей истории/профиле.
+  hiddenFromAdmin Boolean @default(false)
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task       Task       @relation(fields: [taskId], references: [id])
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([phash])
+  @@index([status, createdAt])
+}
+
+model Achievement {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  title       String
+  description String
+  icon        String  @default("star")
+  rule        String  // JSON-правило, см. services/achievements.js
+  points      Int     @default(0)
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // VERDICT | ACHIEVEMENT | RANK | SYSTEM
+  title     String
+  body      String
+  data      String?  // JSON
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+model FraudEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  submissionId String?
+  type         String   // DUPLICATE | STOLEN_PHOTO | SCREEN_PHOTO | AI_GENERATED | EDITED | SPEED_ANOMALY | MULTIACCOUNT
+  severity     Int      @default(10)
+  details      String?  // JSON
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  target    String?
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+// Один ряд-синглтон: глобальный выключатель игры с таймером + режим проверки фото.
+model GameSession {
+  id               String    @id @default("main")
+  active           Boolean   @default(false)
+  startedAt        DateTime?
+  endsAt           DateTime?
+  verificationMode String    @default("MANUAL_ONLY") // AI_ONLY | AI_PLUS_ADMIN | MANUAL_ONLY
+  updatedAt        DateTime  @updatedAt
+}

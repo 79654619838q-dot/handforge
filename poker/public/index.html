@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HandForge Race</title>
+    <link rel="stylesheet" href="css/style.css?v=1785238800">
+    <script src="js/auth-gate.js"></script>
+</head>
+<body>
+    <a href="/" style="position:fixed;top:10px;left:10px;z-index:9999;background:rgba(0,0,0,0.55);color:#d4af37;border:1px solid rgba(212,175,55,0.5);border-radius:6px;padding:6px 12px;font-family:sans-serif;font-size:13px;text-decoration:none;">← В меню</a>
+    <div class="lobby-container">
+        <div class="logo-section">
+            <img src="images/logo.png" alt="HandForge Race" class="logo">
+            <h1>HANDFORGE RACE</h1>
+        </div>
+
+        <div class="login-section" id="loginSection">
+            <h2>Вы вошли как</h2>
+            <input type="text" id="playerName" placeholder="Загрузка..." maxlength="15">
+
+            <div>
+                <!-- Аватар спрятан за кнопкой: при входе видна только строка
+                     "Аватарка", по нажатию раскрывается вся секция выбора
+                     (готовые аватарки, цветные кружки, загрузка своего фото).
+                     Логика раскрытия — в lobby.js (avatarToggleBtn). -->
+                <button type="button" class="avatar-toggle-btn" id="avatarToggleBtn" aria-expanded="false">
+                    <span class="avatar-toggle-preview" id="avatarTogglePreview"></span>
+                    <span class="avatar-toggle-text">Аватарка</span>
+                    <span class="avatar-toggle-arrow">&#9654;</span>
+                </button>
+
+                <div class="avatar-section" id="avatarSection" style="display:none;">
+                    <label style="display:block; font-size:12.5px; color:var(--parchment-dim); margin-bottom:8px;">
+                        Выберите аватар (необязательно — по умолчанию цветной кружок с первой буквой ника). Этот же цвет станет свечением вашего места за столом.
+                    </label>
+                    <!-- Сетка готовых аватарок. Наполняется из lobby.js списком,
+                         который сервер собирает сканированием папки
+                         public/images/avatars/ (см. scanAvatarLibrary в server.js). -->
+                    <div class="avatar-preset-grid" id="avatarPresetGrid"></div>
+                    <div class="avatar-picker" id="avatarPicker"></div>
+                    <div class="avatar-upload-row">
+                        <label for="avatarFileInput" class="btn-small avatar-upload-btn">🖼 Загрузить своё фото</label>
+                        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+                        <button type="button" id="avatarClearBtn" class="btn-small" style="display:none;">Убрать фото</button>
+                    </div>
+                </div>
+            </div>
+
+            <button id="enterBtn" class="btn-gold">Войти</button>
+        </div>
+
+        <div class="mode-section" id="modeSection" style="display:none;">
+            <h2>Выберите режим игры</h2>
+            <!-- Компактный список режимов: нажатие на строку входит в режим,
+                 нажатие на стрелку ▶ раскрывает краткое описание. Классы
+                 .mode-row / .mode-row-head / .mode-row-arrow обязательны —
+                 именно их ищет lobby.js (querySelectorAll('.mode-row')).
+                 Прежняя разметка .mode-card в lobby.js больше не
+                 обрабатывается, из-за чего выбор режима не работал вовсе. -->
+            <div class="mode-picker">
+                <div class="mode-row" data-mode="race">
+                    <button class="mode-row-head" type="button">
+                        <span class="mode-row-title">HandForge <span>Race</span></span>
+                        <span class="mode-row-arrow" role="button" tabindex="0" aria-label="Описание режима">&#9654;</span>
+                    </button>
+                    <div class="mode-row-desc">Классика клуба: карманные карты растут по улицам (2 &rarr; 3 &rarr; 4), лучшая комбинация — 2 карты руки + 3 карты стола.</div>
+                </div>
+                <div class="mode-row" data-mode="pro">
+                    <button class="mode-row-head" type="button">
+                        <span class="mode-row-title">HandForge <span>Pro</span></span>
+                        <span class="mode-row-arrow" role="button" tabindex="0" aria-label="Описание режима">&#9654;</span>
+                    </button>
+                    <div class="mode-row-desc">Своя личная колода на 52 карты. После флопа и терна вы сами выбираете карту масть+номинал. Лимиты ставок по улицам: 2 / 4 / 8 ББ.</div>
+                </div>
+                <div class="mode-row" data-mode="holdem-cash">
+                    <button class="mode-row-head" type="button">
+                        <span class="mode-row-title">HandForge <span>Cash</span></span>
+                        <span class="mode-row-arrow" role="button" tabindex="0" aria-label="Описание режима">&#9654;</span>
+                    </button>
+                    <div class="mode-row-desc">Обычный техасский холдем на деньги: 2 карманные карты, малый/большой блайнд, без лимита ставок. Блайнды фиксированы. Ведётся учёт закупов, докупок и профита по каждому столу.</div>
+                </div>
+                <div class="mode-row" data-mode="holdem-tourney">
+                    <button class="mode-row-head" type="button">
+                        <span class="mode-row-title">HandForge <span>Hold'em Tournament</span></span>
+                        <span class="mode-row-arrow" role="button" tabindex="0" aria-label="Описание режима">&#9654;</span>
+                    </button>
+                    <div class="mode-row-desc">Тот же обычный холдем, но блайнды и анте растут по расписанию — выбывает тот, у кого закончились фишки.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rooms-section" id="roomsSection" style="display: none;">
+            <div class="player-info">
+                <span>
+                    <span class="my-avatar" id="myAvatar"></span>
+                    <span id="playerDisplayName"></span>
+                </span>
+                <span class="current-mode-tag" id="currentModeTag"></span>
+                <button id="changeModeBtn" class="btn-small">Сменить режим</button>
+                <button id="logoutBtn" class="btn-small">Выйти</button>
+            </div>
+
+            <h2>Доступные столы</h2>
+            <div class="rooms-list" id="roomsList">
+                <p class="no-rooms">Нет доступных столов. Создайте первый!</p>
+            </div>
+
+            <div class="create-room">
+                <h3 style="color:var(--spark); margin-bottom:10px;">Создать стол</h3>
+                <div class="form-group">
+                    <label>Название стола:</label>
+                    <input type="text" id="roomName" placeholder="Например: Пятничный кэш" maxlength="40">
+                </div>
+                <div class="form-group">
+                    <label>Мест за столом:</label>
+                    <select id="maxPlayers">
+                        <option value="6">6 (макс. 6 игроков)</option>
+                        <option value="9">9 (макс. 9 игроков)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label id="anteFieldLabel">Анте (1 ББ):</label>
+                    <select id="ante">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                <div class="form-group" id="smallBlindGroup" style="display:none;">
+                    <label>Малый блайнд:</label>
+                    <select id="smallBlind">
+                        <option value="5">5</option>
+                        <option value="10" selected>10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="250">250</option>
+                    </select>
+                </div>
+                <div class="form-group" id="levelMinutesGroup" style="display:none;">
+                    <label>Время уровня блайндов (мин):</label>
+                    <select id="levelMinutes">
+                        <option value="5">5</option>
+                        <option value="8" selected>8</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                    </select>
+                </div>
+                <div class="form-group" id="sbRatioGroup" style="display:none;">
+                    <label>Малый блайнд (относительно большого):</label>
+                    <select id="sbRatio">
+                        <option value="0.5" selected>1/2 ББ (стандарт)</option>
+                        <option value="0.67">2/3 ББ</option>
+                        <option value="1">Равен ББ</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Стартовый стек:</label>
+                    <select id="startingStack">
+                        <option value="1000">1 000</option>
+                        <option value="2000" selected>2 000</option>
+                        <option value="3000">3 000</option>
+                        <option value="5000">5 000</option>
+                        <option value="10000">10 000</option>
+                    </select>
+                </div>
+                <button id="createRoomBtn" class="btn-gold">Создать стол</button>
+            </div>
+
+            <div class="closed-rooms-section" id="closedRoomsSection" style="display:none;">
+                <h3 style="color:var(--spark); margin-bottom:10px;">История столов</h3>
+                <p class="players-tab-hint">Закрытые кэш-столы — можно посмотреть, у кого какой был закуп и финальный стек, даже если стол уже закрылся.</p>
+                <button id="refreshHistoryBtn" class="btn-small" style="margin-bottom:10px;">Обновить список</button>
+                <div id="closedRoomsList"><p class="no-rooms">Загрузка...</p></div>
+            </div>
+        </div>
+
+        <div class="ledger-modal-overlay" id="ledgerModalOverlay" style="display:none;">
+            <div class="ledger-modal-card">
+                <button class="ledger-modal-close" id="ledgerModalClose">✕</button>
+                <h2 id="ledgerModalTitle">Итоги стола</h2>
+                <p class="ledger-modal-sub" id="ledgerModalSub"></p>
+                <div id="ledgerModalList"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/lobby.js?v=1785237999"></script>
+</body>
+</html>

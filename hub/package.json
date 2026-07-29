@@ -1,0 +1,18 @@
+{
+  "name": "handforge-hub",
+  "version": "1.0.0",
+  "description": "Единая точка входа: меню выбора между HandForge Poker и PhotoQuest",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "hub": "node server.js",
+    "hub:dev": "node --watch server.js",
+    "start": "concurrently -n QUEST,POKER,HUB -c blue,green,yellow \"cross-env PORT=4000 npm --prefix ../server start\" \"cross-env PORT=3000 npm --prefix ../poker start\" \"npm run hub\""
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6"
+  }
+}

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420">
+  <defs>
+    <linearGradient id="felt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f3d28"/>
+      <stop offset="55%" stop-color="#124a30"/>
+      <stop offset="100%" stop-color="#0a2e1e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f4d989"/>
+      <stop offset="50%" stop-color="#d4af37"/>
+      <stop offset="100%" stop-color="#8a641c"/>
+    </linearGradient>
+    <pattern id="lattice" width="26" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="26" height="26" fill="none"/>
+      <line x1="13" y1="0" x2="13" y2="26" stroke="#1a5c3c" stroke-width="1.4"/>
+      <line x1="0" y1="13" x2="26" y2="13" stroke="#1a5c3c" stroke-width="1.4"/>
+      <circle cx="13" cy="13" r="1.6" fill="#2f7350"/>
+    </pattern>
+  </defs>
+
+  <rect x="0" y="0" width="300" height="420" rx="18" fill="url(#felt)"/>
+  <rect x="0" y="0" width="300" height="420" rx="18" fill="url(#lattice)" opacity="0.55"/>
+
+  <rect x="10" y="10" width="280" height="400" rx="12" fill="none" stroke="url(#gold)" stroke-width="4"/>
+  <rect x="18" y="18" width="264" height="384" rx="8" fill="none" stroke="url(#gold)" stroke-width="1.4" opacity="0.85"/>
+
+  <g transform="translate(20 20)">
+    <path d="M0 12 Q0 0 12 0" fill="none" stroke="url(#gold)" stroke-width="2"/>
+  </g>
+  <g transform="translate(280 20) scale(-1 1)">
+    <path d="M0 12 Q0 0 12 0" fill="none" stroke="url(#gold)" stroke-width="2"/>
+  </g>
+  <g transform="translate(20 400) scale(1 -1)">
+    <path d="M0 12 Q0 0 12 0" fill="none" stroke="url(#gold)" stroke-width="2"/>
+  </g>
+  <g transform="translate(280 400) scale(-1 -1)">
+    <path d="M0 12 Q0 0 12 0" fill="none" stroke="url(#gold)" stroke-width="2"/>
+  </g>
+
+  <g transform="translate(150 210)">
+    <circle r="46" fill="#0a2e1e" stroke="url(#gold)" stroke-width="2.5"/>
+    <path transform="translate(0 -6) scale(1.7)" fill="url(#gold)"
+      d="M0 -13 C7 -5 13 0 13 7 C13 12.5 8.7 16.5 3.5 16.5 C2.2 16.5 1 16.2 0 15.7
+         C1 20 2.2 23 4.5 26 L-4.5 26 C-2.2 23 -1 20 0 15.7
+         C-1 16.2 -2.2 16.5 -3.5 16.5 C-8.7 16.5 -13 12.5 -13 7 C-13 0 -7 -5 0 -13 Z"/>
+  </g>
+</svg>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HandForge</title>
+<style>
+  :root {
+    --ink: #0a0906;
+    --slab: #16130d;
+    --line: rgba(212, 175, 55, 0.18);
+    --paper: #f3ecd9;
+    --mute: #a89d81;
+    --gold: #d4af37;
+    --gold-hi: #f4d989;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(ellipse 900px 600px at 50% -10%, rgba(212, 175, 55, 0.10), transparent 60%),
+      var(--ink);
+    color: var(--paper);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100%; padding: 24px;
+  }
+  .wrap { width: 100%; max-width: 720px; text-align: center; }
+  h1 {
+    font-family: "Archivo", system-ui, sans-serif; font-weight: 800;
+    letter-spacing: 0.14em; text-transform: uppercase; font-size: 22px;
+    margin: 0 0 8px; text-shadow: 0 0 18px rgba(212, 175, 55, 0.5);
+  }
+  h1 span { color: var(--gold); }
+  .sub { color: var(--mute); margin: 0 0 34px; font-size: 14px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    background: linear-gradient(165deg, #211c13, var(--slab) 70%);
+    border-radius: 12px; padding: 26px 18px 22px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 0 0 1px var(--line),
+      0 0 26px -8px rgba(212, 175, 55, 0.3), 0 18px 30px -20px rgba(0,0,0,0.8);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  a.card:hover, a.card:active {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset, 0 0 0 1px rgba(212,175,55,0.5),
+      0 0 34px -6px rgba(212, 175, 55, 0.5), 0 20px 34px -18px rgba(0,0,0,0.85);
+  }
+  .art {
+    width: 84px; height: 84px; margin: 0 auto 14px; border-radius: 10px;
+    overflow: hidden; background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .art img { width: 100%; height: 100%; object-fit: cover; }
+  .card b {
+    display: block; font-family: "Archivo", system-ui, sans-serif; font-weight: 800;
+    font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .card p { margin: 0; font-size: 13px; color: var(--mute); line-height: 1.4; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Hand<span>Forge</span></h1>
+    <p class="sub">Выбери, во что играем</p>
+    <div class="cards">
+      <a class="card" href="/quest/">
+        <div class="art"><img src="/logo-header.png" alt="" onerror="this.style.display='none'" /></div>
+        <b>PhotoQuest</b>
+        <p>Городская фотоохота — найди объект, сними, получи очки</p>
+      </a>
+      <a class="card" href="/poker/">
+        <div class="art"><img src="/poker/images/logo.png" alt="" onerror="this.style.display='none'" /></div>
+        <b>Poker</b>
+        <p>Онлайн-покер за одним столом с друзьями</p>
+      </a>
+    </div>
+  </div>
+</body>
+</html>
