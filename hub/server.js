@@ -31,6 +31,13 @@ app.use(
   createProxyMiddleware({ target: QUEST_API_TARGET, changeOrigin: true, pathFilter: "/api" })
 );
 
+// Аватарки профиля (свои загруженные фото) отдаёт тот же бэкенд, что и API,
+// но публично (без авторизации) — см. server/src/index.js.
+app.use(
+  "/avatars",
+  createProxyMiddleware({ target: QUEST_API_TARGET, changeOrigin: true, pathFilter: "/avatars" })
+);
+
 // Клиент Poker всегда стучится в "/socket.io/..." от корня (так устроен
 // socket.io-client) — резервируем этот путь целиком за Poker.
 app.use(
