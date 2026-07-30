@@ -12,6 +12,16 @@ export default function History() {
     api.history(page).then(setData).catch(() => {});
   }, [page]);
 
+  const remove = (id) => {
+    if (!window.confirm("Удалить эту отправку из истории? Очки не отнимутся.")) return;
+    api
+      .deleteSubmission(id)
+      .then(() =>
+        setData((d) => ({ ...d, total: d.total - 1, items: d.items.filter((s) => s.id !== id) }))
+      )
+      .catch(() => {});
+  };
+
   if (!data) return <Loader />;
   if (data.items.length === 0)
     return (
@@ -52,6 +62,19 @@ export default function History() {
             <span className="mono" style={{ color: s.status === "APPROVED" ? "var(--go)" : "var(--alarm)" }}>
               {s.status === "APPROVED" ? `+${s.score}` : "0"}
             </span>
+            <button
+              type="button"
+              className="btn ghost sm"
+              style={{ marginLeft: 10, flex: "0 0 auto" }}
+              aria-label="Удалить из истории"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                remove(s.id);
+              }}
+            >
+              ✕
+            </button>
           </Link>
         ))}
       </div>

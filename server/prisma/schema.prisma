@@ -128,6 +128,11 @@ model Submission {
   // своей истории/профиле.
   hiddenFromAdmin Boolean @default(false)
 
+  // "Удалить" из своей истории — тоже только прячет запись у самого игрока.
+  // Очки/XP уже начислены и никак не пересчитываются: удаление из истории
+  // не должно давать возможность "отменить" уже засчитанное задание.
+  hiddenFromUser  Boolean @default(false)
+
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   task       Task       @relation(fields: [taskId], references: [id])
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)

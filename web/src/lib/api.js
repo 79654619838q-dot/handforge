@@ -90,6 +90,7 @@ export const api = {
   submit: (formData) => request("/submissions", { method: "POST", formData }),
   history: (page = 1) => request(`/submissions/history?page=${page}`),
   submission: (id) => request(`/submissions/${id}`),
+  deleteSubmission: (id) => request(`/submissions/${id}`, { method: "DELETE" }),
 
   profile: () => request("/profile"),
   updateProfile: (body) => request("/profile", { method: "PATCH", body }),

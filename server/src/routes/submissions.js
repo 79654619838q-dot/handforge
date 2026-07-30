@@ -61,19 +61,30 @@ submissionsRouter.post("/", submissionLimiter, uploadPhoto, async (req, res, nex
   }
 });
 
+submissionsRouter.delete("/:id", async (req, res, next) => {
+  try {
+    const s = await prisma.submission.findFirst({ where: { id: req.params.id, userId: req.user.id } });
+    if (!s) throw notFound("Отправка не найдена");
+    await prisma.submission.update({ where: { id: s.id }, data: { hiddenFromUser: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 submissionsRouter.get("/history", async (req, res, next) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const take = 20;
     const [items, total] = await Promise.all([
       prisma.submission.findMany({
-        where: { userId: req.user.id },
+        where: { userId: req.user.id, hiddenFromUser: false },
         include: { task: { select: { title: true, category: true, difficulty: true } } },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * take,
         take,
       }),
-      prisma.submission.count({ where: { userId: req.user.id } }),
+      prisma.submission.count({ where: { userId: req.user.id, hiddenFromUser: false } }),
     ]);
 
     res.json({
