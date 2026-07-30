@@ -29,6 +29,7 @@ export const config = {
     duplicateHamming: num(process.env.DUPLICATE_HAMMING, 6),
     taskPoolMin: num(process.env.TASK_POOL_MIN, 60),
     captureTokenTtlSec: num(process.env.CAPTURE_TOKEN_TTL_SEC, 300),
+    banRiskThreshold: num(process.env.BAN_RISK_THRESHOLD, 70),
     minElapsedMs: 800,
     maxUploadBytes: 8 * 1024 * 1024,
     minUploadBytes: 30 * 1024,
