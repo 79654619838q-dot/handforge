@@ -144,7 +144,9 @@ export async function registerFraud(userId, submissionId, event) {
     where: { id: userId },
     data: { riskScore: { increment: event.severity ?? 10 } },
   });
-  if (user.riskScore >= config.rules.banRiskThreshold && !user.banned) {
+  // Админов и модераторов антифрод не банит сам — им и так доверяют
+  // разбирать чужие случаи, автобан себя самого был бы абсурден.
+  if (user.riskScore >= config.rules.banRiskThreshold && !user.banned && user.role === "PLAYER") {
     await prisma.user.update({
       where: { id: userId },
       data: { banned: true, banReason: "Автоблокировка антифрода, требуется проверка модератором" },
