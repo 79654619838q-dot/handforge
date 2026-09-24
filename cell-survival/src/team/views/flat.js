@@ -94,7 +94,7 @@ const COLORS = ['#f6dc97', '#8b5cf6', '#4ade80', '#3da9ff', '#ff6b6b', '#ffb347'
 export class CenterView extends FlatView {
   render(st) {
     this.st = st;
-    const size = Math.min(innerHeight * 0.62, innerWidth * 0.46);
+    const size = innerWidth < 760 ? Math.min(innerHeight * 0.55, innerWidth * 0.86) : Math.min(innerHeight * 0.62, innerWidth * 0.46); // на телефоне фигура почти во всю ширину
     this.el.innerHTML = `<div class="cv-card panel hit cv-canvas-card"><div class="cv-kick">${st.phase === 'act' && this.canAct(st) ? t('putPoint') : st.phase === 'reveal' ? '' : t('waitOthers')}</div>
       <canvas width="1000" height="1000" style="width:${size}px;height:${size}px" data-c></canvas>${st.phase === 'reveal' ? this.outNames(st) : ''}</div>`;
     const c = this.el.querySelector('[data-c]');
