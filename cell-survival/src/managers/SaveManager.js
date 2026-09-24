@@ -4,13 +4,14 @@ const KEY = 'cellsurvival.save.v1';
 
 const DEFAULTS = () => ({
   version: 1,
+  qualityV2: true,
   profile: null,
   settings: {
     music: 0.55,
     sfx: 0.8,
     fullscreen: false,
     renderScale: 1,
-    quality: 'high',
+    quality: 'auto', // ultra на компьютере, high на телефоне (Stage.resolveQuality)
     lang: 'ru',
     theme: 'random',
   },
@@ -30,6 +31,8 @@ export class SaveManager {
       if (!raw) return DEFAULTS();
       const parsed = JSON.parse(raw);
       const d = DEFAULTS();
+      // до 25.09 выбор был только «высокое/низкое»; «высокое» было по умолчанию — переводим на «Авто»
+      if (!parsed.qualityV2) { if (parsed.settings?.quality === 'high') parsed.settings.quality = 'auto'; parsed.qualityV2 = true; }
       return { ...d, ...parsed, settings: { ...d.settings, ...parsed.settings }, best: { ...d.best, ...parsed.best }, stats: { ...d.stats, ...parsed.stats } };
     } catch {
       return DEFAULTS();

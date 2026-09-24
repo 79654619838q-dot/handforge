@@ -22,6 +22,7 @@ export class GameWorld {
     this.players = new PlayerManager(this.scene);
     this.effects = new Effects(this.scene);
     this.bloom = THEMES[themeId].bloom;
+    this.grade = THEMES[themeId].grade; // цветокоррекция мира (Stage → grade.js)
 
     this.camBase = new THREE.Vector3(0, 12, 10);
     this.camLook = new THREE.Vector3(0, 0, 0.4);

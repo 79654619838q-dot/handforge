@@ -14,7 +14,7 @@ const DICT = {
     team: 'Командная игра', teamDesc: 'Создайте комнату или войдите в чужую. Последний выживший побеждает.', soon: 'Скоро',
     cellsCount: 'Количество клеток', startGame: 'Начать игру',
     // настройки
-    music: 'Музыка', sfx: 'Эффекты', fullscreen: 'Полный экран', resolution: 'Разрешение', quality: 'Качество', lang: 'Язык', fieldTheme: 'Тема поля',
+    music: 'Музыка', sfx: 'Эффекты', fullscreen: 'Полный экран', resolution: 'Разрешение', quality: 'Качество', qAuto: 'Авто', qUltra: 'Максимум', lang: 'Язык', fieldTheme: 'Тема поля',
     on: 'Вкл', off: 'Выкл', high: 'Высокое', low: 'Низкое', randomTheme: 'Случайная',
     // игра
     round: 'Раунд', cellsLeft: 'Осталось клеток', theme: 'Тема', chooseCell: 'Выберите клетку', confirmQ: 'Выбрать эту клетку?',
@@ -69,7 +69,7 @@ const DICT = {
     chooseMode: 'Choose mode', single: 'Single player', singleDesc: 'You against the system. Survive as many rounds as you can.',
     team: 'Team game', teamDesc: 'Create a room or join one. The last survivor wins.', soon: 'Soon',
     cellsCount: 'Number of cells', startGame: 'Start game',
-    music: 'Music', sfx: 'Effects', fullscreen: 'Fullscreen', resolution: 'Resolution', quality: 'Quality', lang: 'Language', fieldTheme: 'Field theme',
+    music: 'Music', sfx: 'Effects', fullscreen: 'Fullscreen', resolution: 'Resolution', quality: 'Quality', qAuto: 'Auto', qUltra: 'Ultra', lang: 'Language', fieldTheme: 'Field theme',
     on: 'On', off: 'Off', high: 'High', low: 'Low', randomTheme: 'Random',
     round: 'Round', cellsLeft: 'Cells left', theme: 'Theme', chooseCell: 'Choose a cell', confirmQ: 'Choose this cell?',
     confirm: 'Confirm', cancel: 'Cancel', waiting: 'The die is cast', inGame: 'Alive', out: 'Eliminated', winner: 'Winner',

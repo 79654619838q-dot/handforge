@@ -6,11 +6,11 @@ import { ASSETS } from '../paths.js';
 // Пять утверждённых тем (п.35 ТЗ). Каждая строит окружение вокруг поля
 // и отдаёт материалы клеток и цвета эффектов. Менять состав тем — только с разрешения.
 export const THEMES = {
-  desert: { name: { ru: 'Пустыня — Заброшенный город', en: 'Desert — Abandoned City' }, accent: '#ffb347', glow: '#ffcf70', fx: ['#e8c48a', '#ffb347'], bloom: 0.55 },
-  space: { name: { ru: 'Космос — Космическая станция', en: 'Space — Orbital Station' }, accent: '#3da9ff', glow: '#7cc8ff', fx: ['#9fd8ff', '#3da9ff'], bloom: 0.85 },
-  bunker: { name: { ru: 'Бункер — Секретный объект', en: 'Bunker — Secret Facility' }, accent: '#ff2a2a', glow: '#ff5a3a', fx: ['#9a9590', '#ff6a2a'], bloom: 0.8 },
-  jungle: { name: { ru: 'Джунгли — Затерянный храм', en: 'Jungle — Lost Temple' }, accent: '#e8b54a', glow: '#ffd27a', fx: ['#7d8a5f', '#ffb347'], bloom: 0.6 },
-  iceberg: { name: { ru: 'Айсберг — Ледяная база', en: 'Iceberg — Ice Base' }, accent: '#5fe1ff', glow: '#a8f0ff', fx: ['#e9f8ff', '#7fe8ff'], bloom: 0.75 },
+  desert: { name: { ru: 'Пустыня — Заброшенный город', en: 'Desert — Abandoned City' }, accent: '#ffb347', glow: '#ffcf70', fx: ['#e8c48a', '#ffb347'], bloom: 0.55, grade: { lift: [0.03, 0.012, 0], gain: [1.06, 1.0, 0.9], sat: 1.1, contrast: 1.08, vignette: 0.45 } },
+  space: { name: { ru: 'Космос — Космическая станция', en: 'Space — Orbital Station' }, accent: '#3da9ff', glow: '#7cc8ff', fx: ['#9fd8ff', '#3da9ff'], bloom: 0.85, grade: { lift: [0, 0.01, 0.035], gain: [0.95, 1.0, 1.08], sat: 1.08, contrast: 1.1, vignette: 0.5 } },
+  bunker: { name: { ru: 'Бункер — Секретный объект', en: 'Bunker — Secret Facility' }, accent: '#ff2a2a', glow: '#ff5a3a', fx: ['#9a9590', '#ff6a2a'], bloom: 0.8, grade: { lift: [0.03, 0, 0], gain: [1.05, 0.96, 0.92], sat: 1.05, contrast: 1.12, vignette: 0.55 } },
+  jungle: { name: { ru: 'Джунгли — Затерянный храм', en: 'Jungle — Lost Temple' }, accent: '#e8b54a', glow: '#ffd27a', fx: ['#7d8a5f', '#ffb347'], bloom: 0.6, grade: { lift: [0.005, 0.02, 0.005], gain: [1.02, 1.04, 0.94], sat: 1.12, contrast: 1.07, vignette: 0.45 } },
+  iceberg: { name: { ru: 'Айсберг — Ледяная база', en: 'Iceberg — Ice Base' }, accent: '#5fe1ff', glow: '#a8f0ff', fx: ['#e9f8ff', '#7fe8ff'], bloom: 0.75, grade: { lift: [0, 0.015, 0.035], gain: [0.94, 1.0, 1.08], sat: 1.04, contrast: 1.08, vignette: 0.42 } },
 };
 export const THEME_IDS = Object.keys(THEMES);
 

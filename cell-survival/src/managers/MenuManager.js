@@ -61,7 +61,7 @@ export class MenuManager {
         <div class="row"><span class="label">${t('sfx')}</span><input type="range" min="0" max="1" step="0.05" value="${st.sfx}" data-r="sfx"></div>
         <div class="row"><span class="label">${t('fullscreen')}</span>${chips('fullscreen', [[true, t('on')], [false, t('off')]])}</div>
         <div class="row"><span class="label">${t('resolution')}</span>${chips('renderScale', [[1, '100%'], [0.75, '75%'], [0.5, '50%']])}</div>
-        <div class="row"><span class="label">${t('quality')}</span>${chips('quality', [['high', t('high')], ['low', t('low')]])}</div>
+        <div class="row"><span class="label">${t('quality')}</span>${chips('quality', [['auto', t('qAuto')], ['ultra', t('qUltra')], ['high', t('high')], ['low', t('low')]])}</div>
         <div class="row"><span class="label">${t('lang')}</span>${chips('lang', [['ru', 'Русский'], ['en', 'English']])}</div>
         <div class="row" style="flex-wrap:wrap"><span class="label">${t('fieldTheme')}</span>${chips('theme', [['random', t('randomTheme')], ...THEME_IDS.map((id) => [id, THEMES[id].name[getLang()].split(' — ')[0]])])}</div>
       </div>`;
