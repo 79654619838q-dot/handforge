@@ -148,7 +148,8 @@ export class ProfileWorld {
 
   // Аватар в левой части экрана — справа панель редактора.
   onResize() {
-    const narrow = innerWidth < 900;
+    // телефон вертикально — редактор снизу, аватар по центру; сбоку и на компьютере — аватар слева от редактора
+    const narrow = innerWidth < 760 || innerWidth < innerHeight;
     this.camera.position.set(0, 1.1, 3.9);
     this.camera.lookAt(0, 0.95, 0);
     this.camera.setViewOffset(innerWidth, innerHeight, narrow ? 0 : innerWidth * 0.22, 0, innerWidth, innerHeight);

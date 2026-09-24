@@ -75,6 +75,9 @@ export class Cinematic {
   // Камера плавно подъезжает к точке и смотрит на неё
   async focus(target, dist = 2.4, height = 1.25, dur = 0.8) {
     const w = this.world;
+    // вертикальный экран телефона: по ширине видно меньше — отъезжаем, чтобы фигура влезла целиком
+    const aspect = innerWidth / innerHeight;
+    if (aspect < 1) { dist /= Math.max(0.45, aspect * 1.25); height *= 1.05; }
     const from = w.camera.position.clone();
     const to = target.clone().add(new THREE.Vector3(0.3 * dist, height, dist));
     const look0 = w.camLook.clone(), look1 = target.clone().add(new THREE.Vector3(0, 0.98, 0));
