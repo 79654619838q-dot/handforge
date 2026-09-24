@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { GradeShader, GRADE_DEFAULT } from './grade.js';
@@ -18,6 +19,7 @@ import { updateAvatars } from '../managers/AvatarManager.js';
 export class Stage {
   constructor(container, settings) {
     this.container = container;
+    Stage.current = this; // сцены выбывания включают размытие фона через Stage.current.setDof
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -98,6 +100,13 @@ export class Stage {
       this.aoPass.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.6, thickness: 1.2, scale: 1, samples: 12 });
       this.composer.addPass(this.aoPass);
     }
+    this.dofPass = null;
+    if (q === 'ultra') {
+      // «кино»: в сцене выбывания фон за игроком размывается (включает Cinematic.focus)
+      this.dofPass = new BokehPass(scene, camera, { focus: 4, aperture: 0.004, maxblur: 0.009 });
+      this.dofPass.enabled = false;
+      this.composer.addPass(this.dofPass);
+    }
     if (q !== 'low') {
       this.bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), bloom, 0.55, 0.95);
       this.composer.addPass(this.bloomPass);
@@ -114,6 +123,13 @@ export class Stage {
       this.composer.addPass(this.aaPass);
     }
     this.resize();
+  }
+
+  // Размытие фона: focus — расстояние от камеры до игрока; null — выключить.
+  setDof(focus) {
+    if (!this.dofPass) return;
+    this.dofPass.enabled = focus != null;
+    if (focus != null) this.dofPass.uniforms.focus.value = focus;
   }
 
   resize() {

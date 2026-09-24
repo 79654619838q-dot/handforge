@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Stage } from './Stage.js';
 import { buildAvatar, ensurePerson } from '../managers/AvatarManager.js';
 import { tween, wait, ease } from './tween.js';
 import { softDot } from './textures.js';
@@ -86,9 +87,10 @@ export class Cinematic {
       w.camera.position.lerpVectors(from, to, k);
       w.camera.lookAt(new THREE.Vector3().lerpVectors(look0, look1, k));
     }, ease.inOutCubic);
+    Stage.current?.setDof(to.distanceTo(look1)); // фон за игроком уходит в размытие, как у кинокамеры
   }
 
-  release() { this.world.cineCam = false; this.darken(false); }
+  release() { this.world.cineCam = false; this.darken(false); Stage.current?.setDof(null); }
 
   // Выбывшие в центре сцены на тёмных постаментах
   async stage(players) {
