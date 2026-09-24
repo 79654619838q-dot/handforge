@@ -31,12 +31,12 @@ for (const cid of CHALLENGE_IDS) {
       const m = run(bots(n), [cid], { cells: 16 });
       assert.equal(m.phase, 'final', `${cid} n=${n}: матч не дошёл до конца`);
       const h = m.history[0];
-      const maxWin = cid === 'unique' ? 2 : 1;
+      const maxWin = cid === 'unique' ? 2 : cid === 'cards' ? n : 1; // «Очко» ограничено 12 раундами
       assert.ok(h.winners.length >= 1 && h.winners.length <= maxWin, `${cid} n=${n}: победителей ${h.winners.length}`);
       assert.equal(h.winners.length + h.order.length, n, `${cid} n=${n}: кто-то потерялся`);
       const ids = new Set([...h.winners, ...h.order.map((o) => o.id)]);
       assert.equal(ids.size, n, `${cid}: игрок посчитан дважды`);
-      if (['doors', 'time', 'memory', 'center'].includes(cid)) {
+      if (['doors', 'time', 'memory', 'center', 'bomb', 'roulette', 'cards'].includes(cid)) {
         const perRound = {};
         for (const o of h.order) perRound[o.round] = (perRound[o.round] || 0) + 1;
         assert.ok(Object.values(perRound).every((c) => c === 1), `${cid}: за раунд выбыл не один`);
@@ -51,7 +51,7 @@ for (const cid of CHALLENGE_IDS) {
 // Цепочка из всех испытаний
 for (let rep = 0; rep < 30; rep++) {
   const m = run(bots(6), CHALLENGE_IDS, { cells: 25 });
-  assert.equal(m.history.length, 7);
+  assert.equal(m.history.length, CHALLENGE_IDS.length);
   assert.equal(m.phase, 'final');
   checks++;
 }
@@ -83,6 +83,18 @@ assert.equal(m.phase, 'final');
   assert.equal(sb.mine, null);
   assert.deepEqual(sb.visible, {});
   assert.deepEqual(m2.getStateFor('a').mine, { stand: 3, bomb: 5 });
+  checks++;
+}
+
+// Фитиль бомбы и чужие позиции в «Стрельбе вслепую» не видны игрокам
+for (const cid of ['bomb', 'shoot']) {
+  let now = 0; const q = [];
+  const m3 = new Match({ players: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], chain: [cid], now: () => now, setTimer: (fn, ms) => { const t = { at: now + ms, fn }; q.push(t); return t; }, clearTimer: (t) => { const i = q.indexOf(t); if (i >= 0) q.splice(i, 1); } });
+  m3.start(); q.sort((x, y) => x.at - y.at); const t = q.shift(); now = t.at; t.fn();
+  const sa = m3.getStateFor('a');
+  assert.equal(sa.phase, 'act');
+  if (cid === 'bomb') assert.equal(sa.deadline, null, 'фитиль бомбы виден');
+  if (cid === 'shoot') { assert.ok(sa.priv?.pos, 'своя позиция не пришла'); assert.ok(!JSON.stringify(sa).includes(JSON.stringify(m3.ch.pos.b)), 'чужая позиция утекла'); }
   checks++;
 }
 

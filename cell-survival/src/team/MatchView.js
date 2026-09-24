@@ -5,7 +5,7 @@ import { renderPortrait, ensurePerson } from '../managers/AvatarManager.js';
 import { THEME_IDS } from '../scene/themes.js';
 import { VIEWS } from './views/index.js';
 
-const RULE = { lastcell: 'ruleLastcell', doors: 'ruleDoors', time: 'ruleTime', mines: 'ruleMines', memory: 'ruleMemory', center: 'ruleCenter', unique: 'ruleUnique' };
+const RULE = { lastcell: 'ruleLastcell', doors: 'ruleDoors', time: 'ruleTime', mines: 'ruleMines', memory: 'ruleMemory', center: 'ruleCenter', unique: 'ruleUnique', shoot: 'ruleShoot', bomb: 'ruleBomb', cards: 'ruleCards', roulette: 'ruleRoulette' };
 export const cname = (cid) => CHALLENGE_META[cid]?.[getLang()] || cid;
 
 // Портреты игроков для списков: рендер по одному, с кэшем (реалистичные модели тяжёлые).
@@ -94,7 +94,8 @@ export class MatchView {
     if (st.phase === 'intro') { a.confirm(); this.overlayIntro(st); }
     else this.clearOverlay('intro');
     // в «Останови время» верхний таймер выдаёт прошедшее время — там его нет совсем
-    this.timerOn(st.cid !== 'time' && (st.phase === 'act' || st.phase === 'show'));
+    // таймер сверху скрыт там, где он выдаёт тайну (время, фитиль бомбы) или не нужен (рулетка по очереди)
+    this.timerOn(!['time', 'bomb', 'roulette'].includes(st.cid) && (st.phase === 'act' || st.phase === 'show'));
     if (st.phase === 'reveal' && st.reveal) {
       const out = st.reveal.eliminated || [];
       // «Вы выбыли» — когда вид доиграет анимацию выбывания (showOut); таймер — страховка
@@ -150,7 +151,7 @@ export class MatchView {
       el.textContent = sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : `00:${String(sec).padStart(2, '0')}`;
       this.q('[data-arc]').setAttribute('stroke-dashoffset', String(this.C * (1 - Math.min(1, left / total))));
       tm.classList.toggle('crit', st.phase === 'act' && sec <= 5);
-      if (st.phase === 'act' && st.cid !== 'time' && sec !== this.lastSec && sec <= 5 && sec > 0 && st.alive?.includes(this.myId) && !st.done?.includes(this.myId)) this.game.audio.tickUrgent(sec);
+      if (st.phase === 'act' && !['time', 'bomb', 'roulette'].includes(st.cid) && sec !== this.lastSec && sec <= 5 && sec > 0 && st.alive?.includes(this.myId) && !st.done?.includes(this.myId)) this.game.audio.tickUrgent(sec);
       this.lastSec = sec;
     } else { el.textContent = '—'; tm.classList.remove('crit'); }
     this.view?.frame?.(this.now());

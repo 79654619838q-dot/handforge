@@ -2,7 +2,7 @@
 // в браузере с ботами (src/net/LocalSession.js). Ни DOM, ни three.js — только правила и таймеры.
 // Правила — docs/CHALLENGES.md.
 
-export const CHALLENGE_IDS = ['lastcell', 'doors', 'time', 'mines', 'memory', 'center', 'unique'];
+export const CHALLENGE_IDS = ['lastcell', 'doors', 'time', 'mines', 'memory', 'center', 'unique', 'shoot', 'bomb', 'cards', 'roulette'];
 
 export const CHALLENGE_META = {
   lastcell: { ru: 'Последняя клетка', en: 'Last Cell', skill: { ru: 'позиция', en: 'position' } },
@@ -12,6 +12,10 @@ export const CHALLENGE_META = {
   memory: { ru: 'Запомни число', en: 'Memorize', skill: { ru: 'память', en: 'memory' } },
   center: { ru: 'Центр', en: 'Center', skill: { ru: 'точность', en: 'precision' } },
   unique: { ru: 'Уникальное число', en: 'Unique Number', skill: { ru: 'психология', en: 'psychology' } },
+  shoot: { ru: 'Стрельба вслепую', en: 'Blind Shot', skill: { ru: 'скрытая атака', en: 'hidden attack' } },
+  bomb: { ru: 'Бомба', en: 'Bomb', skill: { ru: 'нервы', en: 'nerve' } },
+  cards: { ru: 'Очко', en: 'Twenty-One', skill: { ru: 'расчёт', en: 'calculation' } },
+  roulette: { ru: 'Русская рулетка', en: 'Roulette', skill: { ru: 'удача', en: 'luck' } },
 };
 
 const INTRO_MS = 3500;
@@ -298,7 +302,176 @@ class Unique extends Base {
   revealMs() { return 9500; }
 }
 
-const CLASSES = { lastcell: LastCell, doors: Doors, time: StopTime, mines: Mines, memory: Memory, center: Center, unique: Unique };
+
+// ---------- Испытания в реальном времени ----------
+// realtime: ход не «закрывает» игрока (complete() всегда false), раунд кончается по фитилю или по endNow.
+// botPlan() — какие ходы ботов запланировать сейчас: [{ id, ms, move }].
+
+// 8. Стрельба вслепую: зона — круг радиуса 1, позиции видит только их хозяин.
+class Shoot extends Base {
+  begin() {
+    this.zone = Math.max(0.35, Math.pow(0.8, this.round)); // после каждого раунда зона сужается
+    this.beam = 0.07 + 0.03 * this.round;                   // а луч становится шире
+    this.pos = {};
+    for (const p of this.alive) {
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * this.zone * 0.92;
+      this.pos[p] = [Math.cos(a) * r, Math.sin(a) * r];
+    }
+    return super.begin();
+  }
+  data() { return { zone: this.zone, beam: this.beam }; }
+  privateData(pid) { return this.pos?.[pid] ? { pos: this.pos[pid] } : null; }
+  actMs() { return 10000; }
+  act(pid, a) { const ang = Number(a?.angle); if (!Number.isFinite(ang)) return false; return this.record(pid, ang); }
+  autofill() { for (const p of this.alive) if (!(p in this.moves)) { this.moves[p] = Math.random() * Math.PI * 2; this.movedAt[p] = this.m.now(); } }
+  resolve() {
+    const hits = {};
+    for (const s1 of this.alive) {
+      const [x0, y0] = this.pos[s1], dx = Math.cos(this.moves[s1]), dy = Math.sin(this.moves[s1]);
+      for (const t of this.alive) {
+        if (t === s1) continue;
+        const [x, y] = this.pos[t];
+        const along = (x - x0) * dx + (y - y0) * dy;
+        const perp = Math.abs((x - x0) * dy - (y - y0) * dx);
+        if (along > 0 && perp < this.beam) (hits[t] ||= []).push(s1);
+      }
+    }
+    let eliminated = Object.keys(hits);
+    const replay = eliminated.length === this.alive.length;
+    if (replay) eliminated = [];
+    return { eliminated, replay, reveal: { pos: { ...this.pos }, angles: { ...this.moves }, hits, zone: this.zone, beam: this.beam } };
+  }
+  revealMs() { return 10500; }
+}
+
+// 9. Бомба: у кого бомба в момент взрыва — выбывает. Фитиль 4–25 с, никто его не видит.
+class Bomb extends Base {
+  realtime = true;
+  hideDeadline = true;
+  begin() {
+    this.fuse = 4000 + rnd(21001);
+    this.holder = pick(this.alive);
+    this.since = this.m.now();
+    this.passes = 0;
+    return super.begin();
+  }
+  data() { return {}; }
+  actMs() { return this.fuse; }
+  complete() { return false; }
+  act(pid, a) {
+    const to = a?.to;
+    if (pid !== this.holder || to === pid || !this.alive.includes(to)) return false;
+    if (this.m.now() - this.since < 1000) return false; // минимум секунду держать
+    this.holder = to; this.since = this.m.now(); this.passes += 1;
+    return true;
+  }
+  visibleMoves() { return { holder: this.holder, since: this.since, passes: this.passes }; }
+  botPlan() {
+    const p = this.m.player(this.holder);
+    if (!p?.isBot) return [];
+    return [{ id: this.holder, ms: 1100 + rnd(2600), move: () => ({ to: pick(this.alive.filter((x) => x !== this.holder)) }) }];
+  }
+  resolve() { return { eliminated: [this.holder], replay: false, reveal: { holder: this.holder, passes: this.passes } }; }
+  revealMs() { return 8000; }
+}
+
+// 10. Очко (как блэкджек): 2 карты, «ещё»/«хватит», туз 1 или 11, картинки по 10, дилер добирает до 17.
+const SUITS = ['♠', '♥', '♦', '♣'];
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+export function handValue(cards) {
+  let v = 0, aces = 0;
+  for (const c of cards) { const r = c.slice(0, -1); if (r === 'A') { aces++; v += 11; } else v += ['J', 'Q', 'K'].includes(r) ? 10 : Number(r); }
+  while (v > 21 && aces) { v -= 10; aces--; }
+  return v;
+}
+class Cards extends Base {
+  begin() {
+    this.deck = shuffle(SUITS.flatMap((s) => RANKS.map((r) => r + s)).concat(SUITS.flatMap((s) => RANKS.map((r) => r + s))));
+    this.hands = {};
+    for (const p of this.alive) this.hands[p] = [this.deck.pop(), this.deck.pop()];
+    this.dealer = [this.deck.pop(), this.deck.pop()];
+    this.stood = {};
+    return super.begin();
+  }
+  data() { return { up: this.dealer[0] }; }
+  actMs() { return 30000; }
+  complete(pid) { return !!this.stood?.[pid]; } // до раздачи stood ещё нет
+  act(pid, a) {
+    if (this.stood[pid]) return false;
+    if (a?.hit) {
+      this.hands[pid].push(this.deck.pop());
+      if (handValue(this.hands[pid]) >= 21) { this.stood[pid] = true; this.movedAt[pid] = this.m.now(); }
+      return true;
+    }
+    if (a?.stand) { this.stood[pid] = true; this.movedAt[pid] = this.m.now(); return true; }
+    return false;
+  }
+  visibleMoves() { return { hands: this.hands, stood: this.stood }; }
+  autofill() { for (const p of this.alive) this.stood[p] = true; }
+  resolve() {
+    while (handValue(this.dealer) < 17) this.dealer.push(this.deck.pop());
+    const d = handValue(this.dealer);
+    const dBust = d > 21;
+    const res = {};
+    const losers = [];
+    for (const p of this.alive) {
+      const v = handValue(this.hands[p]);
+      const lost = v > 21 || (!dBust && v < d);
+      res[p] = { cards: this.hands[p], value: v, lost };
+      if (lost) losers.push(p);
+    }
+    // выбывает один — худший из проигравших дилеру: перебор хуже всего, дальше — кто дальше от 21
+    let eliminated = [];
+    if (losers.length) {
+      const bad = (p) => (res[p].value > 21 ? 100 + res[p].value : 21 - res[p].value);
+      let w = losers[0];
+      for (const p of losers) if (bad(p) > bad(w) || (bad(p) === bad(w) && (this.movedAt[p] ?? 0) > (this.movedAt[w] ?? 0))) w = p;
+      eliminated = [w];
+    }
+    return { eliminated, replay: false, reveal: { dealer: this.dealer, dealerValue: d, results: res } };
+  }
+  over() { return this.alive.length <= 1 || this.round >= 12; }
+  revealMs() { return 9000; }
+}
+
+// 11. Русская рулетка: барабан на 6, в раунде N — N патронов (максимум 5). Ходят по кругу, каждый крутит и жмёт.
+class Roulette extends Base {
+  realtime = true;
+  begin() {
+    this.bullets = Math.min(5, this.round + 1); // round ещё не увеличен
+    this.order = shuffle(this.alive);
+    this.turn = 0;
+    this.pulls = [];
+    this.endNow = false;
+    this.turnAt = this.m.now();
+    return super.begin();
+  }
+  data() { return { bullets: this.bullets, chambers: 6, order: this.order }; }
+  actMs() { return 180000; }
+  complete() { return false; }
+  get current() { return this.order[this.turn % this.order.length]; }
+  act(pid, a) {
+    if (this.endNow || pid !== this.current || !a?.pull) return false;
+    const chamber = rnd(6);
+    const hit = chamber < this.bullets;
+    this.pulls.push({ pid, hit, chamber });
+    this.movedAt[pid] = this.m.now();
+    if (hit) { this.loser = pid; this.endNow = true; } else { this.turn += 1; this.turnAt = this.m.now(); }
+    return true;
+  }
+  turnTimeoutMs() { return 12000; } // не нажал за 12 с — жмёт автоматически
+  onTimeout() { if (!this.endNow) this.act(this.current, { pull: true }); }
+  visibleMoves() { return { turn: this.current, turnAt: this.turnAt, pulls: this.pulls, bullets: this.bullets }; }
+  botPlan() {
+    const p = this.m.player(this.current);
+    if (this.endNow || !p?.isBot) return [];
+    return [{ id: this.current, ms: 1600 + rnd(1600), move: () => ({ pull: true }) }];
+  }
+  resolve() { return { eliminated: this.loser ? [this.loser] : [], replay: false, reveal: { loser: this.loser, pulls: this.pulls, bullets: this.bullets } }; }
+  revealMs() { return 8000; }
+}
+
+const CLASSES = { lastcell: LastCell, doors: Doors, time: StopTime, mines: Mines, memory: Memory, center: Center, unique: Unique, shoot: Shoot, bomb: Bomb, cards: Cards, roulette: Roulette };
 
 // ---------------- Боты ----------------
 const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); };
@@ -317,6 +490,8 @@ function botMove(ch, id, cid) {
     }
     case 'center': { const [cx, cy] = ch.shape.center; const e = 12 + Math.abs(gauss()) * 28; const a = Math.random() * Math.PI * 2; return { x: cx + Math.cos(a) * e, y: cy + Math.sin(a) * e }; }
     case 'unique': return { n: 1 + rnd(ch.alive.length) };
+    case 'shoot': { const [x, y] = ch.pos[id]; const toC = Math.atan2(-y, -x); return { angle: toC + gauss() * 0.9 }; }
+    case 'cards': return handValue(ch.hands[id]) < 17 ? { hit: true } : { stand: true };
     default: return null;
   }
 }
@@ -396,6 +571,7 @@ export class Match {
     this.actStartedAt = this.now();
     this.deadline = this.now() + ch.actMs();
     this.later(ch.actMs(), () => this.closeActions());
+    if (ch.realtime) { this.afterRealtime(); this.changed(); return; }
     for (const id of ch.alive) {
       const p = this.player(id);
       if (!p?.isBot) continue;
@@ -413,8 +589,32 @@ export class Match {
   act(pid, a) {
     if (this.phase !== 'act' || !this.ch.alive.includes(pid) || this.ch.complete(pid)) return false;
     const ok = this.ch.act(pid, a);
-    if (ok) { this.changed(); this.checkAllDone(); }
+    if (ok) { this.changed(); if (this.ch.realtime) this.afterRealtime(); else this.checkAllDone(); }
+    // «Очко»: бот добирает, пока не встанет — каждое «ещё» планирует следующий ход
+    if (ok && this.cid === 'cards' && this.player(pid)?.isBot && !this.ch.complete(pid)) this.botRetry(pid);
     return ok;
+  }
+
+  botRetry(id) {
+    this.later(700 + rnd(900), () => {
+      if (this.phase !== 'act' || this.ch.complete(id)) return;
+      const mv = botMove(this.ch, id, this.cid);
+      if (mv) this.act(id, mv);
+    });
+  }
+
+  // После каждого хода в реальном времени: досрочный конец, таймаут хода, ходы ботов.
+  afterRealtime() {
+    const ch = this.ch;
+    if (ch.endNow) { this.stopTimers(); this.later(900, () => this.closeActions()); return; }
+    if (this.turnTimer) this.clearTimer(this.turnTimer), this.timers.delete(this.turnTimer);
+    if (ch.turnTimeoutMs) this.turnTimer = this.later(ch.turnTimeoutMs(), () => { ch.onTimeout(); this.changed(); this.afterRealtime(); });
+    for (const b of ch.botPlan?.() || []) {
+      this.later(b.ms, () => {
+        if (this.phase !== 'act') return;
+        this.act(b.id, b.move());
+      });
+    }
   }
 
   checkAllDone() {
@@ -479,7 +679,7 @@ export class Match {
     const s = {
       now: this.now(),
       phase: this.phase,
-      deadline: this.deadline,
+      deadline: ch?.hideDeadline && this.phase === 'act' ? null : this.deadline, // фитиль бомбы не выдаём
       chain: this.chain,
       index: this.index,
       cid: this.cid || null,
@@ -496,6 +696,7 @@ export class Match {
       s.done = ch.alive.filter((p) => ch.complete(p));
       s.visible = this.phase === 'act' ? ch.visibleMoves() : {};
       s.mine = ch.moves[pid] ?? null;
+      s.priv = this.phase !== 'intro' ? ch.privateData?.(pid) ?? null : null;
       s.reveal = this.phase === 'reveal' || this.phase === 'end' ? this.lastReveal : null;
       s.eliminatedOrder = this.eliminatedOrder;
       if (this.phase === 'end') s.winners = this.history[this.history.length - 1].winners;

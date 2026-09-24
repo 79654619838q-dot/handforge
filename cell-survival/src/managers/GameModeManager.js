@@ -57,7 +57,7 @@ export class GameModeManager {
   challengesScreen() {
     const s = h('div', 'screen vignette');
     s.id = 'challenges';
-    const RULE = { lastcell: 'ruleLastcell', doors: 'ruleDoorsSolo', time: 'ruleTime', mines: 'ruleMines', memory: 'ruleMemory', center: 'ruleCenter', unique: 'ruleUnique' };
+    const RULE = { lastcell: 'ruleLastcell', doors: 'ruleDoorsSolo', time: 'ruleTime', mines: 'ruleMines', memory: 'ruleMemory', center: 'ruleCenter', unique: 'ruleUnique', shoot: 'ruleShoot', bomb: 'ruleBomb', cards: 'ruleCards', roulette: 'ruleRoulette' };
     s.innerHTML = `
       <div class="topbar"><h1 class="title">${t('chooseChallenge')}</h1><div class="spacer"></div><button class="btn ghost" data-back>${t('back')}</button></div>
       <div class="ch-grid">${CHALLENGE_IDS.map((c, i) => `<div class="ch-card" data-c="${c}" style="background-image:url(${ASSETS}challenges/${c}.jpg)">

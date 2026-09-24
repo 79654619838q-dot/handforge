@@ -77,6 +77,7 @@ export class GameWorld {
     this.effects.update(dt);
     this.beam.intensity += ((this.beamTarget || 0) - this.beam.intensity) * Math.min(1, dt * 6);
 
+    if (this.cineCam) return; // камерой управляет кино-сцена выбывания (scene/cinematics.js)
     if (this.orbit) {
       const o = this.orbit;
       o.t += dt;

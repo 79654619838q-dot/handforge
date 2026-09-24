@@ -9,6 +9,7 @@ import { EliminationManager } from '../../managers/EliminationManager.js';
 import { ensurePerson, buildAvatar } from '../../managers/AvatarManager.js';
 import { tween, wait, ease } from '../../scene/tween.js';
 import { BaseView, Picker, confirmBox, labelSprite } from './common.js';
+import { Cinematic } from '../../scene/cinematics.js';
 
 const OTHER = new THREE.Color('#a78bfa');
 
@@ -32,6 +33,12 @@ class FieldView extends BaseView {
     });
   }
   pickable() { return true; }
+  async closeUp(pos, dist = 2.6) {
+    this.cine = new Cinematic(this.world, this.audio, this.mv.el);
+    this.cine.darken(true);
+    await this.cine.focus(pos, dist, 1.4, 0.7);
+  }
+  closeUpEnd() { this.cine?.release(); this.cine = null; }
   player(st, id) {
     if (!this.pl.has(id)) {
       const info = st.players.find((p) => p.id === id);
@@ -63,7 +70,7 @@ class FieldView extends BaseView {
     })();
     return p.movePromise;
   }
-  leave() { super.leave(); document.body.style.cursor = ''; }
+  leave() { super.leave(); this.cine?.release(); document.body.style.cursor = ''; }
 }
 
 // ---------- 1. Последняя клетка ----------
@@ -117,7 +124,9 @@ export class LastCellView extends FieldView {
     if (!target?.alive) return;
     await this.elim.roulette(this.grid.alive, target);
     const victims = [...this.pl.values()].filter((p) => p.cell === target && p.state === PLAYER.ALIVE);
+    if (victims.length) await this.closeUp(target.group.getWorldPosition(new THREE.Vector3()), 2.2);
     await this.elim.destroy(target, victims);
+    if (victims.length) { await wait(0.4); this.closeUpEnd(); }
     this.mv.showOut();
     await Promise.all([this.grid.relayout(), this.world.fitCamera(this.grid.extent)]);
   }
@@ -196,6 +205,8 @@ export class MinesView extends FieldView {
     this.markers.clear();
     this.hint('');
     const bombs = r.bombs.map((id) => this.grid.cells[id]).filter(Boolean);
+    const hitCell = !r.replay && Object.values(r.moves).map((m) => m.stand).find((sid) => r.bombs.includes(sid));
+    if (hitCell != null) await this.closeUp(this.grid.cells[hitCell].group.getWorldPosition(new THREE.Vector3()), 3);
     await tween(1.1, (k) => bombs.forEach((c) => { c.danger = k; c.shake = k * 0.6; }), ease.inCubic);
     this.audio.destroy();
     this.world.shake(0.4);
@@ -227,7 +238,7 @@ export class MinesView extends FieldView {
         tween(1.4, (k) => { a.position.y = pos.y - k * k * 7; }, ease.linear).then(() => a.removeFromParent());
       }
     }
-    setTimeout(() => this.mv.showOut(), 1500);
+    setTimeout(() => { this.closeUpEnd(); this.mv.showOut(); }, 1700);
   }
 }
 
@@ -370,6 +381,10 @@ export class DoorsView extends BaseView {
   // Монстр за смертельной дверью: из темноты загораются глаза, щупальца хватают игрока,
   // утаскивают внутрь, дверь захлопывается.
   async monster(d, light) {
+    const cine = new Cinematic(this.world, this.audio, this.mv.el);
+    cine.darken(true);
+    await cine.focus(d.g.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0, 0.8)), 2.6, 1.3, 0.6);
+    this.doorCine = cine;
     const g = new THREE.Group();
     g.position.set(0, 0, -0.35);
     d.g.add(g);
@@ -434,6 +449,8 @@ export class DoorsView extends BaseView {
     const p = d.g.getWorldPosition(new THREE.Vector3()); p.y += 0.2; p.z += 0.3;
     this.world.effects.burst(p, new THREE.Color('#2a2a2a'), 120, 2.5, 0.35, false, -1, 1.8);
     d.dead = true;
+    await wait(0.5);
+    this.doorCine?.release();
     this.mv.showOut();
   }
 }
