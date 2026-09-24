@@ -14,7 +14,7 @@ const rooms = new Map();
 const cleanStr = (s, n) => String(s ?? "").replace(/[<>]/g, "").trim().slice(0, n);
 
 // Профиль аватара приходит от клиента — берём только известные поля и короткие строки.
-const PROFILE_KEYS = ["gender", "person", "eyewear", "watch", "chain", "headwear", "background", "faceShape", "skin", "hair", "hairColor", "eyes", "brows", "beard", "mustache", "top", "topColor", "pantsColor"];
+const PROFILE_KEYS = ["gender", "person", "eyewear", "watch", "chain", "headwear", "background", "mask", "headphones", "scarf", "earrings", "backpack", "outfit", "hairTint", "skinTone", "faceShape", "skin", "hair", "hairColor", "eyes", "brows", "beard", "mustache", "top", "topColor", "pantsColor"];
 function cleanProfile(p) {
   const out = {};
   if (p && typeof p === "object") for (const k of PROFILE_KEYS) if (typeof p[k] === "string") out[k] = cleanStr(p[k], 40);

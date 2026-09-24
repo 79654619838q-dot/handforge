@@ -122,6 +122,98 @@ function relaxPose(root) {
   }
 }
 
+// Перекраска прямо в шейдере: кожа находится по цвету (пространство YCbCr), одежда — всё, что не кожа.
+// Тон кожи меняется только на коже; одежда — только вне кожи; волосы — на материале волос.
+const TINT_GLSL = `
+#ifdef USE_MAP
+  vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+  vec3 cc = sampledDiffuseColor.rgb;
+  vec3 sg = pow( max( cc, vec3( 0.0 ) ), vec3( 0.4545 ) );
+  float yy = dot( sg, vec3( 0.299, 0.587, 0.114 ) );
+  float cb = 0.5 - 0.168736 * sg.r - 0.331264 * sg.g + 0.5 * sg.b;
+  float cr = 0.5 + 0.5 * sg.r - 0.418688 * sg.g - 0.081312 * sg.b;
+  // кожа — пиксели, близкие к цвету лица этой модели (uSkinRef = яркость, Cb, Cr), а не «всё коричневое»
+  float ratio = yy / max( uSkinRef.x, 0.05 );
+  float skin = ( 1.0 - smoothstep( 0.03, 0.06, length( vec2( cb, cr ) - uSkinRef.yz ) ) ) * smoothstep( 0.45, 0.62, ratio ) * ( 1.0 - smoothstep( 1.55, 1.9, ratio ) ) * uUseSkin;
+  float lum = dot( cc, vec3( 0.2126, 0.7152, 0.0722 ) );
+  vec3 recol = uTint * clamp( pow( lum, 0.6 ) * 2.6, 0.0, 1.0 );
+  cc = mix( cc, recol, ( 1.0 - skin ) * uTintOn );
+  cc = mix( cc, cc * uSkinMul, skin );
+  diffuseColor *= vec4( cc, sampledDiffuseColor.a );
+#endif
+`;
+
+function tintMaterial(m, tint, skinMul, skinRef, useSkin) {
+  const c = m.clone();
+  c.userData.u = {
+    uTint: { value: new THREE.Color(tint || '#ffffff') }, uTintOn: { value: tint ? 1 : 0 }, uSkinMul: { value: skinMul },
+    uSkinRef: { value: skinRef }, uUseSkin: { value: useSkin ? 1 : 0 },
+  };
+  c.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, c.userData.u);
+    sh.fragmentShader = 'uniform vec3 uTint; uniform float uTintOn; uniform vec3 uSkinMul; uniform vec3 uSkinRef; uniform float uUseSkin;\n' + sh.fragmentShader.replace('#include <map_fragment>', TINT_GLSL);
+  };
+  // Уникальный ключ: при одинаковом ключе three.js берёт готовую программу и не передаёт в неё наши значения —
+  // все аватары получали бы цвета первого.
+  c.customProgramCacheKey = () => 'tint:' + c.uuid;
+  return c;
+}
+
+// Средний цвет кожи модели — по середине текстуры лица (там щёки и лоб). В пространстве Y/Cb/Cr, гамма sRGB.
+function skinRefOf(template) {
+  if (template.userData.skinRef) return template.userData.skinRef;
+  let img = null;
+  template.traverse((o) => {
+    if (!o.isMesh || img) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      const src = m.map?.image?.currentSrc || m.map?.image?.src || '';
+      if (/head_color/.test(src)) img = m.map.image;
+    }
+  });
+  const ref = new THREE.Vector3(0.55, 0.42, 0.58);
+  if (img) {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0, 64, 64);
+    const d = g.getImageData(16, 16, 32, 32).data;
+    const ys = [], cbs = [], crs = [];
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255;
+      const y = 0.299 * r + 0.587 * gg + 0.114 * b, cb = 0.5 - 0.168736 * r - 0.331264 * gg + 0.5 * b, cr = 0.5 + 0.5 * r - 0.418688 * gg - 0.081312 * b;
+      if (cr > 0.52 && cr < 0.7 && cb > 0.3 && cb < 0.5 && y > 0.08) { ys.push(y); cbs.push(cb); crs.push(cr); }
+    }
+    const med = (a) => a.sort((x, z) => x - z)[a.length >> 1];
+    if (ys.length > 30) ref.set(med(ys), med(cbs), med(crs));
+  }
+  template.userData.skinRef = ref;
+  return ref;
+}
+
+// Тон кожи: множитель цвета (темнее — теплее, светлее — чуть розовее)
+const SKIN_MUL = { '-2': [0.55, 0.47, 0.42], '-1': [0.77, 0.71, 0.67], 0: [1, 1, 1], 1: [1.14, 1.1, 1.08], 2: [1.3, 1.24, 1.2] };
+
+function applyLooks(p, person, template) {
+  const outfit = p.outfit && p.outfit !== 'orig' ? p.outfit : null;
+  const hair = p.hairTint && p.hairTint !== 'orig' ? p.hairTint : null;
+  const sm = new THREE.Vector3(...(SKIN_MUL[p.skinTone ?? 0] || SKIN_MUL[0]));
+  if (!outfit && !hair && (!p.skinTone || String(p.skinTone) === '0')) return; // без изменений — общие материалы образца
+  const ref = skinRefOf(template);
+  const one = new THREE.Vector3(1, 1, 1);
+  person.traverse((o) => {
+    if (!o.isMesh) return;
+    const conv = (m) => {
+      const src = (m.map?.image?.currentSrc || m.map?.image?.src || '').split('/').pop();
+      if (/opacity/.test(src)) { // волосы/ресницы
+        if (!hair) return m;
+        return tintMaterial(m, hair, one, ref, false);
+      }
+      if (/head_color/.test(src)) return tintMaterial(m, null, sm, ref, true);
+      if (/_color/.test(src)) return tintMaterial(m, /helmet|equipment|knife/.test(src) ? null : outfit, sm, ref, true);
+      return m;
+    };
+    o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+  });
+}
+
 function buildPerson(p, template) {
   const root = new THREE.Group();
   root.name = 'avatar';
@@ -135,6 +227,7 @@ function buildPerson(p, template) {
   root.add(person);
   relaxPose(person);
   person.updateMatrixWorld(true);
+  applyLooks(p, person, template);
   addPersonAccessories(p, person);
 
   const head = person.getObjectByName('Bip01_Head');
@@ -145,9 +238,15 @@ function buildPerson(p, template) {
   root.userData.person = person;
   root.userData.height = h * k;
   // Лёгкая жизнь: дыхание корпусом и медленный поворот головы.
+  const pelvis = person.getObjectByName('Bip01_Pelvis');
+  const arms = ['Bip01_L_UpperArm', 'Bip01_R_UpperArm'].map((n) => person.getObjectByName(n));
+  const pelvis0 = pelvis?.quaternion.clone(), arms0 = arms.map((a) => a?.quaternion.clone());
   root.userData.update = (t) => {
-    if (spine) { e.set(Math.sin((t + phase) * 1.6) * 0.012, 0, 0); spine.quaternion.copy(spine0).multiply(qa.setFromEuler(e)); }
-    if (head) { e.set(0, Math.sin((t + phase) * 0.4) * 0.12, 0); head.quaternion.copy(head0).multiply(qa.setFromEuler(e)); }
+    const tt = t + phase;
+    if (spine) { e.set(Math.sin(tt * 1.6) * 0.012, 0, -Math.sin(tt * 0.35) * 0.02); spine.quaternion.copy(spine0).multiply(qa.setFromEuler(e)); }
+    if (pelvis) { e.set(0, 0, Math.sin(tt * 0.35) * 0.018); pelvis.quaternion.copy(pelvis0).multiply(qa.setFromEuler(e)); }
+    arms.forEach((a, i) => { if (a) { e.set(0, 0, Math.sin(tt * 0.8 + i * 1.7) * 0.015); a.quaternion.copy(arms0[i]).multiply(qa.setFromEuler(e)); } });
+    if (head) { e.set(Math.sin(tt * 0.27) * 0.03, Math.sin(tt * 0.4) * 0.12, 0); head.quaternion.copy(head0).multiply(qa.setFromEuler(e)); }
   };
   return root;
 }
@@ -179,10 +278,16 @@ function addPersonAccessories(p, person) {
   };
   const metal = (id) => mat(METAL[id].color, METAL[id]);
 
-  if (p.eyewear && p.eyewear !== 'none') mount(head, hp.clone().addScaledVector(up, 0.085), (g) => {
-    const frame = p.eyewear === 'aviators' ? metal('gold') : mat('#101012', { roughness: 0.3, metalness: 0.3 });
-    const lens = new THREE.MeshPhysicalMaterial({ color: p.eyewear === 'glasses' ? '#ffffff' : '#101418', transparent: true, opacity: p.eyewear === 'glasses' ? 0.15 : 0.88, roughness: 0.05, metalness: 0.3 });
-    const r = p.eyewear === 'aviators' ? 0.024 : 0.022;
+  if (p.eyewear === 'visor') mount(head, hp.clone().addScaledVector(up, 0.085), (g) => {
+    const m = new THREE.MeshPhysicalMaterial({ color: '#0b0f14', metalness: 0.6, roughness: 0.08, clearcoat: 1, transparent: true, opacity: 0.9 });
+    const v = new THREE.Mesh(new THREE.CylinderGeometry(0.128, 0.128, 0.05, 40, 1, true, -1.2, 2.4), m);
+    v.material.side = THREE.DoubleSide; v.position.set(0, 0, 0.0); g.add(v);
+  });
+  else if (p.eyewear && p.eyewear !== 'none') mount(head, hp.clone().addScaledVector(up, 0.085), (g) => {
+    const frame = p.eyewear === 'aviators' || p.eyewear === 'round' ? metal('gold') : mat('#101012', { roughness: 0.3, metalness: 0.3 });
+    const clear = p.eyewear === 'glasses' || p.eyewear === 'round';
+    const lens = new THREE.MeshPhysicalMaterial({ color: clear ? '#ffffff' : '#101418', transparent: true, opacity: clear ? 0.15 : 0.88, roughness: 0.05, metalness: 0.3 });
+    const r = p.eyewear === 'aviators' ? 0.024 : p.eyewear === 'round' ? 0.02 : 0.022;
     for (const sx of [-1, 1]) {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.0028, 8, 28), frame);
       ring.position.set(sx * 0.033, 0, 0.122);
@@ -208,12 +313,66 @@ function addPersonAccessories(p, person) {
       const m = cloth('#2a2a30');
       const b = new THREE.Mesh(shell(0.108, 0, Math.PI * 2, 0, Math.PI * 0.55), m); b.scale.y = 1.1; g.add(b);
       const fold = new THREE.Mesh(new THREE.TorusGeometry(0.104, 0.012, 8, 36), m); fold.rotation.x = Math.PI / 2; fold.position.y = -0.01; g.add(fold);
+    } else if (p.headwear === 'cowboy') {
+      const m = mat('#6b4526', { roughness: 0.85 });
+      const brimGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.008, 40, 1);
+      const pos = brimGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, pos.getY(i) + Math.pow(Math.abs(x) / 0.24, 2) * 0.05); void z; }
+      brimGeo.computeVertexNormals();
+      const brim = new THREE.Mesh(brimGeo, m); brim.position.y = -0.03; g.add(brim);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.12, 28), m); crown.position.y = 0.03; crown.scale.z = 1.15; g.add(crown);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.101, 0.101, 0.018, 28), mat('#2a1a10')); band.position.y = -0.012; band.scale.z = 1.15; g.add(band);
+    } else if (p.headwear === 'beret') {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.125, 28, 16), cloth('#141418'));
+      b.scale.set(1, 0.34, 1.02); b.position.set(-0.02, -0.005, -0.01); b.rotation.z = 0.18; g.add(b);
+    } else if (p.headwear === 'bandana') {
+      const b = new THREE.Mesh(shell(0.108, 0, Math.PI * 2, 0, Math.PI * 0.42), cloth('#8e1622'));
+      b.scale.set(0.98, 1.05, 1.02); b.position.y = -0.04; g.add(b);
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), cloth('#8e1622')); knot.position.set(0, -0.05, -0.105); g.add(knot);
     } else {
       const m = mat('#1a1614', { roughness: 0.8 });
       const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.008, 36), m); brim.position.y = -0.03; g.add(brim);
       const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.1, 0.11, 28), m); crown.position.y = 0.025; g.add(crown);
       const band = new THREE.Mesh(new THREE.CylinderGeometry(0.101, 0.101, 0.02, 28), mat('#6b0f1a')); band.position.y = -0.015; g.add(band);
     }
+  });
+
+  const spine2 = B('Bip01_Spine2');
+  const colorOf = (v, fallback) => ({ black: '#141418', gold: '#b88a2e', white: '#e8e6e0', red: '#8e1622', silver: '#cfd4da', tactical: '#3a3f2c' }[v] || fallback);
+
+  if (p.mask && p.mask !== 'none') mount(head, hp.clone(), (g) => {
+    // маска на нижнюю половину лица: дуга перед носом и ртом
+    const m = p.mask === 'gold' ? metal('gold') : new THREE.MeshStandardMaterial({ color: '#0e0e10', roughness: 0.55 });
+    // часть сферы по форме лица: от кончика носа до подбородка
+    const arc = new THREE.Mesh(shell(0.104, FRONT - 1.05, 2.1, Math.PI * 0.55, Math.PI * 0.3), m);
+    arc.material.side = THREE.DoubleSide; arc.scale.set(0.86, 1.05, 1.05); arc.position.set(0, 0.05, 0.004); g.add(arc);
+  });
+
+  if (p.headphones && p.headphones !== 'none') mount(head, hp.clone().addScaledVector(up, 0.08), (g) => {
+    const m = new THREE.MeshStandardMaterial({ color: colorOf(p.headphones), roughness: 0.35, metalness: p.headphones === 'gold' ? 1 : 0.2 });
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.008, 8, 32, Math.PI), m); band.position.set(0, -0.005, -0.01); band.scale.y = 1.05; g.add(band);
+    for (const sx of [-1, 1]) {
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.022, 24), m); cup.rotation.z = Math.PI / 2; cup.position.set(sx * 0.086, -0.02, -0.01); g.add(cup);
+      const pad = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.008, 8, 20), new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.9 })); pad.rotation.y = Math.PI / 2; pad.position.set(sx * 0.076, -0.02, -0.01); g.add(pad);
+    }
+  });
+
+  if (p.earrings && p.earrings !== 'none') mount(head, hp.clone().addScaledVector(up, 0.035), (g) => {
+    for (const sx of [-1, 1]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.0025, 8, 20), metal(p.earrings)); r.position.set(sx * 0.078, -0.012, -0.005); r.rotation.y = Math.PI / 2; g.add(r); }
+  });
+
+  if (p.scarf && p.scarf !== 'none' && neck) mount(neck, wp(neck).addScaledVector(up, -0.02), (g) => {
+    const m = cloth(colorOf(p.scarf));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.022, 12, 32), m); ring.rotation.x = Math.PI / 2 - 0.3; ring.scale.set(1, 1.1, 1); ring.position.z = -0.01; g.add(ring);
+    const tail = new THREE.Mesh(new RoundedBoxGeometry(0.055, 0.22, 0.016, 3, 0.007), m); tail.position.set(0.03, -0.12, 0.075); tail.rotation.set(0.25, 0, 0.1); g.add(tail);
+  });
+
+  if (p.backpack && p.backpack !== 'none' && spine2) mount(spine2, wp(spine2).addScaledVector(fwd, -0.16).addScaledVector(up, -0.04), (g) => {
+    const m = p.backpack === 'gold' ? new THREE.MeshStandardMaterial({ color: '#b8923e', metalness: 0.7, roughness: 0.35 }) : cloth(colorOf(p.backpack));
+    const bag = new THREE.Mesh(new RoundedBoxGeometry(0.28, 0.36, 0.13, 3, 0.04), m); g.add(bag);
+    const pocket = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.14, 0.05, 3, 0.02), m); pocket.position.set(0, -0.08, -0.08); g.add(pocket);
+    const strapM = new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.7 });
+    for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.34, 0.012), strapM); st.position.set(sx * 0.08, 0.02, 0.2); st.rotation.x = -0.12; g.add(st); }
   });
 
   if (p.chain && p.chain !== 'none' && neck) mount(neck, wp(neck).addScaledVector(up, -0.035), (g) => {
@@ -254,11 +413,20 @@ export const CATALOG = {
   mustache: ['none', 'classic', 'chevron', 'handlebar'],
   top: ['tshirt', 'hoodie', 'jacket', 'suit', 'leather', 'tactical', 'premium', 'sport'],
   color: ['#0d0d10', '#1e1e24', '#3a3a42', '#6b0f1a', '#1c2a4a', '#2e3b1f', '#d9b25f', '#e8e4da', '#5b2a86', '#8a4b2a'],
-  eyewear: ['none', 'glasses', 'sunglasses', 'aviators'],
+  eyewear: ['none', 'glasses', 'sunglasses', 'aviators', 'round', 'visor'],
   watch: ['none', 'gold', 'steel', 'black'],
   chain: ['none', 'gold', 'silver'],
   rings: ['none', 'gold', 'silver'],
-  headwear: ['none', 'cap', 'beanie', 'fedora'],
+  headwear: ['none', 'cap', 'beanie', 'fedora', 'cowboy', 'beret', 'bandana'],
+  mask: ['none', 'black', 'gold'],
+  headphones: ['none', 'black', 'gold', 'white'],
+  scarf: ['none', 'red', 'black', 'gold', 'white'],
+  earrings: ['none', 'gold', 'silver'],
+  backpack: ['none', 'black', 'tactical', 'gold'],
+  // перекраска реалистичной модели: 'orig' — как у модели
+  outfit: ['orig', '#101014', '#e8e4da', '#6b0f1a', '#1c2a4a', '#2e3b1f', '#5b2a86', '#8a4b2a', '#d9b25f', '#3a3a42', '#0f5257', '#b8243c'],
+  hairTint: ['orig', '#0f0c0a', '#3a2414', '#7a4a24', '#c49a5a', '#efd9a0', '#a33a1f', '#9a9a9a', '#f2f2f2', '#5b2a86', '#1f4fa8'],
+  skinTone: ['-2', '-1', '0', '1', '2'],
   background: ['forge', 'violet', 'steel', 'crimson', 'ice', 'jungle'],
 };
 
@@ -270,7 +438,9 @@ export const LABELS = {
     none: 'Нет', stubble: 'Щетина', goatee: 'Эспаньолка', full: 'Полная', classic: 'Классика', chevron: 'Шеврон', handlebar: 'Подкрученные',
     tshirt: 'Футболка', hoodie: 'Худи', jacket: 'Куртка', suit: 'Костюм', leather: 'Кожанка', tactical: 'Тактика', premium: 'Премиум', sport: 'Спорт',
     glasses: 'Очки', sunglasses: 'Солнцезащитные', aviators: 'Авиаторы', gold: 'Золото', steel: 'Сталь', black: 'Чёрные', silver: 'Серебро',
-    cap: 'Кепка', beanie: 'Шапка', fedora: 'Федора',
+    cap: 'Кепка', beanie: 'Шапка', fedora: 'Федора', cowboy: 'Ковбойская', beret: 'Берет', bandana: 'Бандана',
+    round: 'Круглые', visor: 'Визор', white: 'Белые', red: 'Красный', tactical: 'Тактический', orig: 'Как у модели',
+    '-2': 'Темнее', '-1': 'Чуть темнее', '0': 'Как у модели', '1': 'Чуть светлее', '2': 'Светлее',
     forge: 'Кузница', violet: 'Неон', crimson: 'Багрянец', ice: 'Лёд', jungle: 'Джунгли',
   },
   en: {},

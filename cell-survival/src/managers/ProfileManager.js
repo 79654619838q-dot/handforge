@@ -23,11 +23,18 @@ export class ProfileManager {
         ['gender', 'chips', CATALOG.gender, (v) => t(v)],
         ['person', 'people', PEOPLE],
       ],
+      look: [
+        ['outfit', 'tint', CATALOG.outfit],
+      ],
       acc: [
-        ['eyewear', 'chips', CATALOG.eyewear],
-        ['watch', 'chips', CATALOG.watch],
-        ['chain', 'chips', CATALOG.chain],
         ['headwear', 'chips', CATALOG.headwear],
+        ['eyewear', 'chips', CATALOG.eyewear],
+        ['headphones', 'chips', CATALOG.headphones],
+        ['earrings', 'chips', CATALOG.earrings],
+        ['scarf', 'chips', CATALOG.scarf],
+        ['chain', 'chips', CATALOG.chain],
+        ['watch', 'chips', CATALOG.watch],
+        ['backpack', 'chips', CATALOG.backpack],
       ],
       bg: [['background', 'bg', CATALOG.background]],
     };
@@ -37,7 +44,7 @@ export class ProfileManager {
       <div class="nameplate"><div class="kicker">${t('profile')}</div><h2 class="title" data-np></h2></div>
       <div class="editor panel">
         <div class="tabs">
-          <button class="tab" data-t="person">${t('tabPerson')}</button>
+          <button class="tab" data-t="person">${t('tabPerson')}</button><button class="tab" data-t="look">${t('tabColors')}</button>
           <button class="tab" data-t="acc">${t('tabAcc')}</button><button class="tab" data-t="bg">${t('tabBg')}</button><button class="tab" data-t="name">${t('tabName')}</button>
         </div>
         <div class="body" data-body></div>
@@ -58,8 +65,9 @@ export class ProfileManager {
       }
       body.innerHTML = TABS[tab].map(([key, kind, opts, fmt, title]) => {
         const label = `<span class="label">${t(title || key)}</span>`;
-        if (kind === 'chips') return `<div class="field">${label}<div class="chips">${opts.map((v) => `<button class="chip ${draft[key] === v ? 'on' : ''}" data-k="${key}" data-v="${v}">${fmt ? fmt(v) : lbl(v)}</button>`).join('')}</div></div>`;
+        if (kind === 'chips') return `<div class="field">${label}<div class="chips">${opts.map((v) => `<button class="chip ${String(draft[key] ?? (key === 'skinTone' ? '0' : 'none')) === String(v) ? 'on' : ''}" data-k="${key}" data-v="${v}">${fmt ? fmt(v) : lbl(v)}</button>`).join('')}</div></div>`;
         if (kind === 'people') return `<div class="field">${label}<div class="people">${opts.filter((x) => x.gender === draft.gender).map((x) => `<div class="person ${draft.person === x.id ? 'on' : ''}" data-k="person" data-v="${x.id}"><img src="${ASSETS}avatar/people/${x.id}/preview.png" alt="" loading="lazy"><span>${lbl(x.style)}</span></div>`).join('')}</div></div>`;
+        if (kind === 'tint') return `<div class="field">${label}<div class="swatches">${opts.map((v) => `<div class="sw ${(draft[key] || 'orig') === v ? 'on' : ''}" title="${lbl(v)}" data-k="${key}" data-v="${v}" style="background:${v === 'orig' ? 'conic-gradient(#c49a5a,#1c2a4a,#6b0f1a,#e8e4da,#c49a5a)' : v}"></div>`).join('')}</div></div>`;
         if (kind === 'swatch') return `<div class="field">${label}<div class="swatches">${opts.map((v) => `<div class="sw ${draft[key] === v ? 'on' : ''}" data-k="${key}" data-v="${v}" style="background:${v}"></div>`).join('')}</div></div>`;
         return `<div class="field">${label}<div class="swatches">${opts.map((v) => { const b = BACKGROUNDS[v]; return `<div class="sw ${draft[key] === v ? 'on' : ''}" title="${lbl(v)}" data-k="${key}" data-v="${v}" style="width:64px;height:64px;background:radial-gradient(circle at 50% 35%, ${b[0]}, ${b[1]});box-shadow:inset 0 -3px 0 ${b[2]}"></div>`; }).join('')}</div></div>`;
       }).join('');

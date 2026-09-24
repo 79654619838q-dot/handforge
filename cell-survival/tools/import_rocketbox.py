@@ -46,7 +46,7 @@ def import_one(name):
         if not fn.lower().endswith('.tga'):
             continue
         base = os.path.splitext(fn)[0]
-        if ONLY_REALISM and not ('specular' in fn or 'head_color' in fn):
+        if ONLY_REALISM and not ('body_color' in fn):
             continue
         im = Image.open(io.BytesIO(get(item['download_url'])))
         if 'specular' in fn:
@@ -56,8 +56,8 @@ def import_one(name):
             im.save(path, quality=88)
             total += os.path.getsize(path)
             continue
-        # лицо — главное в реализме: цвет головы в полном 2K, остальное 1024
-        size = 2048 if 'head_color' in fn else SIZE // 2 if im.mode == 'RGBA' else SIZE  # волосы/ресницы: 512 хватает
+        # лицо и одежда — в полном 2K (реализм), остальное 1024
+        size = 2048 if ('head_color' in fn or 'body_color' in fn) else SIZE // 2 if im.mode == 'RGBA' else SIZE  # волосы/ресницы: 512 хватает
         im = im.resize((size, size), Image.LANCZOS)
         if im.mode == 'RGBA':  # волосы, ресницы — нужна прозрачность
             path = os.path.join(dst, base + '.png')
