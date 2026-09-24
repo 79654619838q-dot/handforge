@@ -70,6 +70,9 @@ class FieldView extends BaseView {
     })();
     return p.movePromise;
   }
+  // настроение людей на поле: nervous — пока решается судьба, cheer/clap — уцелели, sad — выбывают
+  mood(ids, m) { for (const id of ids) { const a = this.pl.get(id)?.avatar; a?.userData.mood?.(m === 'joy' ? (Math.random() < 0.5 ? 'cheer' : 'clap') : m); } }
+  moodAlive(st, m) { this.mood([...this.pl.keys()].filter((id) => st.alive?.includes(id) && this.pl.get(id).state === PLAYER.ALIVE), m); }
   leave() { super.leave(); this.cine?.release(); document.body.style.cursor = ''; }
 }
 
@@ -122,13 +125,17 @@ export class LastCellView extends FieldView {
     await Promise.race([Promise.all(Object.entries(r.stand).map(([pid, cid]) => this.place(st, pid, this.grid.cells[cid]))), wait(1.2)]);
     const target = this.grid.cells[r.target];
     if (!target?.alive) return;
+    this.mood(Object.keys(r.stand), 'nervous');
     await this.elim.roulette(this.grid.alive, target);
     const victims = [...this.pl.values()].filter((p) => p.cell === target && p.state === PLAYER.ALIVE);
+    victims.forEach((p) => p.avatar?.userData.mood?.('sad'));
+    this.mood(Object.keys(r.stand).filter((id) => !victims.some((v) => v.id === id)), 'joy');
     if (victims.length) await this.closeUp(target.group.getWorldPosition(new THREE.Vector3()), 2.2);
     await this.elim.destroy(target, victims);
     if (victims.length) { await wait(0.4); this.closeUpEnd(); }
     this.mv.showOut();
     await Promise.all([this.grid.relayout(), this.world.fitCamera(this.grid.extent)]);
+    setTimeout(() => this.moodAlive(this.st, 'idle'), 2500);
   }
 }
 
@@ -236,6 +243,7 @@ export class MinesView extends FieldView {
       a.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.3));
       const lbl = labelSprite(p.profile.name, pid === this.myId ? '#f6dc97' : '#d8c8ff', 0.28); lbl.position.y = 2.25; a.add(lbl);
       this.world.scene.add(a);
+      a.userData.mood?.(bombed.has(mv.stand) ? 'sad' : Math.random() < 0.5 ? 'cheer' : 'clap');
       if (bombed.has(mv.stand) && !r.replay) {
         const y0 = a.position.y;
         tween(1.4, (k) => { a.position.y = y0 - k * k * 7; a.rotation.x = k * 1.2; }, ease.linear).then(() => a.removeFromParent());
@@ -319,6 +327,7 @@ export class UniqueFieldView extends FieldView {
     await wait(0.8);
     const bad = [...byCell].filter(([, ids]) => ids.length > 1).map(([c]) => c);
     const good = [...byCell].filter(([, ids]) => ids.length === 1).map(([c]) => c);
+    for (const [, ids] of byCell) this.mood(ids, ids.length > 1 && !r.replay ? 'sad' : 'joy');
     good.forEach((c) => c.setState(CELL.CONFIRMED));
     bad.forEach((c) => { c.danger = 0.35; });
     this.audio[bad.length ? 'charge' : 'confirm']();

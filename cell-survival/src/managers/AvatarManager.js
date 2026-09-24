@@ -93,7 +93,71 @@ function toPBR(m) {
 }
 
 export function ensurePerson(profile) {
-  return profile?.person ? loadPerson(profile.person).catch(() => null) : Promise.resolve(null);
+  // человек готов, когда загружены и модель, и движения (иначе первые аватары вышли бы без анимации)
+  return profile?.person ? Promise.all([loadPerson(profile.person).catch(() => null), animsReady]).then(([f]) => f) : Promise.resolve(null);
+}
+
+// ---------- Живые движения (Microsoft Rocketbox Animations, MIT) ----------
+// tools/convert_anims.mjs → assets/avatar/anims.json: ожидание, волнение, радость, аплодисменты, грусть.
+// Все анимированные люди обновляются из Stage.frame (updateAvatars), даже созданные сценами вне PlayerManager.
+let animLib = null;
+// ?noanim в адресе — без живых движений (для замера скорости)
+export const animsReady = (/noanim/.test(location.search) ? Promise.reject() : fetch(`${ASSETS}avatar/anims.json`)).then((r) => r.json()).then((raw) => {
+  animLib = {};
+  for (const [name, c] of Object.entries(raw)) {
+    const tracks = c.k.map((tr) => {
+      const size = tr.p === 'quaternion' ? 4 : 3;
+      const times = tr.v.length === size ? [0] : c.t;
+      const T = tr.p === 'quaternion' ? THREE.QuaternionKeyframeTrack : THREE.VectorKeyframeTrack;
+      return new T(`${tr.n}.${tr.p}`, times, tr.v);
+    });
+    animLib[name] = new THREE.AnimationClip(name, c.d, tracks);
+  }
+  return animLib;
+}).catch(() => null);
+
+// какие ролики у какого настроения (m_/f_ — по полу модели)
+const MOODS = {
+  idle: ['idle_neutral_01', 'idle_neutral_02', 'idle_look_around_01', 'idle_waiting_01'],
+  nervous: ['idle_nervous_01', 'idle_look_around_01'],
+  cheer: ['cheer_01', 'cheer_03'],
+  clap: ['claphands_01'],
+  sad: ['gestic_listen_sad_01', 'gestic_shrug_01'],
+};
+const liveMixers = new Set();
+const topOf = (o) => { while (o.parent) o = o.parent; return o; };
+// Считаем движения только тех, кто стоит на показываемой сцене. Кто 10 с не на ней (прошлое испытание,
+// удалённый аватар) — забываем, иначе старые сцены жили бы в памяти вечно.
+export function updateAvatars(dt, scene) {
+  for (const m of liveMixers) {
+    if (topOf(m.getRoot()) === scene) { m.idle = 0; m.update(dt); }
+    else if ((m.idle = (m.idle || 0) + dt) > 10) liveMixers.delete(m);
+  }
+}
+
+function animatePerson(root, person, female) {
+  const mixer = new THREE.AnimationMixer(person);
+  const pre = female ? 'f_' : 'm_';
+  let cur = null, mood = 'idle', emoteLeft = 0;
+  const clipOf = (list) => { const ok = list.map((n) => animLib[pre + n] || animLib['m_' + n]).filter(Boolean); return ok[Math.floor(Math.random() * ok.length)]; };
+  const play = (clip, fade = 0.5) => {
+    if (!clip) return;
+    const a = mixer.clipAction(clip);
+    a.reset(); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
+    if (cur && cur !== a) a.crossFadeFrom(cur, fade, false); else a.fadeIn(fade);
+    a.play(); cur = a;
+  };
+  // ролик кончился — плавно следующий ролик того же настроения (шов обрезанных роликов не виден)
+  mixer.addEventListener('finished', (e) => { if (e.action === cur) play(clipOf(MOODS[mood] || MOODS.idle), 0.6); });
+  const first = clipOf(MOODS.idle);
+  play(first, 0);
+  if (cur) cur.time = Math.random() * first.duration * 0.8; // все стоят не в такт
+  mixer.update(0);
+  liveMixers.add(mixer);
+  // настроение: idle / nervous / cheer / clap / sad
+  root.userData.mood = (m) => { if (m === mood || !MOODS[m]) return; mood = m; play(clipOf(MOODS[m]), 0.4); };
+  root.userData.mixer = mixer;
+  void emoteLeft;
 }
 
 // Скелет Rocketbox — Biped (Bip01_…), модель в T-позе. Опускаем руки вдоль тела:
@@ -241,6 +305,11 @@ function buildPerson(p, template) {
   const pelvis = person.getObjectByName('Bip01_Pelvis');
   const arms = ['Bip01_L_UpperArm', 'Bip01_R_UpperArm'].map((n) => person.getObjectByName(n));
   const pelvis0 = pelvis?.quaternion.clone(), arms0 = arms.map((a) => a?.quaternion.clone());
+  if (animLib) { // есть живые движения — «дыхание» кодом не нужно
+    animatePerson(root, person, PEOPLE.find((x) => x.id === p.person)?.gender === 'female');
+    root.userData.update = () => {};
+    return root;
+  }
   root.userData.update = (t) => {
     const tt = t + phase;
     if (spine) { e.set(Math.sin(tt * 1.6) * 0.012, 0, -Math.sin(tt * 0.35) * 0.02); spine.quaternion.copy(spine0).multiply(qa.setFromEuler(e)); }
@@ -867,5 +936,6 @@ export function renderPortrait(profile, w = 480, h = 600, full = false) {
   g.fillStyle = vg; g.fillRect(0, 0, w, h);
   // у реалистичного человека геометрия и материалы общие с загруженным образцом — не освобождаем
   if (!av.userData.person) av.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  scene.remove(av); // портрет готов — его движения больше не считаем (updateAvatars забудет аватар без родителя)
   return c.toDataURL('image/jpeg', 0.9);
 }

@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { updateTweens } from './tween.js';
+import { updateAvatars } from '../managers/AvatarManager.js';
 
 // Один WebGL-холст на всю игру. Экран подменяет «мир» (scene + camera + update).
 export class Stage {
@@ -130,6 +131,7 @@ export class Stage {
     const t = this.clock.elapsedTime;
     updateTweens(dt);
     if (!this.world) return;
+    updateAvatars(dt, this.world.scene);
     this.world.update?.(dt, t);
     this.composer.render(dt);
   }

@@ -103,6 +103,7 @@ export class Cinematic {
       const a = buildAvatar(p.profile || {});
       a.position.set(x, 0.18, 0);
       a.scale.setScalar(0.001);
+      a.userData.mood?.('sad'); // выбывший опускает голову / разводит руками
       this.group.add(a);
       return a;
     });
