@@ -7,6 +7,7 @@ import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { attachCellServer } from "./cell-server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8877;
@@ -76,7 +77,15 @@ app.get("/cell", (req, res, next) => {
   if (req.path === "/cell") return res.redirect(301, "/cell/");
   next();
 });
-app.use("/cell", express.static(CELL_DIST, { maxAge: "7d", index: "index.html" }));
+// index.html не кэшируем (иначе после обновления игроки неделю видят старую версию),
+// собранные файлы с хэшем в имени и картинки — кэшируем.
+app.use("/cell", express.static(CELL_DIST, {
+  index: "index.html",
+  setHeaders: (res, file) => {
+    if (file.endsWith(".html")) res.setHeader("Cache-Control", "no-cache");
+    else res.setHeader("Cache-Control", "public, max-age=604800");
+  },
+}));
 
 // PhotoQuest — SPA на React Router: любой путь внутри /quest отдаём одним
 // и тем же index.html, дальше маршрутизацией занимается сам React Router.
@@ -84,7 +93,7 @@ app.get(["/quest", "/quest/*"], (_req, res) => {
   res.sendFile(path.join(QUEST_DIST, "index.html"));
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`HandForge Hub → http://localhost:${PORT}`);
   console.log(`  /        меню`);
   console.log(`  /poker   → ${POKER_TARGET}`);
@@ -92,3 +101,6 @@ app.listen(PORT, () => {
   console.log(`  /cell    → ${CELL_DIST}`);
   console.log(`  /api     → ${QUEST_API_TARGET}`);
 });
+
+// Комнаты командной игры Cell Survival — socket.io на пути /cell/io.
+attachCellServer(server);

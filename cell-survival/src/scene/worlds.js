@@ -102,8 +102,10 @@ export class ProfileWorld {
     this.camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 100);
     this.bloom = 0.25;
     this.scene.fog = new THREE.Fog('#050409', 8, 22);
-    this.scene.add(new THREE.HemisphereLight('#ffffff', '#1a1208', 0.35));
-    const key = new THREE.SpotLight('#fff0d8', 9, 20, 0.5, 0.5, 1.2); key.position.set(2.5, 5, 4); key.castShadow = true; this.scene.add(key);
+    // студийная схема для реалистичного лица: тёплый боковой ключ, холодная мягкая заливка, контровые
+    this.scene.add(new THREE.HemisphereLight('#ffffff', '#1a1208', 0.12));
+    const key = new THREE.SpotLight('#ffe6c8', 12, 20, 0.45, 0.6, 1.2); key.position.set(3.2, 3.4, 1.6); key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.target.position.set(0, 1.3, 0); this.scene.add(key, key.target);
+    const fill = new THREE.DirectionalLight('#bcd2ff', 0.28); fill.position.set(-3, 1.8, 2.5); this.scene.add(fill);
     this.rimA = new THREE.DirectionalLight('#d9b25f', 3); this.rimA.position.set(-3, 3, -3); this.scene.add(this.rimA);
     this.rimB = new THREE.DirectionalLight('#8b5cf6', 2); this.rimB.position.set(3, 2, -3); this.scene.add(this.rimB);
 

@@ -41,7 +41,8 @@ export class GameWorld {
   // Камера отъезжает так, чтобы всё поле помещалось между панелями HUD.
   fitCamera(extent, instant = false) {
     const aspect = window.innerWidth / window.innerHeight;
-    const fitW = extent / Math.min(1, aspect / 1.6);
+    // на телефоне (портрет) боковых панелей нет — поле занимает всю ширину
+    const fitW = extent / Math.min(1, aspect < 1 ? aspect / 1.3 : aspect / 1.6);
     const d = fitW * 1.05 + 2.2;
     const target = this.hasBackdrop ? new THREE.Vector3(0, d * 1.14, d * 0.67) : new THREE.Vector3(0, d * 0.74, d * 0.92);
     if (instant) { this.camBase.copy(target); return Promise.resolve(); }

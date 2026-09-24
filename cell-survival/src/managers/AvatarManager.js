@@ -41,7 +41,7 @@ export function loadPerson(id) {
     const name = url.split('/').pop();
     if (!/\.tga$/i.test(name)) return url;
     const base = name.replace(/\.tga$/i, '');
-    if (base.includes('specular')) return BLANK; // specular не импортируем (tools/import_rocketbox.py)
+    if (base.includes('specular')) return dir + base.replace('specular', 'roughness') + '.jpg'; // блеск → шероховатость (tools/import_rocketbox.py)
     return dir + base + (base.includes('opacity') ? '.png' : '.jpg');
   });
   // «Готов» = FBX разобран И все его текстуры скачаны; иначе портрет рисуется без текстур.
@@ -65,24 +65,30 @@ export function loadPerson(id) {
 }
 
 // Phong из 3ds Max → PBR, чтобы человек освещался так же, как всё остальное в сцене.
+// Реализм: шероховатость по карте блеска (кожа, глаза, губы блестят по-разному),
+// лицо — физический материал с тёплым «рассеиванием» (sheen) вместо пластика,
+// волосы и ресницы — alphaHash: мягкие края без «лесенки» и без проблем сортировки.
 function toPBR(m) {
-  const opacityMap = m.alphaMap || (m.transparent && m.map ? m.map : null);
-  const out = new THREE.MeshStandardMaterial({
+  const src = (m.map?.image?.currentSrc || m.map?.image?.src || '').split('/').pop();
+  const isHead = /head_color/.test(src);
+  const cut = !!m.transparent || !!m.alphaMap;
+  const params = {
     name: m.name,
     map: m.map || null,
     normalMap: m.normalMap || null,
-    color: m.map ? 0xffffff : m.color,
-    roughness: 0.62,
+    roughnessMap: m.specularMap || null,
+    roughness: m.specularMap ? 1 : 0.62,
     metalness: 0,
-    envMapIntensity: 0.5,
-    transparent: !!m.transparent || !!m.alphaMap,
-    alphaTest: m.transparent || m.alphaMap ? 0.35 : 0,
-    side: m.transparent || m.alphaMap ? THREE.DoubleSide : THREE.FrontSide,
-  });
-  if (m.alphaMap) out.alphaMap = m.alphaMap;
-  if (out.transparent) out.depthWrite = true;
-  if (out.map) out.map.colorSpace = THREE.SRGBColorSpace;
-  void opacityMap;
+    color: m.map ? 0xffffff : m.color,
+    envMapIntensity: 0.6,
+    side: cut ? THREE.DoubleSide : THREE.FrontSide,
+  };
+  const out = isHead
+    ? new THREE.MeshPhysicalMaterial({ ...params, sheen: 0.35, sheenRoughness: 0.55, sheenColor: new THREE.Color('#ff9f88'), specularIntensity: 0.55 })
+    : new THREE.MeshStandardMaterial(params);
+  if (cut) { out.alphaMap = m.alphaMap || null; out.alphaHash = true; out.transparent = false; }
+  if (out.map) { out.map.colorSpace = THREE.SRGBColorSpace; out.map.anisotropy = 8; }
+  if (out.normalMap) out.normalScale = new THREE.Vector2(1, 1);
   return out;
 }
 
@@ -666,8 +672,9 @@ export function renderPortrait(profile, w = 480, h = 600, full = false) {
   portraitRenderer.setSize(w, h, false);
   const scene = new THREE.Scene();
   const bg = BACKGROUNDS[profile.background] || BACKGROUNDS.forge;
-  scene.add(new THREE.HemisphereLight('#ffffff', '#302018', 0.9));
-  const key = new THREE.DirectionalLight('#fff2dd', 2.6); key.position.set(1.5, 2.5, 2.5); scene.add(key);
+  scene.add(new THREE.HemisphereLight('#ffffff', '#302018', 0.45));
+  const key = new THREE.DirectionalLight('#ffe8cc', 3.2); key.position.set(2.2, 2.6, 1.8); scene.add(key);
+  const fill = new THREE.DirectionalLight('#c4d6ff', 0.7); fill.position.set(-2.5, 1.6, 2.4); scene.add(fill);
   const rim = new THREE.DirectionalLight(bg[2], 4); rim.position.set(-2, 2, -2); scene.add(rim);
   const rim2 = new THREE.DirectionalLight(bg[2], 2); rim2.position.set(2, 1, -2); scene.add(rim2);
   const av = buildAvatar(profile);

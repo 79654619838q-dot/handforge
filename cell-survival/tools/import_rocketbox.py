@@ -13,12 +13,13 @@ import os
 import sys
 import urllib.request
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 REPO = 'https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars'
 API = 'https://api.github.com/repos/microsoft/Microsoft-Rocketbox/contents/Assets/Avatars'
 OUT = os.path.join(os.path.dirname(__file__), '..', 'public', 'assets', 'avatar', 'people')
 SIZE = 1024
+ONLY_REALISM = '--realism' in sys.argv  # докачать только лицо 2K и карты блеска
 
 
 def get(url):
@@ -34,18 +35,30 @@ def import_one(name):
     grp = group_of(name)
     dst = os.path.join(OUT, name)
     os.makedirs(dst, exist_ok=True)
-    fbx = get(f'{REPO}/{grp}/{name}/Export/{name}.fbx')
-    open(os.path.join(dst, f'{name}.fbx'), 'wb').write(fbx)
+    total = 0
+    if not ONLY_REALISM:
+        fbx = get(f'{REPO}/{grp}/{name}/Export/{name}.fbx')
+        open(os.path.join(dst, f'{name}.fbx'), 'wb').write(fbx)
+        total = len(fbx)
     listing = json.loads(get(f'{API}/{grp}/{name}/Textures'))
-    total = len(fbx)
     for item in listing:
         fn = item['name']
-        if not fn.lower().endswith('.tga') or 'specular' in fn:
+        if not fn.lower().endswith('.tga'):
+            continue
+        base = os.path.splitext(fn)[0]
+        if ONLY_REALISM and not ('specular' in fn or 'head_color' in fn):
             continue
         im = Image.open(io.BytesIO(get(item['download_url'])))
-        size = SIZE // 2 if im.mode == 'RGBA' else SIZE  # волосы/ресницы: 512 хватает
+        if 'specular' in fn:
+            # блеск → шероховатость для PBR: инверсия, 512 хватает (карта плавная)
+            im = ImageOps.invert(im.convert('L')).resize((512, 512), Image.LANCZOS)
+            path = os.path.join(dst, base.replace('specular', 'roughness') + '.jpg')
+            im.save(path, quality=88)
+            total += os.path.getsize(path)
+            continue
+        # лицо — главное в реализме: цвет головы в полном 2K, остальное 1024
+        size = 2048 if 'head_color' in fn else SIZE // 2 if im.mode == 'RGBA' else SIZE  # волосы/ресницы: 512 хватает
         im = im.resize((size, size), Image.LANCZOS)
-        base = os.path.splitext(fn)[0]
         if im.mode == 'RGBA':  # волосы, ресницы — нужна прозрачность
             path = os.path.join(dst, base + '.png')
             im.save(path, optimize=True)
@@ -54,14 +67,15 @@ def import_one(name):
             im.convert('RGB').save(path, quality=86 if 'normal' not in fn else 92)
         total += os.path.getsize(path)
     # превью для экрана профиля
-    prev = Image.open(io.BytesIO(get(f'{REPO}/{grp}/{name}/{name}.png')))
-    prev.thumbnail((640, 360))
-    prev.save(os.path.join(dst, 'preview.png'), optimize=True)
+    if not ONLY_REALISM:
+        prev = Image.open(io.BytesIO(get(f'{REPO}/{grp}/{name}/{name}.png')))
+        prev.thumbnail((640, 360))
+        prev.save(os.path.join(dst, 'preview.png'), optimize=True)
     print(f'{name}: {total / 1e6:.1f} MB')
 
 
 if __name__ == '__main__':
-    for n in sys.argv[1:]:
+    for n in [a for a in sys.argv[1:] if not a.startswith('--')]:
         try:
             import_one(n)
         except Exception as e:  # один сбойный аватар не должен ронять остальные

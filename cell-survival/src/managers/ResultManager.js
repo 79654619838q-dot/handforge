@@ -21,4 +21,18 @@ export class ResultManager {
     const isBest = this.save.recordGame(entry);
     return { ...entry, isBest, best: this.save.data.best };
   }
+
+  // Одиночное испытание против ботов: лучший результат — наибольшие очки, для «Дверей» — пройденные двери.
+  recordChallenge(st, myId) {
+    const h = st.history[0];
+    if (!h) return;
+    const me = st.players.find((p) => p.id === myId);
+    const score = h.cid === 'doors' && h.solo ? h.passed : me?.points ?? 0;
+    const best = (this.save.data.bestChallenge ||= {});
+    const isBest = best[h.cid] == null || score > best[h.cid];
+    if (isBest) best[h.cid] = score;
+    this.save.data.stats.games += 1;
+    this.save.save();
+    return { score, isBest };
+  }
 }

@@ -14,6 +14,8 @@ import { GameWorld } from '../scene/GameWorld.js';
 import { THEMES, THEME_IDS } from '../scene/themes.js';
 import { clearTweens } from '../scene/tween.js';
 import { t, setLang, getLang } from '../i18n.js';
+import { LocalSession, RemoteSession } from '../net/session.js';
+import { MatchView } from '../team/MatchView.js';
 
 // Точка сборки: знает все системы и переводит игру между экранами.
 export class GameManager {
@@ -39,6 +41,10 @@ export class GameManager {
 
   start() {
     this.goMenu();
+    // ссылка-приглашение ?room=КОД: после профиля сразу в комнату
+    const code = new URLSearchParams(location.search).get('room');
+    if (code) this.pendingRoom = code.toUpperCase();
+    if (code && this.save.profile) setTimeout(() => this.joinPending(), 600);
     setTimeout(() => document.getElementById('boot')?.classList.add('gone'), 300);
   }
 
@@ -51,7 +57,11 @@ export class GameManager {
   }
 
   goMenu() {
+    this.inRoom = false;
+    if (this.remote?.room) { this.remote.call('leave'); this.remote.room = null; }
     this._leaveGame();
+    this._leaveMatch();
+    this.lobby?.cleanup();
     this._menuBackdrop();
     this.ui.show(this.menu.menuScreen());
   }
@@ -69,11 +79,94 @@ export class GameManager {
 
   goModes() {
     if (!this.save.profile) return this.goProfile(true); // сначала аватар
+    if (this.pendingRoom) return this.joinPending();
     this._menuBackdrop();
     this.ui.show(this.modes.modesScreen());
   }
 
   goSetup() { this._menuBackdrop(); this.ui.show(this.modes.setupScreen()); }
+
+  goChallenges() { this._leaveMatch(); this._menuBackdrop(); this.ui.show(this.modes.challengesScreen()); }
+
+  // ---------- Командная игра ----------
+  // Одно подключение к серверу комнат на всю вкладку; профиль отправляется при каждом входе.
+  net() {
+    if (!this.remote) {
+      this.remote = new RemoteSession(this.save.profile);
+      this.remote.on('status', (s) => this.lobby.status(s));
+      this.remote.on('game', (g) => {
+        if (g && g.phase !== 'final' && !this.matchView && this.inRoom) this.startMatch(this.remote); // создатель нажал «Начать»
+        if (!g && this.matchView && !this.matchView.session.local) this.goRoom(); // «Сыграть ещё» — назад в комнату
+      });
+    } else if (this.remote.profile !== this.save.profile) { this.remote.profile = this.save.profile; this.remote.hello(); }
+    return this.remote;
+  }
+
+  goLobby() {
+    if (!this.save.profile) return this.goProfile(true);
+    this._leaveMatch(); this.lobby.cleanup();
+    const net = this.net();
+    this.inRoom = false;
+    if (net.room) { net.call('leave'); net.room = null; } // из лобби — значит, из комнаты вышли
+    this._menuBackdrop();
+    this.ui.show(this.lobby.lobbyScreen());
+  }
+
+  goRoom() {
+    this._leaveMatch(); this.lobby.cleanup();
+    this.inRoom = true;
+    this._menuBackdrop();
+    this.ui.show(this.lobby.roomScreen());
+  }
+
+  async joinPending() {
+    const code = this.pendingRoom;
+    this.pendingRoom = null;
+    history.replaceState(null, '', location.pathname);
+    const net = this.net();
+    for (let i = 0; i < 20 && !net.socket.connected; i++) await new Promise((r) => setTimeout(r, 250));
+    const r = await net.call('join', { roomId: code });
+    if (r?.ok) this.goRoom(); else this.goLobby();
+  }
+
+  // ---------- Матч испытаний (одиночный с ботами или командный) ----------
+  startLocal(cid, options = {}) {
+    const session = new LocalSession({ profile: this.save.profile, chain: [cid], bots: cid === 'doors' ? 0 : 5, options });
+    this.startMatch(session, () => this.startLocal(cid, options));
+    session.start();
+  }
+
+  startMatch(session, again) {
+    this._leaveGame();
+    this._leaveMatch();
+    this.lobby.cleanup();
+    this.menuWorld = null;
+    const mv = new MatchView({
+      game: this,
+      session,
+      isHost: () => this.remote?.room?.hostId === this.remote?.myId,
+      onExit: () => {
+        if (session.local) this.ui.dip(() => this.goChallenges());
+        else { this.remote.call('leave'); this.ui.dip(() => this.goLobby()); }
+      },
+      onAgain: () => (session.local ? again?.() : this.remote.send('again')),
+    });
+    mv.onFinal = (st) => { if (session.local) this.results.recordChallenge(st, session.myId); };
+    this.matchView = mv;
+    this.audio.playMusic('game');
+    this.ui.show(mv.el, { dip: true });
+    // у удалённой сессии состояние уже могло прийти до создания экрана
+    if (!session.local && session.game) mv.onState(session.game);
+  }
+
+  _leaveMatch() {
+    if (!this.matchView) return;
+    const mv = this.matchView;
+    this.matchView = null;
+    mv.dispose();
+    if (mv.session.local) mv.session.close();
+    clearTweens();
+  }
 
   pickTheme() {
     const s = this.save.settings.theme;
