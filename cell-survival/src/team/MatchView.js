@@ -82,7 +82,8 @@ export class MatchView {
     const View = VIEWS[st.cid];
     this.viewCid = st.cid;
     this.viewIndex = st.index;
-    const theme = THEME_IDS[Math.floor(Math.random() * THEME_IDS.length)];
+    const pref = this.game.save.settings.theme; // тема из «Настроек» — и для испытаний
+    const theme = THEME_IDS.includes(pref) ? pref : THEME_IDS[Math.floor(Math.random() * THEME_IDS.length)];
     this.view = new View({ game: this.game, stage: this.game.stage, root: this.stageEl, audio: this.game.audio, act: (a) => this.session.act(a), myId: this.myId, theme, hint: (s) => this.setHint(s), mv: this });
     this.view.enter(st);
   }

@@ -134,7 +134,7 @@ export class Cinematic {
         case 'bomb': await this.fxBomb(avatars, chest); break;
         case 'cards': await this.fxCards(avatars, chest); break;
         case 'roulette': await this.fxRoulette(avatars, chest); break;
-        default: await Promise.all(avatars.map((a) => dissolve(sc, a)));
+        default: await Promise.all(avatars.map((a) => this.exit(a)));
       }
     } finally {
       await wait(0.3);
@@ -146,6 +146,102 @@ export class Cinematic {
   dispose() {
     this.world.scene.remove(this.group);
     this.release();
+  }
+
+  // ---- финал по миру: как игрок покидает поле ----
+  // Пустыня — засасывает песок; космос — уносит в открытый космос; бункер — лазерная решётка;
+  // джунгли — лианы утаскивают вниз; айсберг — игрок замерзает и раскалывается.
+  // всё ниже уровня постамента не рисуется — игрок уходит «под землю», а не проваливается сквозь неё
+  clipBelow(a, y) {
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -y);
+    a.traverse((o) => {
+      if (!o.isMesh) return;
+      const cl = (m) => { const c = m.clone(); c.clippingPlanes = [plane]; return c; };
+      o.material = Array.isArray(o.material) ? o.material.map(cl) : cl(o.material);
+    });
+  }
+
+  exit(a, color = '#ffb347') {
+    const sc = this.group;
+    const base = a.getWorldPosition(new THREE.Vector3());
+    const mid = base.clone().add(new THREE.Vector3(0, 0.9, 0));
+    const s0 = a.scale.x;
+    switch (this.world.themeId) {
+      case 'desert': {
+        // воронка песка: кольцо пыли кружит, игрок уходит под землю
+        const n = 260, geo = new THREE.BufferGeometry(), p = new Float32Array(n * 3), ang = [], rad = [], hy = [];
+        for (let i = 0; i < n; i++) { ang.push(Math.random() * 6.28); rad.push(0.3 + Math.random() * 0.6); hy.push(Math.random() * 1.6); }
+        geo.setAttribute('position', new THREE.BufferAttribute(p, 3));
+        const m = new THREE.PointsMaterial({ map: dot, color: '#d8b07a', size: 0.12, transparent: true, depthWrite: false });
+        const pts = new THREE.Points(geo, m); sc.add(pts);
+        this.clipBelow(a, base.y);
+        this.audio.charge();
+        return tween(1.8, (k) => {
+          for (let i = 0; i < n; i++) { ang[i] += 0.08 + k * 0.1; const r = rad[i] * (1 - k * 0.6); p.set([base.x + Math.cos(ang[i]) * r, base.y + hy[i] * (1 - k), base.z + Math.sin(ang[i]) * r], i * 3); }
+          geo.attributes.position.needsUpdate = true;
+          a.position.y = base.y - k * k * 2.2; a.rotation.y += 0.05 * k;
+          m.opacity = k < 0.8 ? 1 : (1 - k) * 5;
+        }, ease.inQuad).then(() => { a.visible = false; sc.remove(pts); });
+      }
+      case 'space': {
+        // невесомость: игрок медленно всплывает, кувыркается и улетает в темноту
+        sparks(sc, mid, new THREE.Color('#7cc8ff'), 90, 0.8, 2, 0.05, 0.4);
+        this.audio.charge();
+        return tween(2.0, (k) => {
+          a.position.set(base.x + k * k * 2.5, base.y + k * 3.2, base.z - k * k * 5);
+          a.rotation.set(k * 2.2, k * 1.4, k * 1.1);
+          a.scale.setScalar(s0 * (1 - k * 0.8));
+        }, ease.inCubic).then(() => { a.visible = false; });
+      }
+      case 'bunker': {
+        // красная лазерная решётка проходит сверху вниз, игрок распадается на искры
+        const lasers = new THREE.Group();
+        const lm = new THREE.MeshBasicMaterial({ color: '#ff1a1a', transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+        for (let i = 0; i < 6; i++) { const l = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.012), lm); l.position.set(0, i * 0.08, 0.02); lasers.add(l); const l2 = l.clone(); l2.rotation.y = Math.PI / 2; lasers.add(l2); }
+        lasers.position.copy(base).add(new THREE.Vector3(0, 2.1, 0));
+        sc.add(lasers);
+        this.audio.charge();
+        return tween(1.3, (k) => {
+          lasers.position.y = base.y + 2.1 - k * 2.2;
+          if (Math.random() < 0.5) sparks(sc, new THREE.Vector3(base.x, lasers.position.y, base.z), new THREE.Color('#ff3b2a'), 6, 1.2, 0.5, 0.05, -4);
+          a.scale.y = s0 * Math.max(0.001, (lasers.position.y - base.y) / 1.9);
+        }, ease.linear).then(() => { a.visible = false; this.audio.crack(); sc.remove(lasers); });
+      }
+      case 'jungle': {
+        // лианы вырастают из земли, обвивают и утаскивают вниз
+        const vm = new THREE.MeshStandardMaterial({ color: '#2f5a1f', roughness: 0.8, emissive: '#0e2a08', emissiveIntensity: 0.4 });
+        const vines = [];
+        for (let i = 0; i < 5; i++) {
+          const a0 = (i / 5) * 6.28, pts = [];
+          for (let j = 0; j <= 12; j++) { const h = j * 0.15, an = a0 + j * 0.7; pts.push(new THREE.Vector3(base.x + Math.cos(an) * 0.26, base.y + h, base.z + Math.sin(an) * 0.26)); }
+          const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.025, 6);
+          geo.setDrawRange(0, 0);
+          const v = new THREE.Mesh(geo, vm); sc.add(v); vines.push(v);
+        }
+        this.clipBelow(a, base.y);
+        vines.forEach((v) => { v.material = vm.clone(); v.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -base.y)]; });
+        this.audio.crack();
+        return tween(1.0, (k) => vines.forEach((v) => v.geometry.setDrawRange(0, Math.floor(v.geometry.index.count * k))), ease.outCubic)
+          .then(() => tween(1.0, (k) => { a.position.y = base.y - k * 2.3; vines.forEach((v) => { v.position.y = -k * 2.3; }); }, ease.inCubic))
+          .then(() => { a.visible = false; vines.forEach((v) => sc.remove(v)); });
+      }
+      case 'iceberg': {
+        // игрок покрывается льдом, замирает и раскалывается на осколки
+        const ice = new THREE.MeshPhysicalMaterial({ color: '#7fb6d6', roughness: 0.15, metalness: 0.1, clearcoat: 1, emissive: '#0f3550', emissiveIntensity: 0.25 });
+        this.audio.charge();
+        return tween(1.0, (k) => { a.traverse((o) => { if (o.isMesh && k > 0.5 && !o.userData.iced) { o.userData.iced = true; o.material = Array.isArray(o.material) ? o.material.map(() => ice) : ice; } }); }, ease.linear)
+          .then(() => wait(0.4))
+          .then(() => {
+            this.audio.crack(); this.audio.destroy();
+            const shardM = new THREE.MeshPhysicalMaterial({ color: '#d6f1ff', roughness: 0.05, clearcoat: 1, transparent: true, opacity: 0.9 });
+            const shards = Array.from({ length: 22 }, () => { const m = new THREE.Mesh(new THREE.TetrahedronGeometry(0.06 + Math.random() * 0.08), shardM); m.position.copy(base).add(new THREE.Vector3((Math.random() - 0.5) * 0.4, Math.random() * 1.7, (Math.random() - 0.5) * 0.3)); m.userData.v = new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3); sc.add(m); return m; });
+            a.visible = false;
+            sparks(sc, mid, new THREE.Color('#e9f8ff'), 120, 2.5, 1.2, 0.05, -4);
+            return tween(1.2, (k) => shards.forEach((m) => { m.userData.v.y -= 0.15; m.position.addScaledVector(m.userData.v, 0.016); m.rotation.x += 0.2; m.rotation.y += 0.15; shardM.opacity = 0.9 * (1 - k); }), ease.linear);
+          });
+      }
+      default: return dissolve(sc, a, color);
+    }
   }
 
   // ---- эффекты по испытаниям ----
@@ -169,7 +265,7 @@ export class Cinematic {
     this.flash('#ffffff', 250);
     this.audio.crack(); this.audio.destroy();
     rings.forEach((r) => { sparks(sc, r.position, new THREE.Color('#dff4ff'), 160, 3.5, 1.3, 0.06, -4); r.visible = false; });
-    await Promise.all(avatars.map((a) => dissolve(sc, a, '#9fd8ff')));
+    await Promise.all(avatars.map((a) => this.exit(a, '#9fd8ff')));
   }
 
   // Запомни число: светящиеся цифры кружат вокруг игрока, краснеют и разлетаются.
@@ -184,7 +280,7 @@ export class Cinematic {
     const dirs = all.map(() => new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize().multiplyScalar(3));
     await Promise.all([
       tween(0.9, (k) => all.forEach((s, i) => { s.position.addScaledVector(dirs[i], 0.03); s.material.opacity = 1 - k; }), ease.linear),
-      ...avatars.map((a) => dissolve(sc, a, '#f6dc97')),
+      ...avatars.map((a) => this.exit(a, '#f6dc97')),
     ]);
   }
 
@@ -204,7 +300,7 @@ export class Cinematic {
     this.flash('#f6dc97', 200);
     shapes.forEach((m) => { sparks(sc, m.position, new THREE.Color('#f6dc97'), 140, 2.5, 1.2, 0.09, -5); m.visible = false; });
     this.audio.destroy();
-    await Promise.all(avatars.map((a) => dissolve(sc, a, '#f6dc97')));
+    await Promise.all(avatars.map((a) => this.exit(a, '#f6dc97')));
   }
 
   // Уникальное число: над головой выбранное число, совпавшие связаны красной линией, числа разбиваются.
@@ -218,7 +314,7 @@ export class Cinematic {
     await wait(1.1);
     this.audio.crack();
     nums.forEach((s) => { sparks(sc, s.position, new THREE.Color('#ff4a3a'), 90, 2.2, 1, 0.08, -4); s.visible = false; });
-    await Promise.all(avatars.map((a) => dissolve(sc, a, '#ff5a3a')));
+    await Promise.all(avatars.map((a) => this.exit(a, '#ff5a3a')));
   }
 
   // Стрельба вслепую: из темноты бьёт луч, вспышка, игрока отбрасывает.
@@ -243,7 +339,7 @@ export class Cinematic {
       tween(0.5, (k) => { beam.material.opacity = 1 - k; }).then(() => sc.remove(beam));
       await tween(0.7, (k) => { a.position.set(p0.x + k * 1.4, p0.y + Math.sin(k * Math.PI) * 0.4, p0.z - k * 0.8); a.rotation.z = -k * 1.3; }, ease.outCubic);
     }
-    await Promise.all(avatars.map((a) => dissolve(sc, a, '#7cf0ff')));
+    await Promise.all(avatars.map((a) => this.exit(a, '#7cf0ff')));
   }
 
   // Бомба: в руках пульсирует красная бомба, тиканье ускоряется, тишина — белая вспышка — взрыв, остаются дым и искры.
@@ -293,7 +389,7 @@ export class Cinematic {
     const dirs = cards.map(() => new THREE.Vector3((Math.random() - 0.5) * 4, 2 + Math.random() * 2, (Math.random() - 0.2) * 3));
     await Promise.all([
       tween(1.1, (k) => cards.forEach((c, i) => { dirs[i].y -= 0.12; c.position.addScaledVector(dirs[i], 0.016); c.rotation.x += 0.2; c.rotation.y += 0.15; }), ease.linear),
-      ...avatars.map((a) => dissolve(sc, a, '#ff5a3a')),
+      ...avatars.map((a) => this.exit(a, '#ff5a3a')),
     ]);
   }
 
@@ -316,6 +412,6 @@ export class Cinematic {
     this.audio.destroy();
     this.world.shake(0.4);
     drums.forEach((d) => { sparks(sc, d.position, new THREE.Color('#ff3b2a'), 120, 2.4, 1, 0.08, -4); d.visible = false; });
-    await Promise.all(avatars.map((a) => dissolve(sc, a, '#ff3b2a')));
+    await Promise.all(avatars.map((a) => this.exit(a, '#ff3b2a')));
   }
 }

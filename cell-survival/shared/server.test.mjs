@@ -39,6 +39,7 @@ for (const [s, id] of [[a, 'A'], [b, 'B']]) {
     if (st.cid === 'roulette') { if (st.visible?.turn === me.id) s.emit('act', { pull: true }); return; }
     if (st.cid === 'cards') { s.emit('act', { stand: true }); return; }
     if (st.cid === 'shoot') { s.emit('act', { angle: Math.random() * 6.28 }); return; }
+    if (st.cid === 'mines') { const c = st.data?.cells; if (!c) return; s.emit('act', { stand: c[Math.floor(Math.random() * c.length)], bomb: c[Math.floor(Math.random() * c.length)] }); return; }
     if (st.cid === 'doors') {
       const taken = new Set(Object.values(st.visible));
       const free = Array.from({ length: st.data.doors }, (_, i) => i).filter((i) => !taken.has(i));
