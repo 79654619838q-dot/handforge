@@ -9,6 +9,7 @@ services:
       npm run generate --prefix server &&
       npm install --prefix web && npm run build --prefix web &&
       npm install --prefix poker &&
+      npm install --prefix cell-survival && npm run build --prefix cell-survival &&
       npm install --prefix hub &&
       npm run db:push --prefix server
     startCommand: npm run start --prefix hub

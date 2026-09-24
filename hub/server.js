@@ -1,6 +1,6 @@
 // Единая точка входа под одну публичную ссылку. Ничего не переписывает изнутри
 // Poker и PhotoQuest — просто раскладывает трафик по путям: "/" — меню выбора,
-// "/poker" — HandForge Poker, "/quest" — PhotoQuest.
+// "/poker" — HandForge Poker, "/quest" — PhotoQuest, "/cell" — Cell Survival.
 // PhotoQuest отдаёт готовую сборку (npm run build), Poker работает как обычно.
 
 import express from "express";
@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 8877;
 const POKER_TARGET = process.env.POKER_TARGET || "http://localhost:3000";
 const QUEST_API_TARGET = process.env.QUEST_API_TARGET || "http://localhost:4000";
 const QUEST_DIST = path.join(__dirname, "..", "web", "dist");
+const CELL_DIST = path.join(__dirname, "..", "cell-survival", "dist");
 
 const app = express();
 
@@ -68,6 +69,15 @@ app.use(
   })
 );
 
+// Cell Survival — статическая сборка Vite с base "/cell/": все её пути уже
+// начинаются с /cell/, поэтому раздаём папку как есть. Без хвостового "/"
+// редиректим — так же, как у Poker (см. выше про req.path).
+app.get("/cell", (req, res, next) => {
+  if (req.path === "/cell") return res.redirect(301, "/cell/");
+  next();
+});
+app.use("/cell", express.static(CELL_DIST, { maxAge: "7d", index: "index.html" }));
+
 // PhotoQuest — SPA на React Router: любой путь внутри /quest отдаём одним
 // и тем же index.html, дальше маршрутизацией занимается сам React Router.
 app.get(["/quest", "/quest/*"], (_req, res) => {
@@ -79,5 +89,6 @@ app.listen(PORT, () => {
   console.log(`  /        меню`);
   console.log(`  /poker   → ${POKER_TARGET}`);
   console.log(`  /quest   → ${QUEST_DIST}`);
+  console.log(`  /cell    → ${CELL_DIST}`);
   console.log(`  /api     → ${QUEST_API_TARGET}`);
 });
