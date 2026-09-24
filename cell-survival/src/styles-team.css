@@ -258,8 +258,8 @@
   #match .hud-exit { top: auto; bottom: 6px; left: 8px; right: auto; padding: 6px 10px; font-size: 10px; }
   #match .hint { bottom: 6px; font-size: 11px; }
   .m-stage .cv { padding: 6px 164px 6px 92px; }
-  .cv-card { padding: 10px 14px; min-width: 0; max-height: calc(100vh - 12px); overflow-y: auto; }
-  .cv-kick { margin-bottom: 6px; font-size: 11px; }
+  .cv-card { padding: 10px 14px; min-width: 0; max-height: calc(100vh - 12px); overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+  .cv-kick { margin-bottom: 6px; font-size: 11px; letter-spacing: .18em; }
   .cv-huge { font-size: 54px; }
   .cv-big { margin-top: 10px; font-size: 18px; padding: 12px 34px; }
   .cv-digits span { width: 36px; height: 46px; font-size: 28px; }
@@ -282,6 +282,20 @@
   #profile .nameplate { top: 40px; }
   #menu .brand .title { font-size: 34px; } #menu nav { margin-top: 26vh; gap: 6px; }
   .hud-left { top: 6px; left: 6px; flex-direction: row; gap: 4px; } .hud-left .stat { min-width: 0; padding: 4px 8px; } .stat .v { font-size: 16px; } .hud-left .stat:nth-child(3) { display: none; }
-  .timer { top: 4px; } .timer .ring { width: 72px !important; height: 72px !important; } .timer .t { font-size: 18px !important; }
+  .timer:not(.m-timer) { top: 4px; } .timer:not(.m-timer) .ring { width: 72px !important; height: 72px !important; } .timer:not(.m-timer) .t { font-size: 18px !important; }
   .hud-right { top: 6px; right: 6px; width: 90px; padding: 5px; } .hud-right .pname { font-size: 11px; }
 }
+
+/* Рулетка: патроны на столе */
+.rl-shells { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 8px 0 14px; }
+.rl-shell { position: relative; width: 46px; height: 118px; border: 0; background: none; cursor: pointer; padding: 0; transition: transform .2s; }
+.rl-shell .tip { position: absolute; top: 0; left: 8px; width: 30px; height: 34px; border-radius: 15px 15px 3px 3px; background: linear-gradient(90deg, #6a4a22, #c9a060, #6a4a22); }
+.rl-shell .case { position: absolute; top: 32px; left: 5px; width: 36px; height: 80px; border-radius: 3px; background: linear-gradient(90deg, #7a5a1c, #e6c06a 45%, #8a6a2c); box-shadow: 0 6px 14px rgba(0,0,0,.5); }
+.rl-shell:not([disabled]):hover { transform: translateY(-8px); }
+.rl-shell[disabled] { cursor: default; }
+.rl-shell.blank { opacity: .35; transform: translateY(10px) rotate(-12deg); }
+.rl-shell.blank .tip { background: #444; }
+.rl-shell.shot .case, .rl-shell.live .case { background: linear-gradient(90deg, #6b0f1a, #ff3b2a 45%, #6b0f1a); box-shadow: 0 0 22px rgba(255,59,42,.7); }
+.rl-shell small { position: absolute; bottom: -18px; left: -10px; right: -10px; font-size: 11px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; }
+@media (max-width: 760px) { .rl-shell { width: 38px; height: 96px; } .rl-shell .tip { width: 24px; left: 7px; height: 28px; } .rl-shell .case { width: 30px; top: 26px; height: 66px; left: 4px; } }
+@media (max-height: 500px) and (orientation: landscape) { .rl-shell { width: 34px; height: 78px; } .rl-shell .tip { width: 22px; left: 6px; height: 22px; } .rl-shell .case { width: 28px; top: 20px; height: 56px; left: 3px; } }

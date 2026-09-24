@@ -5,98 +5,92 @@ import { FlatView } from './flat.js';
 import { confirmBox } from './common.js';
 import { esc, portraitOf } from '../MatchView.js';
 import { handValue } from '../../../shared/match.js';
+import { wait } from '../../scene/tween.js';
 
 // ---------- 8. Стрельба вслепую ----------
+// Шаг 1: нажмите в зоне — там вы встанете (подтвердить). Шаг 2: поставьте метку выстрела (подтвердить).
 export class ShootView extends FlatView {
+  holdSec = 0; // итог показывается своей анимацией
   render(st) {
     this.st = st;
-    const size = innerWidth < 760 ? Math.min(innerHeight * 0.52, innerWidth * 0.88) : Math.min(innerHeight * 0.62, innerWidth * 0.46);
-    const kick = st.phase === 'act' ? (this.canAct(st) ? t('aimHint') : this.alive(st) ? t('waitOthers') : '') : '';
+    const size = innerWidth < 760 ? Math.min(innerHeight * 0.5, innerWidth * 0.88) : Math.min(innerHeight * (innerHeight < 500 ? 0.5 : 0.6), innerWidth * 0.44);
+    const can = st.phase === 'act' && this.canAct(st);
+    const kick = st.phase === 'act' ? (can ? (this.posOk ? t('pickMark') : t('pickSpot')) : this.alive(st) ? t('waitOthers') : '') : '';
     this.el.innerHTML = `<div class="cv-card panel hit cv-canvas-card"><div class="cv-kick">${kick}</div>
       <canvas width="1000" height="1000" style="width:${size}px;height:${size}px" data-c></canvas>
-      ${st.phase === 'act' && this.canAct(st) ? `<button class="btn primary" data-fire style="margin-top:12px">${t('fireReady')}</button>` : ''}
       ${st.phase === 'reveal' ? this.outNames(st) : ''}</div>`;
     const c = this.el.querySelector('[data-c]');
     this.draw(c, st, 1);
-    const aimAt = (e) => {
+    c.onclick = async (e) => {
+      if (!this.canAct(this.st) || this.busy) return;
       const r = c.getBoundingClientRect();
-      const x = ((e.clientX - r.left) / r.width) * 2 - 1, y = ((e.clientY - r.top) / r.height) * 2 - 1;
-      const me = st.priv?.pos; if (!me) return;
-      this.angle = Math.atan2(y - me[1], x - me[0]);
-      this.draw(c, this.st, 1);
+      const pt = [((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1];
+      const zone = this.st.data?.zone ?? 1;
+      if (Math.hypot(pt[0], pt[1]) > zone) { const k = zone / Math.hypot(pt[0], pt[1]) * 0.98; pt[0] *= k; pt[1] *= k; } // за краем — к краю зоны
+      this.busy = true;
+      if (!this.posOk) {
+        this.pos = pt; this.draw(c, this.st, 1); this.audio.select();
+        if (await confirmBox(this.root, t('confirmSpot'))) { this.posOk = true; this.audio.confirm(); } else this.pos = null;
+      } else {
+        this.mark = pt; this.draw(c, this.st, 1); this.audio.charge();
+        if (await confirmBox(this.root, t('confirmMark')) && this.canAct(this.st)) { this.act({ pos: this.pos, mark: this.mark }); this.audio.confirm(); } else this.mark = null;
+      }
+      this.busy = false;
+      this.render(this.st);
     };
-    c.onpointerdown = (e) => { if (!this.canAct(this.st)) return; this.dragging = true; aimAt(e); this.audio.hover(); };
-    c.onpointermove = (e) => { if (this.dragging) aimAt(e); };
-    c.onpointerup = () => { this.dragging = false; };
-    this.el.querySelector('[data-fire]')?.addEventListener('click', () => this.fire());
-  }
-  fire() {
-    if (!this.canAct(this.st) || this.angle == null) return;
-    this.act({ angle: this.angle });
-    this.audio.confirm();
-  }
-  frame(now) {
-    // за полсекунды до конца прицел отправляется сам, чтобы не выстрелить случайно
-    const st = this.st;
-    if (st?.phase === 'act' && this.canAct(st) && this.angle != null && st.deadline && st.deadline - now < 600 && !this.autoSent) { this.autoSent = true; this.fire(); }
   }
   update(st, changed) {
-    if (changed && st.phase === 'act') { this.angle = null; this.autoSent = false; }
+    if (changed && st.phase === 'act') { this.pos = null; this.mark = null; this.posOk = false; }
     if (st.phase === 'reveal' && changed) { this.st = st; this.animateReveal(st); return; }
-    super.update(st, changed);
+    if (this.fxBusy) return;
+    if (changed && st.phase !== 'reveal' && this.cine) this.clearFx();
+    if (changed || (st.phase === 'act' && !this.canAct(st) && this.el.querySelector('.cv-kick')?.textContent !== t('waitOthers'))) this.render(st);
   }
-  // раскрытие: все появляются, лучи прочерчивают поле, потом — сцена выбывания
+  // раскрытие: все появляются, метки накрывают поле, потом — сцена выбывания
   async animateReveal(st) {
     this.fxBusy = true;
+    this.el.innerHTML = '';
     this.render(st);
     const c = this.el.querySelector('[data-c]');
     const t0 = performance.now();
     this.audio.charge();
     await new Promise((res) => {
-      const step = () => { const k = Math.min(1, (performance.now() - t0) / 1600); this.draw(c, st, k); if (k < 1) requestAnimationFrame(step); else res(); };
+      const step = () => { const k = Math.min(1, (performance.now() - t0) / 1500); this.draw(c, st, k); if (k < 1) requestAnimationFrame(step); else res(); };
       step();
     });
     this.audio.destroy();
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 1300));
     this.fxBusy = false;
     this.playOut(st);
   }
   draw(c, st, k) {
+    if (!c) return;
     const g = c.getContext('2d');
     const P = (x, y) => [(x + 1) * 500, (y + 1) * 500];
     g.clearRect(0, 0, 1000, 1000);
-    const zone = st.reveal?.zone ?? st.data?.zone ?? 1;
-    // зона
+    const r = st.reveal;
+    const zone = r?.zone ?? st.data?.zone ?? 1, rad = (r?.radius ?? st.data?.radius ?? 0.15) * 500;
     g.beginPath(); g.arc(500, 500, zone * 500, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(20,16,30,.75)'; g.fill(); g.lineWidth = 6; g.strokeStyle = '#d9b25f'; g.stroke();
-    g.setLineDash([12, 14]); g.beginPath(); g.arc(500, 500, zone * 500 * 0.8, 0, Math.PI * 2); g.strokeStyle = 'rgba(217,178,95,.25)'; g.lineWidth = 2; g.stroke(); g.setLineDash([]);
-    const me = st.priv?.pos;
-    if (st.phase !== 'reveal' && me) {
-      const [x, y] = P(...me);
-      if (this.angle != null || st.mine != null) {
-        const a = this.angle ?? st.mine;
-        g.strokeStyle = 'rgba(124,240,255,.8)'; g.lineWidth = (st.data?.beam || 0.08) * 500 * 0.35;
-        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 1400, y + Math.sin(a) * 1400); g.stroke();
-      }
-      g.beginPath(); g.arc(x, y, 22, 0, Math.PI * 2); g.fillStyle = '#f6dc97'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#000'; g.stroke();
-      g.font = '600 34px Rajdhani, sans-serif'; g.fillStyle = '#f6dc97'; g.fillText(t('you'), x + 28, y - 20);
+    g.fillStyle = 'rgba(20,16,30,.8)'; g.fill(); g.lineWidth = 6; g.strokeStyle = '#d9b25f'; g.stroke();
+    const person = (x, y, col, label) => {
+      g.beginPath(); g.arc(x, y, 22, 0, Math.PI * 2); g.fillStyle = col; g.fill(); g.lineWidth = 4; g.strokeStyle = '#000'; g.stroke();
+      if (label) { g.font = '600 32px Rajdhani, sans-serif'; g.fillStyle = '#fff'; g.fillText(label, x + 28, y - 18); }
+    };
+    const target = (x, y, col, scale = 1) => {
+      g.strokeStyle = col; g.lineWidth = 5; g.beginPath(); g.arc(x, y, rad * scale, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(x - 26, y); g.lineTo(x + 26, y); g.moveTo(x, y - 26); g.lineTo(x, y + 26); g.stroke();
+    };
+    if (st.phase !== 'reveal') {
+      const mine = st.mine;
+      const pos = mine?.pos || this.pos, mark = mine?.mark || this.mark;
+      if (mark) { const [x, y] = P(...mark); g.fillStyle = 'rgba(255,59,42,.15)'; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill(); target(x, y, '#ff5a3a'); }
+      if (pos) { const [x, y] = P(...pos); person(x, y, '#f6dc97', t('you')); }
+      return;
     }
-    if (st.phase === 'reveal' && st.reveal?.pos) {
-      const r = st.reveal;
-      const hit = new Set(r.eliminated || []);
-      for (const [id, a] of Object.entries(r.angles)) {
-        const [x, y] = P(...r.pos[id]);
-        const L = 1400 * k;
-        g.strokeStyle = id === this.myId ? 'rgba(246,220,151,.9)' : 'rgba(124,240,255,.75)'; g.lineWidth = r.beam * 500 * 0.35;
-        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke();
-      }
-      for (const [id, pos] of Object.entries(r.pos)) {
-        const [x, y] = P(...pos);
-        g.beginPath(); g.arc(x, y, 22, 0, Math.PI * 2);
-        g.fillStyle = k >= 1 && hit.has(id) ? '#ff3b2a' : id === this.myId ? '#f6dc97' : '#a78bfa'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#000'; g.stroke();
-        g.font = '600 30px Rajdhani, sans-serif'; g.fillStyle = '#fff'; g.fillText(this.name(st, id), x + 26, y - 18);
-      }
-    }
+    if (!r?.pos) return;
+    const hit = new Set(r.eliminated || []);
+    for (const [id, m] of Object.entries(r.marks)) { const [x, y] = P(...m); g.fillStyle = `rgba(255,59,42,${0.18 * k})`; g.beginPath(); g.arc(x, y, rad * k, 0, Math.PI * 2); g.fill(); target(x, y, id === this.myId ? '#f6dc97' : 'rgba(255,90,58,.8)', k); }
+    for (const [id, pos] of Object.entries(r.pos)) { const [x, y] = P(...pos); person(x, y, k >= 1 && hit.has(id) ? '#ff3b2a' : id === this.myId ? '#f6dc97' : '#a78bfa', this.name(st, id)); }
   }
 }
 
@@ -143,6 +137,7 @@ const cardHtml = (c, hidden = false) => {
   return `<div class="pc ${'♥♦'.includes(s) ? 'red' : ''}"><b>${r}</b><i>${s}</i></div>`;
 };
 export class CardsView extends FlatView {
+  holdSec = 0; // итог показывается своей анимацией
   render(st) {
     this.st = st;
     const v = st.visible || {};
@@ -165,45 +160,75 @@ export class CardsView extends FlatView {
     this.el.querySelector('[data-stand]')?.addEventListener('click', () => { this.act({ stand: true }); this.audio.confirm(); });
   }
   update(st, changed) {
-    if (st.phase === 'reveal' && changed) return this.playOut(st);
+    if (st.phase === 'reveal' && changed) return this.dealerReveal(st);
     if (this.fxBusy) return;
     if (changed && st.phase !== 'reveal' && this.cine) this.clearFx();
     this.render(st);
+  }
+  // дилер переворачивает вторую карту, добирает по одной — все видят итог, потом сцена выбывания
+  async dealerReveal(st) {
+    this.fxBusy = true;
+    const r = st.reveal;
+    const box = (n) => {
+      const shown = r.dealer.slice(0, n);
+      this.el.innerHTML = `<div class="cv-card panel hit"><div class="cv-kick">${t('dealer')}</div><div class="pc-row">${shown.map((c) => cardHtml(c)).join('')}${n < 2 ? cardHtml('', true) : ''}</div>
+        <div class="cv-huge" style="font-size:54px">${n >= 2 ? handValue(shown) : ''}</div></div>`;
+    };
+    box(1); await wait(0.6);
+    for (let n = 2; n <= r.dealer.length; n++) { box(n); this.audio.select(); await wait(0.8); }
+    this.render(st); // таблица: дилер и все игроки
+    await wait(2.4);
+    this.fxBusy = false;
+    this.playOut(st);
   }
 }
 
 // ---------- 11. Русская рулетка ----------
+// На столе патроны: среди них боевые (в первом раунде один), остальные холостые. В свой ход выбираете патрон.
 export class RouletteView extends FlatView {
+  holdSec = 0; // итог показывается своей анимацией
   render(st) {
     this.st = st;
     const v = st.visible || {};
-    const bullets = v.bullets ?? st.data?.bullets ?? 1;
-    const my = v.turn === this.myId && this.canAct(st);
+    const total = v.total ?? st.data?.total ?? 6, live = v.live ?? st.data?.live ?? 1;
+    const my = st.phase === 'act' && v.turn === this.myId && this.canAct(st);
+    const taken = new Map((v.taken || st.reveal?.taken || []).map((x) => [x.i, x]));
+    const liveRev = new Set(st.reveal?.live || []);
     const order = st.data?.order || [];
-    const holes = Array.from({ length: 6 }, (_, i) => { const a = (i / 6) * Math.PI * 2 - Math.PI / 2; return `<circle cx="${100 + Math.cos(a) * 52}" cy="${100 + Math.sin(a) * 52}" r="17" class="${i < bullets ? 'live' : ''}"/>`; }).join('');
-    const pulls = (v.pulls || []).slice(-6).map((p) => `<span class="${p.hit ? 'bad' : ''}">${esc(this.name(st, p.pid))} — ${p.hit ? t('shot') : t('click')}</span>`).join('');
+    const shells = Array.from({ length: total }, (_, i) => {
+      const tk = taken.get(i);
+      const cls = tk ? (tk.live ? 'shot' : 'blank') : st.phase === 'reveal' && liveRev.has(i) ? 'live' : '';
+      return `<button class="rl-shell hit ${cls}" data-i="${i}" ${my && !tk ? '' : 'disabled'}><span class="tip"></span><span class="case"></span>${tk ? `<small>${esc(this.name(st, tk.pid))}</small>` : ''}</button>`;
+    }).join('');
     this.el.innerHTML = `<div class="cv-card panel hit rl-card">
-      <div class="cv-kick">${t('bulletsN')}: ${bullets} ${t('of')} 6</div>
-      <svg class="rl-drum ${this.spin ? 'spin' : ''}" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" class="body"/>${holes}<circle cx="100" cy="100" r="16" class="axis"/></svg>
+      <div class="cv-kick">${t('liveRounds')}: ${live} · ${t('blankRounds')}: ${total - live}</div>
+      <div class="rl-shells">${shells}</div>
       <div class="rl-order">${order.filter((id) => st.alive?.includes(id)).map((id) => `<span class="${id === v.turn ? 'on' : ''}">${esc(this.name(st, id))}</span>`).join('')}</div>
-      ${st.phase === 'act' ? (my ? `<button class="btn primary cv-big" data-pull>${t('pull')}</button>` : `<div class="cv-note">${v.turn ? `${t('turnOf')}: ${esc(this.name(st, v.turn))}` : ''}</div>`) : ''}
-      <div class="rl-log">${pulls}</div>${st.phase === 'reveal' ? this.outNames(st) : ''}</div>`;
-    this.el.querySelector('[data-pull]')?.addEventListener('click', async () => {
-      if (!(await confirmBox(this.root, t('pullQ')))) return;
-      this.act({ pull: true });
+      <div class="cv-note">${st.phase === 'act' ? (my ? t('pickShell') : v.turn ? `${t('turnOf')}: ${esc(this.name(st, v.turn))}` : '') : ''}</div>
+      ${st.phase === 'reveal' ? this.outNames(st) : ''}</div>`;
+    this.el.querySelectorAll('.rl-shell:not([disabled])').forEach((b) => b.onclick = async () => {
+      this.audio.select();
+      if (!(await confirmBox(this.root, t('pickShellQ')))) return;
+      this.act({ pick: Number(b.dataset.i) });
     });
   }
   update(st, changed) {
-    const n = this.st?.visible?.pulls?.length || 0;
-    if (st.phase === 'reveal' && changed) return this.playOut(st);
+    const n = this.st?.visible?.taken?.length || 0;
+    if (st.phase === 'reveal' && changed) return this.showShells(st);
     if (this.fxBusy) return;
     if (changed && st.phase !== 'reveal' && this.cine) this.clearFx();
-    const pulls = st.visible?.pulls || [];
-    if (pulls.length > n) { // новый щелчок: барабан крутится, звук
-      const last = pulls[pulls.length - 1];
-      this.spin = true; this.audio.charge();
-      setTimeout(() => { this.spin = false; last.hit ? this.audio.destroy() : this.audio.crack(); this.render(this.st); }, 700);
-    }
+    const taken = st.visible?.taken || [];
+    if (taken.length > n) { const last = taken[taken.length - 1]; last.live ? this.audio.destroy() : this.audio.crack(); }
     this.render(st);
   }
+  // все видят, кто вытянул боевой и где лежали остальные боевые, — потом сцена выбывания
+  async showShells(st) {
+    this.fxBusy = true;
+    this.render(st);
+    this.audio.destroy();
+    await wait(2.6);
+    this.fxBusy = false;
+    this.playOut(st);
+  }
+
 }

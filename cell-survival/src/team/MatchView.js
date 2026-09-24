@@ -126,6 +126,10 @@ export class MatchView {
     const done = new Set(st.done || []);
     const winners = new Set(st.winners || []);
     const sorted = st.players.slice().sort((a, b) => (alive.has(b.id) - alive.has(a.id)) || b.points - a.points);
+    // состояние приходит много раз в секунду — перестраиваем список, только если в нём что-то поменялось
+    const key = st.phase + '|' + sorted.map((p) => [p.id, p.name, p.points, p.connected, alive.has(p.id), done.has(p.id), winners.has(p.id)].join(',')).join(';') + '|' + !!st.cid;
+    if (key === this.playersKey) return;
+    this.playersKey = key;
     box.innerHTML = `<div class="label" style="margin-bottom:8px">${t('players')}</div>` + sorted.map((p) => {
       const status = winners.has(p.id) ? `<span class="pl-st win">★</span>` : !st.cid || alive.has(p.id) ? (done.has(p.id) && st.phase === 'act' ? `<span class="pl-st ok">✓</span>` : '') : `<span class="pl-st out">✕</span>`;
       return `<div class="pl ${alive.has(p.id) || !st.cid ? '' : 'dead'} ${p.id === this.myId ? 'me' : ''}" data-pid="${p.id}">

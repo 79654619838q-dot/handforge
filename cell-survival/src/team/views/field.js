@@ -1,9 +1,9 @@
-// Испытания на 3D-поле: «Последняя клетка», «Взрывное поле», «Двери».
+// Испытания на 3D-поле: «Последняя клетка», «Взрывное поле», «Уникальное число», «Двери».
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { t } from '../../i18n.js';
 import { GameWorld } from '../../scene/GameWorld.js';
-import { CELL } from '../../managers/CellManager.js';
+import { CELL, CELL_H } from '../../managers/CellManager.js';
 import { PLAYER } from '../../managers/PlayerManager.js';
 import { EliminationManager } from '../../managers/EliminationManager.js';
 import { ensurePerson, buildAvatar } from '../../managers/AvatarManager.js';
@@ -244,6 +244,92 @@ export class MinesView extends FieldView {
       }
     }
     setTimeout(() => { this.closeUpEnd(); this.mv.showOut(); }, 1700);
+  }
+}
+
+// ---------- 7. Уникальное число ----------
+// Числа написаны на плитках поля. Каждый тайно встаёт на плитку; когда выбрали все — все выходят на свои плитки.
+// Плитка, на которую встали двое и больше, рушится вместе с ними. Выбранные плитки из игры уходят.
+function tileNumberTexture(n) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.font = '700 76px Cinzel, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 10; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(String(n), 64, 70);
+  g.fillStyle = '#f6dc97'; g.fillText(String(n), 64, 70);
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4; return tx;
+}
+const numGeo = new THREE.PlaneGeometry(0.72, 0.72);
+
+export class UniqueFieldView extends FieldView {
+  revealFxSec = 5;
+  enter(st) { if (st.data) this.build(st); else this.world = backdrop(this); }
+  build(st) {
+    this.built = true;
+    this.round = st.round;
+    this.picker?.dispose();
+    const total = st.data.total || st.data.max;
+    this.setupWorld(st, total);
+    const keep = new Set(st.data.pool.map((n) => n - 1));
+    for (const c of this.grid.cells) {
+      if (!keep.has(c.id)) { c.alive = false; c.group.parent?.remove(c.group); continue; }
+      const m = new THREE.Mesh(numGeo, new THREE.MeshBasicMaterial({ map: tileNumberTexture(c.id + 1), transparent: true, depthWrite: false, toneMapped: false }));
+      m.rotation.x = -Math.PI / 2; m.position.y = CELL_H / 2 + 0.01; m.renderOrder = 2;
+      c.inner.add(m);
+    }
+    if (keep.size !== total) this.grid.relayout().then(() => this.world.fitCamera(this.grid.extent));
+    this.grid.intro();
+    this.busy = false;
+  }
+  pickable() { return this.canAct(this.st) && !this.busy; }
+  async onCell(c) {
+    if (!this.canAct(this.st) || this.busy) return;
+    this.busy = true;
+    this.grid.clearSelection(); c.setState(CELL.SELECTED); this.audio.select();
+    const ok = await confirmBox(this.root, `${t('chooseNumber')}: ${c.id + 1}?`);
+    this.busy = false;
+    if (!ok || !this.canAct(this.st)) { c.setState(CELL.AVAILABLE); return; }
+    const r = await this.act({ n: c.id + 1 });
+    this.audio[r?.ok ? 'confirm' : 'click']();
+    if (!r?.ok) { c.setState(CELL.AVAILABLE); return; }
+    c.setState(CELL.CONFIRMED);
+    this.place(this.st, this.myId, c); // свою фигуру видите только вы; чужие появятся при раскрытии
+  }
+  update(st, changed) {
+    this.st = st;
+    if (!this.built) { if (!st.data) return; this.build(st); }
+    if (st.phase === 'act' && changed && st.round !== this.round) this.build(st); // новый раунд — поле без выбранных плиток
+    this.picker.set(this.canAct(st));
+    if (st.phase === 'act') {
+      this.hint(this.canAct(st) ? t('chooseNumber') : this.alive(st) ? t('waitOthers') : '');
+      if (st.mine != null && !this.pl.get(this.myId)?.cell) { const c = this.grid.cells[st.mine - 1]; if (c?.alive) { c.setState(CELL.CONFIRMED); this.place(st, this.myId, c); } }
+    }
+    if (st.phase === 'reveal' && changed && st.reveal) this.reveal(st);
+  }
+  async reveal(st) {
+    const r = st.reveal;
+    this.picker.set(false);
+    this.hint('');
+    this.grid.clearSelection();
+    const byCell = new Map();
+    for (const [pid, n] of Object.entries(r.picks || {})) { const c = this.grid.cells[n - 1]; if (!c?.alive) continue; if (!byCell.has(c)) byCell.set(c, []); byCell.get(c).push(pid); }
+    // все выходят на свои плитки одновременно
+    await Promise.race([Promise.all([...byCell].flatMap(([c, ids]) => ids.map((id) => this.place(st, id, c)))), wait(2.2)]);
+    // несколько на одной плитке — расставить рядом, чтобы было видно всех
+    for (const [, ids] of byCell) if (ids.length > 1) ids.forEach((id, k) => { const a = this.pl.get(id)?.avatar; if (!a) return; a.position.x = (k - (ids.length - 1) / 2) * 0.36; const l = a.children.find((o) => o.isSprite); if (l) l.position.y = 2.25 + k * 0.32; });
+    await wait(0.8);
+    const bad = [...byCell].filter(([, ids]) => ids.length > 1).map(([c]) => c);
+    const good = [...byCell].filter(([, ids]) => ids.length === 1).map(([c]) => c);
+    good.forEach((c) => c.setState(CELL.CONFIRMED));
+    bad.forEach((c) => { c.danger = 0.35; });
+    this.audio[bad.length ? 'charge' : 'confirm']();
+    await wait(1.4);
+    if (!bad.length) { this.mv.showOut(); return; }
+    await this.closeUp(bad[0].group.getWorldPosition(new THREE.Vector3()), bad.length > 1 ? 4 : 2.6);
+    const players = [...this.pl.values()];
+    await Promise.all(bad.map((c) => this.elim.destroy(c, players)));
+    await wait(0.4);
+    this.closeUpEnd();
+    this.mv.showOut();
   }
 }
 

@@ -31,7 +31,7 @@ for (const cid of CHALLENGE_IDS) {
       const m = run(bots(n), [cid], { cells: 16 });
       assert.equal(m.phase, 'final', `${cid} n=${n}: матч не дошёл до конца`);
       const h = m.history[0];
-      const maxWin = cid === 'unique' ? 2 : cid === 'cards' || cid === 'mines' ? n : 1; // «Очко» — 12 раундов, «Взрывное поле» — пока есть клетки
+      const maxWin = ['unique', 'cards', 'mines', 'shoot'].includes(cid) ? n : 1; // «Очко» — 12 раундов, «Взрывное поле» — пока есть клетки
       assert.ok(h.winners.length >= 1 && h.winners.length <= maxWin, `${cid} n=${n}: победителей ${h.winners.length}`);
       assert.equal(h.winners.length + h.order.length, n, `${cid} n=${n}: кто-то потерялся`);
       const ids = new Set([...h.winners, ...h.order.map((o) => o.id)]);
@@ -94,7 +94,7 @@ for (const cid of ['bomb', 'shoot']) {
   const sa = m3.getStateFor('a');
   assert.equal(sa.phase, 'act');
   if (cid === 'bomb') assert.equal(sa.deadline, null, 'фитиль бомбы виден');
-  if (cid === 'shoot') { assert.ok(sa.priv?.pos, 'своя позиция не пришла'); assert.ok(!JSON.stringify(sa).includes(JSON.stringify(m3.ch.pos.b)), 'чужая позиция утекла'); }
+  if (cid === 'shoot') { m3.act('b', { pos: [0.123, 0.321], mark: [0, 0] }); const s2 = m3.getStateFor('a'); assert.ok(!JSON.stringify(s2).includes('0.321'), 'чужая позиция утекла'); }
   checks++;
 }
 

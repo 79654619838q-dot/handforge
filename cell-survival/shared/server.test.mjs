@@ -36,15 +36,16 @@ for (const [s, id] of [[a, 'A'], [b, 'B']]) {
     if (st.phase !== 'act' || !st.alive.includes(me.id) || (st.done.includes(me.id) && !['bomb', 'roulette'].includes(st.cid))) return;
     if (st.cid === 'unique' && Object.keys(st.visible).length) leaked = true;
     if (st.cid === 'bomb') { if (st.visible?.holder === me.id && Date.now() - st.visible.since > 1200) s.emit('act', { to: st.alive.find((x) => x !== me.id) }); return; }
-    if (st.cid === 'roulette') { if (st.visible?.turn === me.id) s.emit('act', { pull: true }); return; }
+    if (st.cid === 'roulette') { if (st.visible?.turn === me.id) { const t = new Set(st.visible.taken.map((x) => x.i)); const f = Array.from({ length: st.visible.total }, (_, i) => i).filter((i) => !t.has(i)); s.emit('act', { pick: f[Math.floor(Math.random() * f.length)] }); } return; }
     if (st.cid === 'cards') { s.emit('act', { stand: true }); return; }
-    if (st.cid === 'shoot') { s.emit('act', { angle: Math.random() * 6.28 }); return; }
+    if (st.cid === 'shoot') { const z = st.data.zone * 0.7, r = () => [(Math.random() * 2 - 1) * z, (Math.random() * 2 - 1) * z]; s.emit('act', { pos: r(), mark: r() }); return; }
     if (st.cid === 'mines') { const c = st.data?.cells; if (!c) return; s.emit('act', { stand: c[Math.floor(Math.random() * c.length)], bomb: c[Math.floor(Math.random() * c.length)] }); return; }
     if (st.cid === 'doors') {
       const taken = new Set(Object.values(st.visible));
       const free = Array.from({ length: st.data.doors }, (_, i) => i).filter((i) => !taken.has(i));
       s.emit('act', { door: free[Math.floor(Math.random() * free.length)] });
-    } else s.emit('act', { n: 1 + Math.floor(Math.random() * st.data.max) });
+    } else if (st.data?.pool) s.emit('act', { n: st.data.pool[Math.floor(Math.random() * st.data.pool.length)] });
+    else s.emit('act', { n: 1 + Math.floor(Math.random() * st.data.max) });
   });
 }
 const t0 = Date.now();

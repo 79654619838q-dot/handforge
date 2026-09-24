@@ -1,14 +1,16 @@
-// Испытания без поля: «Останови время», «Запомни число», «Центр», «Уникальное число».
+// Испытания без поля: «Останови время», «Запомни число», «Центр». Их общий FlatView — основа и для extra.js.
 // Сцена — задник темы, всё управление — HTML/canvas поверх.
 import { t } from '../../i18n.js';
 import { BaseView, backdropWorld, confirmBox } from './common.js';
 import { Cinematic } from '../../scene/cinematics.js';
+import { wait } from '../../scene/tween.js';
 import { esc } from '../MatchView.js';
 
 const fmtSec = (ms) => (ms == null ? '—' : (ms / 1000).toFixed(2));
 
 export class FlatView extends BaseView {
   revealFxSec = 5;
+  holdSec = 2.5; // сколько показывать итог раунда (числа, результаты) до сцены выбывания
   enter(st) { this.world = backdropWorld(this.stage, this.theme); this.render(st); }
   update(st, changed) {
     // раскрытие: сначала выбывшие проваливаются на сцене, потом — таблица результатов
@@ -31,6 +33,7 @@ export class FlatView extends BaseView {
     const out = st.reveal?.replay ? [] : st.reveal?.eliminated || [];
     if (!out.length) { this.render(st); return; }
     this.fxBusy = true;
+    if (this.holdSec) { this.render(st); await wait(this.holdSec); }
     this.el.innerHTML = '';
     this.cine?.dispose();
     this.cine = new Cinematic(this.world, this.audio, this.mv.el);
@@ -127,7 +130,7 @@ const COLORS = ['#f6dc97', '#8b5cf6', '#4ade80', '#3da9ff', '#ff6b6b', '#ffb347'
 export class CenterView extends FlatView {
   render(st) {
     this.st = st;
-    const size = innerWidth < 760 ? Math.min(innerHeight * 0.55, innerWidth * 0.86) : Math.min(innerHeight * 0.62, innerWidth * 0.46); // на телефоне фигура почти во всю ширину
+    const size = innerWidth < 760 ? Math.min(innerHeight * 0.55, innerWidth * 0.86) : Math.min(innerHeight * (innerHeight < 500 ? 0.5 : 0.62), innerWidth * 0.46); // на телефоне фигура почти во всю ширину
     this.el.innerHTML = `<div class="cv-card panel hit cv-canvas-card"><div class="cv-kick">${st.phase === 'act' && this.canAct(st) ? t('putPoint') : st.phase === 'reveal' ? '' : t('waitOthers')}</div>
       <canvas width="1000" height="1000" style="width:${size}px;height:${size}px" data-c></canvas>${st.phase === 'reveal' ? this.outNames(st) : ''}</div>`;
     const c = this.el.querySelector('[data-c]');
@@ -173,26 +176,3 @@ export class CenterView extends FlatView {
   }
 }
 
-// ---------- Уникальное число ----------
-export class UniqueView extends FlatView {
-  render(st) {
-    const max = st.data?.max || 0;
-    const picks = st.reveal?.picks;
-    const count = {};
-    if (picks) for (const v of Object.values(picks)) count[v] = (count[v] || 0) + 1;
-    const tiles = Array.from({ length: max }, (_, i) => i + 1).map((n) => {
-      const who = picks ? Object.keys(picks).filter((id) => picks[id] === n) : [];
-      const cls = picks ? (count[n] > 1 ? 'bad' : count[n] === 1 ? 'good' : 'empty') : (st.mine === n || this.sel === n ? 'on' : '');
-      return `<button class="cv-num hit ${cls}" data-n="${n}"><b>${n}</b>${who.length ? `<span>${who.map((id) => esc(this.name(st, id))).join('<br>')}</span>` : ''}</button>`;
-    }).join('');
-    const kick = st.phase === 'act' ? (this.canAct(st) ? t('chooseNumber') : this.alive(st) ? t('waitOthers') : '') : '';
-    this.el.innerHTML = `<div class="cv-card panel hit"><div class="cv-kick">${kick}</div><div class="cv-nums">${tiles}</div>${picks ? this.outNames(st) : ''}</div>`;
-    this.el.querySelectorAll('[data-n]').forEach((b) => b.onclick = async () => {
-      if (!this.canAct(st)) return;
-      this.sel = Number(b.dataset.n); this.render(st); this.audio.select();
-      if (await confirmBox(this.root, `${t('chooseNumber')}: ${this.sel}?`)) { this.act({ n: this.sel }); this.audio.confirm(); } else { this.sel = null; this.render(this.st || st); }
-    });
-    this.st = st;
-  }
-  update(st, changed) { if (st.phase === 'reveal' && changed) return this.playOut(st); if (this.fxBusy) return; if (changed && st.phase !== 'reveal' && this.cine) this.clearFx(); if (changed) { this.sel = null; } this.render(st); }
-}

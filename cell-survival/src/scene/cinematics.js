@@ -399,17 +399,19 @@ export class Cinematic {
   // Рулетка: над игроком вращается барабан, щелчок — красная вспышка, игрок рассыпается в дым.
   async fxRoulette(avatars, chest) {
     const sc = this.group;
+    // над выбывшим — его боевой патрон: латунная гильза с красной пулей
     const drums = avatars.map((a) => {
       const g = new THREE.Group();
-      const metalM = new THREE.MeshStandardMaterial({ color: '#8a8f96', metalness: 1, roughness: 0.25 });
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.25, 6), metalM); body.rotation.x = Math.PI / 2; g.add(body);
-      for (let i = 0; i < 6; i++) { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.26, 16), new THREE.MeshStandardMaterial({ color: i === 0 ? '#ff2a1a' : '#0a0a0a', emissive: i === 0 ? '#ff2a1a' : '#000', emissiveIntensity: 1.2 })); const an = (i / 6) * Math.PI * 2; h.position.set(Math.cos(an) * 0.17, Math.sin(an) * 0.17, 0); h.rotation.x = Math.PI / 2; g.add(h); }
+      const brass = new THREE.MeshStandardMaterial({ color: '#d9a94a', metalness: 1, roughness: 0.3 });
+      const lead = new THREE.MeshStandardMaterial({ color: '#ff2a1a', emissive: '#ff2a1a', emissiveIntensity: 1.2, metalness: 0.4, roughness: 0.4 });
+      const caseM = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.3, 20), brass); g.add(caseM);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.066, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), lead); tip.scale.y = 1.8; tip.position.y = 0.15; g.add(tip);
       g.position.copy(chest(a)).add(new THREE.Vector3(0, 1.0, 0.2));
       sc.add(g);
       return g;
     });
     this.audio.charge();
-    await tween(1.4, (k) => drums.forEach((d) => { d.rotation.z = (1 - Math.pow(1 - k, 3)) * Math.PI * 8; }), ease.linear);
+    await tween(1.4, (k) => drums.forEach((d) => { d.rotation.y = (1 - Math.pow(1 - k, 3)) * Math.PI * 8; d.rotation.z = Math.sin(k * Math.PI) * 0.4; }), ease.linear);
     await wait(0.3);
     this.flash('#ff2020', 400);
     this.audio.destroy();

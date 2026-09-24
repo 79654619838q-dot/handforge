@@ -165,7 +165,7 @@ class StopTime extends Base {
     for (const p of this.alive) results[p] = { elapsed: this.moves[p] ?? null, dev: Number.isFinite(dev(p)) ? dev(p) : null };
     return { eliminated, replay: false, reveal: { target: this.target, results } };
   }
-  revealMs() { return 10000; }
+  revealMs() { return 12500; }
 }
 
 // 4. Взрывное поле
@@ -206,7 +206,8 @@ class Memory extends Base {
     this.number = String(1 + rnd(9)) + Array.from({ length: digits - 1 }, () => rnd(10)).join('');
     return super.begin();
   }
-  get showSec() { return Math.max(0.6, 2 - 0.2 * (this.round - 1)); }
+  // показ растёт вместе с числом: 3 цифры — 1 с, каждая следующая цифра +0,3 с
+  get showSec() { return 1 + 0.3 * (this.number.length - 3); }
   data() { return { digits: this.number.length, showMs: this.showSec * 1000 }; }
   showData() { return { number: this.number }; }
   showMs() { return this.showSec * 1000; }
@@ -230,7 +231,7 @@ class Memory extends Base {
     for (const p of this.alive) results[p] = { answer: this.moves[p]?.answer ?? '', ok: this.moves[p]?.answer === n, ms: this.moves[p]?.ms ?? null };
     return { eliminated, replay: false, reveal: { number: n, results } };
   }
-  revealMs() { return 9500; }
+  revealMs() { return 12000; }
 }
 
 // 6. Центр
@@ -249,7 +250,7 @@ function makeShape(round) {
   const kinds = ['circle', 'square', 'triangle', 'rhombus', 'pentagon', 'hexagon', 'irregular', 'concave'];
   const kind = round <= kinds.length ? kinds[round - 1] : pick(kinds.slice(4));
   // координаты поля 0..1000; фигура смещена случайно, чтобы центр не совпадал с серединой поля
-  const ox = 360 + rnd(280), oy = 360 + rnd(280), R = 190 + rnd(90), rot = Math.random() * Math.PI * 2;
+  const ox = 440 + rnd(120), oy = 440 + rnd(120), R = 290 + rnd(70), rot = Math.random() * Math.PI * 2; // фигура на большую часть поля
   let pts;
   const reg = (n) => Array.from({ length: n }, (_, i) => { const a = rot + (i / n) * Math.PI * 2; return [ox + Math.cos(a) * R, oy + Math.sin(a) * R]; });
   switch (kind) {
@@ -283,29 +284,36 @@ class Center extends Base {
     for (const p of this.alive) results[p] = { point: this.moves[p] ?? null, dist: Number.isFinite(dist(p)) ? dist(p) : null };
     return { eliminated, replay: false, reveal: { center: [cx, cy], results } };
   }
-  revealMs() { return 9500; }
+  revealMs() { return 12000; }
 }
 
 // 7. Уникальное число
 class Unique extends Base {
-  data() { return { max: this.alive.length }; }
+  constructor(m, ids, opts) {
+    super(m, ids, opts);
+    this.pool = Array.from({ length: ids.length * 3 }, (_, k) => k + 1); // 6 игроков — числа 1…18
+  }
+  data() { return { pool: this.pool.slice(), total: this.start * 3, max: this.pool.length ? Math.max(...this.pool) : 0 }; }
   actMs() { return 20000; }
   act(pid, a) {
     const n = Number(a?.n);
-    if (!(Number.isInteger(n) && n >= 1 && n <= this.alive.length)) return false;
+    if (!this.pool.includes(n)) return false;
     return this.record(pid, n);
   }
-  autofill() { for (const p of this.alive) if (!(p in this.moves)) { this.moves[p] = 1 + rnd(this.alive.length); this.movedAt[p] = this.m.now(); } }
+  autofill() { for (const p of this.alive) if (!(p in this.moves)) { this.moves[p] = pick(this.pool); this.movedAt[p] = this.m.now(); } }
   resolve() {
     const count = {};
     for (const p of this.alive) count[this.moves[p]] = (count[this.moves[p]] || 0) + 1;
     let eliminated = this.alive.filter((p) => count[this.moves[p]] > 1);
     const replay = eliminated.length === this.alive.length; // совпали все — переигровка
     if (replay) eliminated = [];
-    return { eliminated, replay, reveal: { picks: { ...this.moves } } };
+    const used = new Set(Object.values(this.moves));
+    this.pool = this.pool.filter((n) => !used.has(n)); // выбранные числа удаляются
+    return { eliminated, replay, reveal: { picks: { ...this.moves }, removed: [...used] } };
   }
-  over() { return this.alive.length <= 2; } // двое оставшихся проходят оба
-  revealMs() { return 9500; }
+  // двое оставшихся проходят оба; чисел не хватает на всех — испытание окончено
+  over() { return this.alive.length <= 2 || this.pool.length < this.alive.length; }
+  revealMs() { return 12000; }
 }
 
 
@@ -316,37 +324,37 @@ class Unique extends Base {
 // 8. Стрельба вслепую: зона — круг радиуса 1, позиции видит только их хозяин.
 class Shoot extends Base {
   begin() {
-    this.zone = Math.max(0.35, Math.pow(0.8, this.round)); // после каждого раунда зона сужается
-    this.beam = 0.07 + 0.03 * this.round;                   // а луч становится шире
-    this.pos = {};
-    for (const p of this.alive) {
-      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * this.zone * 0.92;
-      this.pos[p] = [Math.cos(a) * r, Math.sin(a) * r];
-    }
+    this.zone = Math.max(0.4, Math.pow(0.82, this.round)); // после каждого раунда зона сужается
+    this.radius = Math.min(0.33, 0.13 + 0.03 * this.round); // зона поражения растёт, но не накрывает всё поле (иначе вечная переигровка)
     return super.begin();
   }
-  data() { return { zone: this.zone, beam: this.beam }; }
-  privateData(pid) { return this.pos?.[pid] ? { pos: this.pos[pid] } : null; }
-  actMs() { return 10000; }
-  act(pid, a) { const ang = Number(a?.angle); if (!Number.isFinite(ang)) return false; return this.record(pid, ang); }
-  autofill() { for (const p of this.alive) if (!(p in this.moves)) { this.moves[p] = Math.random() * Math.PI * 2; this.movedAt[p] = this.m.now(); } }
+  data() { return { zone: this.zone, radius: this.radius }; }
+  actMs() { return 15000; }
+  inZone(pt) { return Array.isArray(pt) && pt.length === 2 && pt.every(Number.isFinite) && Math.hypot(pt[0], pt[1]) <= this.zone + 1e-6; }
+  act(pid, a) {
+    if (!this.inZone(a?.pos) || !this.inZone(a?.mark)) return false;
+    return this.record(pid, { pos: a.pos, mark: a.mark });
+  }
+  randPt() { const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * this.zone * 0.95; return [Math.cos(a) * r, Math.sin(a) * r]; }
+  autofill() { for (const p of this.alive) if (!(p in this.moves)) { this.moves[p] = { pos: this.randPt(), mark: this.randPt() }; this.movedAt[p] = this.m.now(); } }
   resolve() {
     const hits = {};
     for (const s1 of this.alive) {
-      const [x0, y0] = this.pos[s1], dx = Math.cos(this.moves[s1]), dy = Math.sin(this.moves[s1]);
+      const [mx, my] = this.moves[s1].mark;
       for (const t of this.alive) {
         if (t === s1) continue;
-        const [x, y] = this.pos[t];
-        const along = (x - x0) * dx + (y - y0) * dy;
-        const perp = Math.abs((x - x0) * dy - (y - y0) * dx);
-        if (along > 0 && perp < this.beam) (hits[t] ||= []).push(s1);
+        const [x, y] = this.moves[t].pos;
+        if (Math.hypot(x - mx, y - my) < this.radius) (hits[t] ||= []).push(s1);
       }
     }
     let eliminated = Object.keys(hits);
     const replay = eliminated.length === this.alive.length;
     if (replay) eliminated = [];
-    return { eliminated, replay, reveal: { pos: { ...this.pos }, angles: { ...this.moves }, hits, zone: this.zone, beam: this.beam } };
+    const pos = {}, marks = {};
+    for (const p of this.alive) { pos[p] = this.moves[p].pos; marks[p] = this.moves[p].mark; }
+    return { eliminated, replay, reveal: { pos, marks, hits, zone: this.zone, radius: this.radius } };
   }
+  over() { return this.alive.length <= 1 || this.round >= 15; } // 15 раундов без развязки — оставшиеся проходят
   revealMs() { return 10500; }
 }
 
@@ -378,7 +386,7 @@ class Bomb extends Base {
     return [{ id: this.holder, ms: 1100 + rnd(2600), move: () => ({ to: pick(this.alive.filter((x) => x !== this.holder)) }) }];
   }
   resolve() { return { eliminated: [this.holder], replay: false, reveal: { holder: this.holder, passes: this.passes } }; }
-  revealMs() { return 8000; }
+  revealMs() { return 10500; }
 }
 
 // 10. Очко (как блэкджек): 2 карты, «ещё»/«хватит», туз 1 или 11, картинки по 10, дилер добирает до 17.
@@ -437,44 +445,48 @@ class Cards extends Base {
     return { eliminated, replay: false, reveal: { dealer: this.dealer, dealerValue: d, results: res } };
   }
   over() { return this.alive.length <= 1 || this.round >= 12; }
-  revealMs() { return 9000; }
+  revealMs() { return 12500; }
 }
 
 // 11. Русская рулетка: барабан на 6, в раунде N — N патронов (максимум 5). Ходят по кругу, каждый крутит и жмёт.
 class Roulette extends Base {
   realtime = true;
   begin() {
-    this.bullets = Math.min(5, this.round + 1); // round ещё не увеличен
+    this.live = Math.min(5, this.round + 1);           // 1-й раунд — один боевой, дальше +1
+    this.total = 6;
+    const idx = shuffle(Array.from({ length: this.total }, (_, k) => k));
+    this.liveSet = new Set(idx.slice(0, this.live));   // где боевые — знает только сервер
+    this.taken = [];                                   // открытые патроны: { i, pid, live }
     this.order = shuffle(this.alive);
     this.turn = 0;
-    this.pulls = [];
     this.endNow = false;
     this.turnAt = this.m.now();
     return super.begin();
   }
-  data() { return { bullets: this.bullets, chambers: 6, order: this.order }; }
+  data() { return { total: this.total, live: this.live, order: this.order }; }
   actMs() { return 180000; }
   complete() { return false; }
   get current() { return this.order[this.turn % this.order.length]; }
+  free() { const t = new Set(this.taken.map((x) => x.i)); return Array.from({ length: this.total }, (_, k) => k).filter((k) => !t.has(k)); }
   act(pid, a) {
-    if (this.endNow || pid !== this.current || !a?.pull) return false;
-    const chamber = rnd(6);
-    const hit = chamber < this.bullets;
-    this.pulls.push({ pid, hit, chamber });
+    const i = Number(a?.pick);
+    if (this.endNow || pid !== this.current || !this.free().includes(i)) return false;
+    const live = this.liveSet.has(i);
+    this.taken.push({ i, pid, live });
     this.movedAt[pid] = this.m.now();
-    if (hit) { this.loser = pid; this.endNow = true; } else { this.turn += 1; this.turnAt = this.m.now(); }
+    if (live) { this.loser = pid; this.endNow = true; } else { this.turn += 1; this.turnAt = this.m.now(); }
     return true;
   }
-  turnTimeoutMs() { return 12000; } // не нажал за 12 с — жмёт автоматически
-  onTimeout() { if (!this.endNow) this.act(this.current, { pull: true }); }
-  visibleMoves() { return { turn: this.current, turnAt: this.turnAt, pulls: this.pulls, bullets: this.bullets }; }
+  turnTimeoutMs() { return 15000; } // не выбрал за 15 с — патрон выбирается случайно
+  onTimeout() { if (!this.endNow) this.act(this.current, { pick: pick(this.free()) }); }
+  visibleMoves() { return { turn: this.current, turnAt: this.turnAt, taken: this.taken, live: this.live, total: this.total }; }
   botPlan() {
     const p = this.m.player(this.current);
     if (this.endNow || !p?.isBot) return [];
-    return [{ id: this.current, ms: 1600 + rnd(1600), move: () => ({ pull: true }) }];
+    return [{ id: this.current, ms: 1600 + rnd(1600), move: () => ({ pick: pick(this.free()) }) }];
   }
-  resolve() { return { eliminated: this.loser ? [this.loser] : [], replay: false, reveal: { loser: this.loser, pulls: this.pulls, bullets: this.bullets } }; }
-  revealMs() { return 8000; }
+  resolve() { return { eliminated: this.loser ? [this.loser] : [], replay: false, reveal: { loser: this.loser, taken: this.taken, live: [...this.liveSet] } }; }
+  revealMs() { return 10500; }
 }
 
 const CLASSES = { lastcell: LastCell, doors: Doors, time: StopTime, mines: Mines, memory: Memory, center: Center, unique: Unique, shoot: Shoot, bomb: Bomb, cards: Cards, roulette: Roulette };
@@ -495,8 +507,8 @@ function botMove(ch, id, cid) {
       return { answer: ans, ms: 2000 + rnd(5000) };
     }
     case 'center': { const [cx, cy] = ch.shape.center; const e = 12 + Math.abs(gauss()) * 28; const a = Math.random() * Math.PI * 2; return { x: cx + Math.cos(a) * e, y: cy + Math.sin(a) * e }; }
-    case 'unique': return { n: 1 + rnd(ch.alive.length) };
-    case 'shoot': { const [x, y] = ch.pos[id]; const toC = Math.atan2(-y, -x); return { angle: toC + gauss() * 0.9 }; }
+    case 'unique': return { n: pick(ch.pool) };
+    case 'shoot': return { pos: ch.randPt(), mark: ch.randPt() };
     case 'cards': return handValue(ch.hands[id]) < 17 ? { hit: true } : { stand: true };
     default: return null;
   }
