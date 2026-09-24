@@ -98,7 +98,7 @@ class LastCell extends Base {
     return { eliminated, replay: false, reveal: { target, stand: { ...this.moves } } };
   }
   over() { return this.alive.length <= 1 || this.cells.length <= 1; }
-  revealMs() { return 7500; }
+  revealMs() { return 9500; }
 }
 
 // 2. Двери
@@ -141,7 +141,7 @@ class Doors extends Base {
     return { eliminated, replay: false, reveal: { death: this.death, doors: this.moves } };
   }
   over() { return this.solo ? this.alive.length === 0 || this.finished : this.alive.length <= 1; }
-  revealMs() { return 6000; }
+  revealMs() { return 11500; }
 }
 
 // 3. Останови время
@@ -161,7 +161,7 @@ class StopTime extends Base {
     for (const p of this.alive) results[p] = { elapsed: this.moves[p] ?? null, dev: Number.isFinite(dev(p)) ? dev(p) : null };
     return { eliminated, replay: false, reveal: { target: this.target, results } };
   }
-  revealMs() { return 7000; }
+  revealMs() { return 10000; }
 }
 
 // 4. Взрывное поле
@@ -186,7 +186,7 @@ class Mines extends Base {
     if (replay) eliminated = [];
     return { eliminated, replay, reveal: { moves: { ...this.moves }, bombs: [...bombs] } };
   }
-  revealMs() { return 8000; }
+  revealMs() { return 9500; }
 }
 
 // 5. Запомни число
@@ -220,7 +220,7 @@ class Memory extends Base {
     for (const p of this.alive) results[p] = { answer: this.moves[p]?.answer ?? '', ok: this.moves[p]?.answer === n, ms: this.moves[p]?.ms ?? null };
     return { eliminated, replay: false, reveal: { number: n, results } };
   }
-  revealMs() { return 6000; }
+  revealMs() { return 9500; }
 }
 
 // 6. Центр
@@ -273,7 +273,7 @@ class Center extends Base {
     for (const p of this.alive) results[p] = { point: this.moves[p] ?? null, dist: Number.isFinite(dist(p)) ? dist(p) : null };
     return { eliminated, replay: false, reveal: { center: [cx, cy], results } };
   }
-  revealMs() { return 6500; }
+  revealMs() { return 9500; }
 }
 
 // 7. Уникальное число
@@ -295,7 +295,7 @@ class Unique extends Base {
     return { eliminated, replay, reveal: { picks: { ...this.moves } } };
   }
   over() { return this.alive.length <= 2; } // двое оставшихся проходят оба
-  revealMs() { return 6000; }
+  revealMs() { return 9500; }
 }
 
 const CLASSES = { lastcell: LastCell, doors: Doors, time: StopTime, mines: Mines, memory: Memory, center: Center, unique: Unique };

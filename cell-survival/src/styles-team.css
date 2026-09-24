@@ -3,7 +3,8 @@
 #match .hit, #match .m-overlay .btn { pointer-events: auto; }
 .m-head { position: absolute; top: 24px; left: 28px; min-width: 240px; padding: 14px 18px; }
 .m-title { font-family: var(--font-title); font-size: 24px; color: var(--gold-hi); margin: 4px 0; letter-spacing: .06em; }
-.m-timer { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); }
+.m-timer { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); transition: opacity .3s; }
+.m-timer.idle { opacity: 0; }
 .m-players { position: absolute; top: 24px; right: 24px; width: 250px; max-height: calc(100vh - 110px); overflow-y: auto; padding: 14px; }
 .m-players::-webkit-scrollbar { width: 3px; }
 .m-players::-webkit-scrollbar-thumb { background: var(--gold-lo); }

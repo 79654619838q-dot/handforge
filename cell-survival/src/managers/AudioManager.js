@@ -1,3 +1,5 @@
+import { Music } from './Music.js';
+
 // Звук синтезируется Web Audio — файлов нет, но API одинаковое:
 // позже любой звук можно заменить сэмплом из assets/ без правок вызывающего кода.
 export class AudioManager {
@@ -28,93 +30,18 @@ export class AudioManager {
   applyVolumes() {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
-    this.musicBus.gain.setTargetAtTime(this.settings.music * 0.5, now, 0.1);
+    this.musicBus.gain.setTargetAtTime(this.settings.music * 0.7, now, 0.1);
     this.sfxBus.gain.setTargetAtTime(this.settings.sfx, now, 0.05);
   }
 
-  // ---------- Музыка ----------
+  // ---------- Музыка (src/managers/Music.js) ----------
   playMusic(name) {
-    if (this.track === name) return;
     if (!this.ctx) { this.pending = name; return; }
-    this.stopMusic();
-    this.track = name;
-    const ctx = this.ctx;
-    const out = ctx.createGain();
-    out.gain.value = 0;
-    out.gain.setTargetAtTime(1, ctx.currentTime, 1.2);
-    out.connect(this.musicBus);
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = name === 'menu' ? 900 : 1400;
-    lp.connect(out);
-    this.trackNodes.push(out, lp);
-
-    // Тёмный аккорд-подложка: минорные ступени, расстроенные пилы.
-    const chords = name === 'menu'
-      ? [[55, 65.4, 82.4], [49, 58.3, 73.4], [43.7, 55, 65.4], [49, 61.7, 73.4]]
-      : [[41.2, 49, 61.7], [43.7, 52, 65.4]];
-    const voices = [];
-    for (let i = 0; i < 3; i++) {
-      for (const det of [-6, 6]) {
-        const o = ctx.createOscillator();
-        o.type = 'sawtooth';
-        o.detune.value = det;
-        const g = ctx.createGain();
-        g.gain.value = 0.05;
-        o.connect(g).connect(lp);
-        o.start();
-        voices.push({ o, i });
-        this.trackNodes.push(o, g);
-      }
-    }
-    const lfo = ctx.createOscillator();
-    const lfoG = ctx.createGain();
-    lfo.frequency.value = 0.07;
-    lfoG.gain.value = 350;
-    lfo.connect(lfoG).connect(lp.frequency);
-    lfo.start();
-    this.trackNodes.push(lfo, lfoG);
-
-    let step = 0;
-    const barSec = name === 'menu' ? 8 : 4;
-    const setChord = () => {
-      const ch = chords[step % chords.length];
-      for (const v of voices) v.o.frequency.setTargetAtTime(ch[v.i] * 2, ctx.currentTime, 0.8);
-      step++;
-    };
-    setChord();
-
-    // В игре — пульс баса, держит напряжение.
-    let beat = 0;
-    const tick = () => {
-      if (name === 'game') {
-        const t0 = ctx.currentTime;
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(chords[step % chords.length][0], t0);
-        o.frequency.exponentialRampToValueAtTime(30, t0 + 0.35);
-        g.gain.setValueAtTime(beat % 2 ? 0.25 : 0.45, t0);
-        g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
-        o.connect(g).connect(out);
-        o.start(t0); o.stop(t0 + 0.45);
-      }
-      beat++;
-      if (beat % (name === 'menu' ? 16 : 8) === 0) setChord();
-    };
-    this.trackTimer = setInterval(tick, (barSec / 8) * 1000 / (name === 'menu' ? 2 : 1));
+    this.music ||= new Music(this.ctx, this.musicBus);
+    this.music.play(name);
   }
 
-  stopMusic() {
-    if (!this.ctx) return;
-    clearInterval(this.trackTimer);
-    const nodes = this.trackNodes;
-    this.trackNodes = [];
-    const out = nodes[0];
-    if (out && out.gain) out.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
-    setTimeout(() => nodes.forEach((n) => { try { n.stop?.(); n.disconnect(); } catch { /* уже остановлен */ } }), 2000);
-    this.track = null;
-  }
+  stopMusic() { this.music?.stop(); }
 
   // ---------- Эффекты ----------
   _env(node, t0, a, d, peak) {
@@ -167,6 +94,21 @@ export class AudioManager {
     this._tone(90, 1.4, 'sine', 0.6, 28);
     this._noise(0.6, 0.3, 4000, 'highpass', 0.05);
   }
+  // рычание монстра: низкая дрожащая «пила» и шипение
+  monster() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain(), f = this.ctx.createBiquadFilter();
+    const lfo = this.ctx.createOscillator(), lg = this.ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(70, t0); o.frequency.exponentialRampToValueAtTime(45, t0 + 1.4);
+    lfo.frequency.value = 23; lg.gain.value = 18; lfo.connect(lg).connect(o.frequency);
+    f.type = 'lowpass'; f.frequency.value = 420;
+    this._env(g, t0, 0.08, 1.4, 0.55);
+    o.connect(f).connect(g).connect(this.sfxBus);
+    o.start(t0); lfo.start(t0); o.stop(t0 + 1.6); lfo.stop(t0 + 1.6);
+    this._noise(1.2, 0.2, 900, 'bandpass', 0.1);
+  }
+
   survived() { [523, 659, 784, 1046].forEach((f, i) => this._tone(f, 0.5, 'triangle', 0.16, null, i * 0.09)); }
   eliminated() { [392, 311, 261, 196].forEach((f, i) => this._tone(f, 0.7, 'sawtooth', 0.12, f * 0.97, i * 0.22)); this._tone(55, 2, 'sine', 0.5, 30, 0.3); }
   victory() {

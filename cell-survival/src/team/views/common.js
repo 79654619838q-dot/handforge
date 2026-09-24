@@ -71,7 +71,8 @@ export function labelSprite(text, color = '#f6dc97', scale = 0.9) {
 // Сцена-фон для «плоских» испытаний: задник темы и частицы, без поля.
 export function backdropWorld(stage, theme) {
   const w = new GameWorld(theme);
-  w.env.group.visible = false; // плоским испытаниям нужен только нарисованный задник — без 3D-декораций, пока он грузится
+  // плоским испытаниям нужен только нарисованный задник: 3D-декорации прячем, свет оставляем (для сцены выбывания)
+  w.env.group.traverse((o) => { if (o.isMesh || o.isSprite) o.visible = false; });
   w.fitCamera(6, true);
   stage.setWorld(w);
   return w;

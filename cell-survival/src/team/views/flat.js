@@ -2,13 +2,52 @@
 // Сцена — задник темы, всё управление — HTML/canvas поверх.
 import { t } from '../../i18n.js';
 import { BaseView, backdropWorld, confirmBox } from './common.js';
+import { GridManager } from '../../managers/GridManager.js';
+import { PlayerManager } from '../../managers/PlayerManager.js';
+import { EliminationManager } from '../../managers/EliminationManager.js';
+import { ensurePerson } from '../../managers/AvatarManager.js';
+import { wait } from '../../scene/tween.js';
 import { esc } from '../MatchView.js';
 
 const fmtSec = (ms) => (ms == null ? '—' : (ms / 1000).toFixed(2));
 
 class FlatView extends BaseView {
+  revealFxSec = 4.2;
   enter(st) { this.world = backdropWorld(this.stage, this.theme); this.render(st); }
-  update(st, changed) { if (changed || this.dirty(st)) this.render(st); }
+  update(st, changed) {
+    // раскрытие: сначала выбывшие проваливаются на сцене, потом — таблица результатов
+    if (st.phase === 'reveal' && changed) { this.playOut(st); return; }
+    if (this.fxBusy && st.phase === 'reveal') return;
+    if (changed && st.phase !== 'reveal' && this.fxGrid) this.clearFx();
+    if (changed || this.dirty(st)) this.render(st);
+  }
+  clearFx() { this.fxGrid?.dispose(); this.fxGrid = null; this.world.fitCamera(6); }
+  async playOut(st) {
+    const out = st.reveal?.replay ? [] : st.reveal?.eliminated || [];
+    if (!out.length) { this.render(st); return; }
+    this.fxBusy = true;
+    this.el.innerHTML = '';
+    const w = this.world;
+    this.fxGrid?.dispose();
+    const grid = new GridManager(w.scene, w.mats);
+    this.fxGrid = grid;
+    const cells = grid.build(out.length);
+    w.fitCamera(Math.max(2.6, grid.extent * 1.4));
+    const players = new PlayerManager(w.scene);
+    const pl = out.map((id) => { const info = st.players.find((p) => p.id === id); const p = players.add({ ...info?.profile, name: info?.name }, id === this.myId); return p; });
+    const u = w.update.bind(w);
+    w.update = (dt, t) => { u(dt, t); grid.update(dt, t); players.update(dt, t); };
+    await Promise.all(pl.map((p) => ensurePerson(p.profile)));
+    await grid.intro();
+    await Promise.all(pl.map((p, i) => players.moveTo(p, cells[i])));
+    await wait(0.4);
+    const elim = new EliminationManager(w, this.audio);
+    await Promise.all(cells.map((c) => elim.destroy(c, pl)));
+    this.mv.showOut();
+    w.update = u;
+    this.fxBusy = false;
+    if (this.mv.st?.phase === 'reveal') this.render(this.mv.st);
+  }
   dirty() { return false; }
   outNames(st) {
     const out = st.reveal?.eliminated || [];
@@ -86,7 +125,7 @@ export class MemoryView extends FlatView {
     }
   }
   // при каждом ходе других игроков не перерисовываем поле ввода — иначе стирается набранное
-  update(st, changed) { if (changed) this.render(st); else if (st.phase === 'act' && !this.canAct(st) && this.el.querySelector('[data-f]')) this.render(st); }
+  update(st, changed) { if (st.phase === 'reveal' && changed) return this.playOut(st); if (this.fxBusy) return; if (changed && st.phase !== 'reveal' && this.fxGrid) this.clearFx(); if (changed) this.render(st); else if (st.phase === 'act' && !this.canAct(st) && this.el.querySelector('[data-f]')) this.render(st); }
 }
 
 // ---------- Центр ----------
@@ -109,7 +148,7 @@ export class CenterView extends FlatView {
       this.act({ x, y }); // одна точка — сразу зафиксирована (так в правилах)
     };
   }
-  update(st, changed) { if (changed) { if (st.phase !== 'act') this.draft = null; this.render(st); } }
+  update(st, changed) { if (st.phase === 'reveal' && changed) return this.playOut(st); if (this.fxBusy) return; if (changed && st.phase !== 'reveal' && this.fxGrid) this.clearFx(); if (changed) { if (st.phase !== 'act') this.draft = null; this.render(st); } }
   draw(c, st) {
     const g = c.getContext('2d');
     g.clearRect(0, 0, 1000, 1000);
@@ -161,5 +200,5 @@ export class UniqueView extends FlatView {
     });
     this.st = st;
   }
-  update(st, changed) { if (changed) { this.sel = null; } this.render(st); }
+  update(st, changed) { if (st.phase === 'reveal' && changed) return this.playOut(st); if (this.fxBusy) return; if (changed && st.phase !== 'reveal' && this.fxGrid) this.clearFx(); if (changed) { this.sel = null; } this.render(st); }
 }

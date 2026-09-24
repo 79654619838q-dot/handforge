@@ -68,6 +68,7 @@ class FieldView extends BaseView {
 
 // ---------- 1. Последняя клетка ----------
 export class LastCellView extends FieldView {
+  revealFxSec = 5.5;
   enter(st) { if (st.data) this.build(st); else this.world = backdrop(this); }
   build(st) {
     this.built = true;
@@ -117,37 +118,46 @@ export class LastCellView extends FieldView {
     await this.elim.roulette(this.grid.alive, target);
     const victims = [...this.pl.values()].filter((p) => p.cell === target && p.state === PLAYER.ALIVE);
     await this.elim.destroy(target, victims);
+    this.mv.showOut();
     await Promise.all([this.grid.relayout(), this.world.fitCamera(this.grid.extent)]);
   }
 }
 
 // ---------- 4. Взрывное поле ----------
 export class MinesView extends FieldView {
+  revealFxSec = 3.2;
   enter(st) { if (st.data) this.build(st); else this.world = backdrop(this); }
   build(st) {
     this.built = true;
     this.picker?.dispose(); // старое поле освобождает Stage.setWorld, обработчики нажатий — здесь
     this.setupWorld(st, st.data.size);
     this.grid.intro();
-    this.stand = null; this.bomb = null;
+    this.stand = null; this.bomb = null; this.standOk = false; this.busy = false;
     this.markers = new THREE.Group();
     this.world.scene.add(this.markers);
     this.panel();
   }
-  panel() {
-    this.el.innerHTML = `<div class="cv-bar panel hit"><button class="btn ghost" data-reset>${t('again')}</button><button class="btn primary" data-ok disabled>${t('confirmChoice')}</button></div>`;
-    this.el.querySelector('[data-reset]').onclick = () => { this.stand = null; this.bomb = null; this.drawMarkers(); };
-    this.el.querySelector('[data-ok]').onclick = async () => {
-      if (this.stand == null || this.bomb == null || !this.canAct(this.st)) return;
-      const r = await this.act({ stand: this.stand, bomb: this.bomb });
-      if (r?.ok) this.audio.confirm();
-    };
-  }
-  pickable() { return this.canAct(this.st); }
-  onCell(c) {
-    if (!this.canAct(this.st)) return;
-    if (this.stand == null) this.stand = c.id; else this.bomb = c.id;
-    if (this.bomb != null && this.stand != null) this.audio.charge(); else this.audio.select();
+  panel() { this.el.innerHTML = ''; }
+  pickable() { return this.canAct(this.st) && !this.busy; }
+  async onCell(c) {
+    if (!this.canAct(this.st) || this.busy) return;
+    this.busy = true;
+    if (!this.standOk) {
+      // шаг 1: где я стою
+      this.stand = c.id; this.bomb = null;
+      this.audio.select(); this.drawMarkers();
+      if (await confirmBox(this.root, t('confirmStand'))) { this.standOk = true; this.audio.confirm(); }
+      else this.stand = null;
+    } else {
+      // шаг 2: какую клетку минирую — после подтверждения ход уходит на сервер
+      this.bomb = c.id;
+      this.audio.charge(); this.drawMarkers();
+      if (await confirmBox(this.root, t('confirmBomb')) && this.canAct(this.st)) {
+        const r = await this.act({ stand: this.stand, bomb: this.bomb });
+        if (r?.ok) this.audio.confirm();
+      } else this.bomb = null;
+    }
+    this.busy = false;
     this.drawMarkers();
   }
   drawMarkers() {
@@ -156,7 +166,9 @@ export class MinesView extends FieldView {
     if (this.stand != null) {
       const ghost = buildAvatar(this.st.players.find((p) => p.id === this.myId)?.profile || {});
       ghost.scale.setScalar(0.7); ghost.position.copy(at(this.stand)).add(new THREE.Vector3(0, 0.17, 0));
-      ghost.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.55; } });
+      // полупрозрачный «призрак»; у реалистичных людей на меше несколько материалов
+      const ghostMat = (m) => { const c = m.clone(); c.transparent = true; c.opacity = 0.55; c.alphaHash = false; return c; };
+      ghost.traverse((o) => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(ghostMat) : ghostMat(o.material); });
       this.markers.add(ghost);
     }
     if (this.bomb != null) {
@@ -166,9 +178,7 @@ export class MinesView extends FieldView {
       const cross2 = cross.clone(); cross2.rotation.z = Math.PI / 2;
       this.markers.add(ring, cross, cross2);
     }
-    const ok = this.el.querySelector('[data-ok]');
-    if (ok) ok.disabled = this.stand == null || this.bomb == null;
-    this.hint(this.stand == null ? t('pickStand') : this.bomb == null ? t('pickBomb') : t('confirmChoice'));
+    if (this.canAct(this.st)) this.hint(!this.standOk ? t('pickStand') : t('pickBomb'));
   }
   update(st, changed) {
     const prev = this.st;
@@ -176,8 +186,6 @@ export class MinesView extends FieldView {
     if (!this.built) { if (!st.data) return; this.build(st); }
     this.picker.set(this.canAct(st));
     if (st.phase === 'act' && changed && prev && prev.round !== st.round) this.build(st); // каждый раунд — целое поле заново
-    const bar = this.el.querySelector('.cv-bar');
-    if (bar) bar.style.display = this.canAct(st) ? '' : 'none';
     if (st.phase === 'act') {
       if (this.canAct(st)) { if (changed) this.drawMarkers(); } else this.hint(this.alive(st) ? t('waitOthers') : '');
     }
@@ -219,6 +227,7 @@ export class MinesView extends FieldView {
         tween(1.4, (k) => { a.position.y = pos.y - k * k * 7; }, ease.linear).then(() => a.removeFromParent());
       }
     }
+    setTimeout(() => this.mv.showOut(), 1500);
   }
 }
 
@@ -233,6 +242,7 @@ function doorNumberTexture(n) {
 }
 
 export class DoorsView extends BaseView {
+  revealFxSec = 6.5;
   enter(st) {
     this.world = new GameWorld(this.theme);
     this.stage.setWorld(this.world);
@@ -307,12 +317,13 @@ export class DoorsView extends BaseView {
     const lbl = labelSprite(info?.name || '', pid === this.myId ? '#f6dc97' : '#d8c8ff', 0.3); lbl.position.y = 2.3; a.add(lbl);
     const p = new THREE.Vector3(); d.g.getWorldPosition(p);
     a.position.set(p.x, 5, p.z + 0.75);
-    this.world.scene.add(a);
+    this.group.add(a); // в группе раунда: новый раунд убирает и двери, и фигуры
     d.avatar = a;
     tween(0.7, (k) => { a.position.y = 5 * (1 - k); }, ease.inQuad);
   }
   frame() {
     for (const d of this.doors || []) {
+      if (d.dead) { d.leafM.emissive.set('#ff1a1a'); d.leafM.emissiveIntensity = 0.8; continue; }
       const mine = d.owner === this.myId;
       const target = d.hover && !d.owner ? 0.45 : d.owner ? (mine ? 0.9 : 0.5) : 0.05;
       d.leafM.emissiveIntensity += (target - d.leafM.emissiveIntensity) * 0.2;
@@ -334,29 +345,95 @@ export class DoorsView extends BaseView {
   }
   async reveal(st) {
     const r = st.reveal;
-    for (const [pid, di] of Object.entries(r.doors)) if (this.doors[di]) await Promise.race([this.claim(st, this.doors[di], pid), wait(0.3)]);
+    await Promise.race([Promise.all(Object.entries(r.doors).map(([pid, di]) => this.doors[di] && this.claim(st, this.doors[di], pid))), wait(0.8)]);
     this.hint('');
-    await wait(0.6);
+    await wait(0.3);
     this.audio.charge();
     // двери распахиваются по очереди, смертельная — последней
     const order = this.doors.filter((d) => d.i !== r.death).concat(this.doors[r.death] ? [this.doors[r.death]] : []);
     for (const d of order) {
       const death = d.i === r.death;
-      d.inner.material.color.set(death ? '#ff1a1a' : '#ffd27a');
+      d.inner.material.color.set(death ? '#120000' : '#ffd27a');
       const light = new THREE.PointLight(death ? '#ff2020' : '#ffcf70', 0, 6, 1.6);
       light.position.set(0, 1.2, -0.4); d.g.add(light);
-      tween(0.8, (k) => { d.hinge.rotation.y = -k * 1.8; light.intensity = k * (death ? 45 : 18); }, ease.outCubic);
-      if (death) {
-        await wait(0.5);
-        this.audio.destroy();
-        this.world.shake(0.35);
-        const p = new THREE.Vector3(); d.g.getWorldPosition(p); p.y += 1;
-        this.world.effects.burst(p, new THREE.Color('#1a1a1a'), 160, 3, 0.4, false, -0.5, 2.4);
-        this.world.effects.burst(p, new THREE.Color('#ff3b1a'), 120, 6, 0.12, true, -6, 1.2);
-        this.world.effects.flash(p, '#ff2a1a', 90);
+      tween(0.8, (k) => { d.hinge.rotation.y = -k * 1.8; light.intensity = k * (death ? 30 : 18); }, ease.outCubic);
+      if (death) { await wait(0.4); await this.monster(d, light); }
+      else {
+        // выживший шагает в свет своей двери и исчезает
         const a = d.avatar;
-        if (a) { const y0 = a.position.y, z0 = a.position.z; tween(1.3, (k) => { a.position.z = z0 - k * 1.2; a.position.y = y0 - k * k * 4; a.rotation.x = k * 0.8; }, ease.inQuad).then(() => a.removeFromParent()); }
-      } else await wait(0.18);
+        if (a) { const z0 = a.position.z; tween(1.1, (k) => { a.position.z = z0 - k * 1.3; a.scale.setScalar(0.8 * (1 - k * 0.35)); }, ease.inCubic).then(() => { a.visible = false; }); }
+        await wait(0.12);
+      }
     }
+  }
+
+  // Монстр за смертельной дверью: из темноты загораются глаза, щупальца хватают игрока,
+  // утаскивают внутрь, дверь захлопывается.
+  async monster(d, light) {
+    const g = new THREE.Group();
+    g.position.set(0, 0, -0.35);
+    d.g.add(g);
+    const dark = new THREE.MeshStandardMaterial({ color: '#050304', roughness: 0.55, metalness: 0.2, emissive: '#3a0000', emissiveIntensity: 0.4 });
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.9, 6, 16), dark); body.position.set(0, 1.0, -0.25); body.scale.set(1, 1, 0.7); g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 14), dark); head.position.set(0, 1.78, -0.1); head.scale.set(1.1, 0.9, 1); g.add(head);
+    for (const sx of [-1, 1]) {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.35, 10), dark); horn.position.set(sx * 0.16, 2.0, -0.12); horn.rotation.z = -sx * 0.5; g.add(horn);
+    }
+    const eyeM = new THREE.MeshBasicMaterial({ color: '#ff2a1a', transparent: true, opacity: 0 });
+    for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), eyeM); e.position.set(sx * 0.09, 1.8, 0.1); e.scale.set(1.4, 0.7, 1); g.add(e); }
+    const eyeLight = new THREE.PointLight('#ff2020', 0, 3, 2); eyeLight.position.set(0, 1.8, 0.4); g.add(eyeLight);
+    g.scale.setScalar(0.001);
+
+    this.audio.monster();
+    await tween(0.7, (k) => { g.scale.setScalar(0.001 + k); eyeM.opacity = k; eyeLight.intensity = k * 6; }, ease.outBack);
+
+    const a = d.avatar;
+    if (a) {
+      // щупальца тянутся от монстра к игроку (координаты в системе монстра)
+      g.updateMatrixWorld(true);
+      const target = g.worldToLocal(a.getWorldPosition(new THREE.Vector3()));
+      const tm = new THREE.MeshStandardMaterial({ color: '#0a0406', roughness: 0.4, emissive: '#5a0010', emissiveIntensity: 0.6 });
+      const tentacles = [];
+      for (let i = 0; i < 4; i++) {
+        const h = 0.55 + i * 0.3, side = i % 2 ? 1 : -1;
+        const pts = [
+          new THREE.Vector3(side * 0.25, 1.0 + i * 0.12, -0.1),
+          new THREE.Vector3(side * 0.5, h + 0.5, target.z * 0.5),
+          new THREE.Vector3(target.x + side * 0.12, target.y + h, target.z - 0.05),
+        ];
+        const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.05 - i * 0.006, 8);
+        geo.setDrawRange(0, 0);
+        const t = new THREE.Mesh(geo, tm);
+        g.add(t); tentacles.push(t);
+      }
+      const grow = (k) => tentacles.forEach((t) => t.geometry.setDrawRange(0, Math.floor(t.geometry.index.count * k)));
+      this.audio.crack();
+      await tween(0.35, grow, ease.outCubic);
+      this.world.shake(0.25);
+      // рывок — игрок пытается вырваться, потом его утаскивает в дверь
+      const start = a.position.clone();
+      await tween(0.3, (k) => { a.position.x = start.x + Math.sin(k * 40) * 0.05; }, ease.linear);
+      const doorPos = d.g.getWorldPosition(new THREE.Vector3());
+      const inside = new THREE.Vector3(doorPos.x, start.y + 0.6, doorPos.z - 1.5);
+      this.audio.destroy();
+      await tween(0.9, (k) => {
+        a.position.lerpVectors(start, inside, k);
+        a.position.y += Math.sin(Math.PI * k) * 0.5;
+        a.rotation.x = -k * 0.9;
+        a.scale.setScalar(0.8 * (1 - k * 0.5));
+        grow(1 - k);
+      }, ease.inCubic);
+      a.visible = false;
+    }
+    // монстр уходит в темноту, дверь захлопывается
+    await tween(0.4, (k) => { g.scale.setScalar(1 - k * 0.999); eyeM.opacity = 1 - k; eyeLight.intensity = (1 - k) * 6; }, ease.inCubic);
+    g.visible = false;
+    await tween(0.25, (k) => { d.hinge.rotation.y = -1.8 * (1 - k); light.intensity = 30 * (1 - k); }, ease.inQuad);
+    this.audio.destroy();
+    this.world.shake(0.45);
+    const p = d.g.getWorldPosition(new THREE.Vector3()); p.y += 0.2; p.z += 0.3;
+    this.world.effects.burst(p, new THREE.Color('#2a2a2a'), 120, 2.5, 0.35, false, -1, 1.8);
+    d.dead = true;
+    this.mv.showOut();
   }
 }

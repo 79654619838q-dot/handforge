@@ -93,15 +93,21 @@ export class MatchView {
     this.setHint('');
     if (st.phase === 'intro') { a.confirm(); this.overlayIntro(st); }
     else this.clearOverlay('intro');
-    if (st.phase === 'act') this.timerOn(true); else this.timerOn(st.phase === 'show');
+    // в «Останови время» верхний таймер выдаёт прошедшее время — там его нет совсем
+    this.timerOn(st.cid !== 'time' && (st.phase === 'act' || st.phase === 'show'));
     if (st.phase === 'reveal' && st.reveal) {
       const out = st.reveal.eliminated || [];
-      if (out.includes(this.myId)) { a.eliminated(); this.banner(t('eliminated'), 'red'); }
+      // «Вы выбыли» — когда вид доиграет анимацию выбывания (showOut); таймер — страховка
+      if (out.includes(this.myId)) {
+        this.outPending = true;
+        if (!this.view?.revealFxSec) this.showOut();
+        else setTimeout(() => this.showOut(), (this.view.revealFxSec + 4) * 1000);
+      }
       else if (st.reveal.replay) this.banner(t('replay'), '', '', 2.5);
       else if (st.alive?.includes(this.myId)) setTimeout(() => a.survived(), 1800);
     }
     if (st.phase === 'end') { this.overlayEnd(st); if (st.winners?.includes(this.myId)) a.victory(); }
-    if (st.phase === 'final') { this.view?.leave(); this.view = null; this.overlayFinal(st); }
+    if (st.phase === 'final') { this.view?.leave(); this.view = null; this.overlayFinal(st); a.playMusic('final'); }
   }
 
   renderHead(st) {
@@ -144,10 +150,17 @@ export class MatchView {
       el.textContent = sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : `00:${String(sec).padStart(2, '0')}`;
       this.q('[data-arc]').setAttribute('stroke-dashoffset', String(this.C * (1 - Math.min(1, left / total))));
       tm.classList.toggle('crit', st.phase === 'act' && sec <= 5);
-      if (st.phase === 'act' && sec !== this.lastSec && sec <= 5 && sec > 0 && st.alive?.includes(this.myId) && !st.done?.includes(this.myId)) this.game.audio.tickUrgent(sec);
+      if (st.phase === 'act' && st.cid !== 'time' && sec !== this.lastSec && sec <= 5 && sec > 0 && st.alive?.includes(this.myId) && !st.done?.includes(this.myId)) this.game.audio.tickUrgent(sec);
       this.lastSec = sec;
     } else { el.textContent = '—'; tm.classList.remove('crit'); }
     this.view?.frame?.(this.now());
+  }
+
+  showOut() {
+    if (!this.outPending) return;
+    this.outPending = false;
+    this.game.audio.eliminated();
+    this.banner(t('eliminated'), 'red');
   }
 
   setHint(s) { const e = this.q('[data-hint]'); if (e.textContent !== s) e.textContent = s; }
