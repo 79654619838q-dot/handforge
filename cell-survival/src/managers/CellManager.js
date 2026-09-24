@@ -45,7 +45,10 @@ export class Cell {
     this.group = new THREE.Group();
     this.group.userData.cell = this;
 
-    this.topMat = mats.tops[id % mats.tops.length].clone();
+    const src = mats.tops[id % mats.tops.length];
+    this.topMat = src.clone();
+    // фото-фактура приходит позже постройки поля — копия клетки забирает её у образца
+    mats.photoReady?.then(() => { if (src.map === this.topMat.map) return; this.topMat.map = src.map; this.topMat.roughnessMap = src.roughnessMap; this.topMat.roughness = src.roughness; this.topMat.needsUpdate = true; });
     this.base = new THREE.Mesh(baseGeo, mats.side);
     this.base.castShadow = this.base.receiveShadow = true;
     this.top = new THREE.Mesh(topGeo, this.topMat);

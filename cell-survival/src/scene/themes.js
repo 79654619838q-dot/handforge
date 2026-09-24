@@ -367,6 +367,22 @@ function buildIceberg(g, ctx) {
 
 const BUILDERS = { desert: buildDesert, space: buildSpace, bunker: buildBunker, jungle: buildJungle, iceberg: buildIceberg };
 
+// Атмосфера над полем: крупные пылинки/снежинки/светлячки между камерой и полем — глубина кадра.
+// (Лучи света пробовал: камера смотрит почти сверху, вертикальные лучи уходят за кадр; на задниках лучи уже нарисованы.)
+const MOTES = {
+  desert: ['#f3d3a0', 170, 0.22, { vx: 0.7, vy: 0.04, jitter: 0.25, opacity: 0.45 }],
+  space: ['#bfe0ff', 110, 0.12, { vy: 0.06, jitter: 0.1, opacity: 0.7, additive: true }],
+  bunker: ['#c8b8a8', 150, 0.17, { vy: -0.08, jitter: 0.12, opacity: 0.4 }],
+  jungle: ['#ffd27a', 90, 0.19, { vy: 0.12, jitter: 0.3, opacity: 0.8, additive: true }],
+  iceberg: ['#ffffff', 280, 0.24, { vx: -1.1, vy: -0.8, jitter: 0.4, opacity: 0.75 }],
+};
+function atmosphere(themeId, ctx) {
+  const m = MOTES[themeId];
+  if (!m) return;
+  const [col, n, size, opts] = m;
+  ctx.addUpdate(particles(n, [18, 6, 14], col, size, { ...opts, yMin: 0 }));
+}
+
 export function buildEnvironment(themeId, scene, onBackdrop) {
   const group = new THREE.Group();
   const updates = [];
@@ -396,6 +412,7 @@ export function buildEnvironment(themeId, scene, onBackdrop) {
       if ((o.isMesh || o.isSprite) && !o.isPoints) o.visible = false;
       if (o.isHemisphereLight) o.intensity *= 0.45; // картинка тёмная — рассеянный свет не должен высветлять клетки
     });
+    atmosphere(themeId, ctx); // пылинки над полем — после скрытия декораций, чтобы остались видны
     const catcher = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.45 }));
     catcher.rotation.x = -Math.PI / 2;
     catcher.position.y = -0.17;
@@ -424,5 +441,47 @@ export function cellMaterials(themeId) {
     return new M({ ...t, roughness: conf.rough, metalness: conf.metal, emissive: new THREE.Color(th.glow), emissiveIntensity: 0.0, ...extra });
   });
   const side = new THREE.MeshStandardMaterial({ color: conf.side, roughness: conf.rough, metalness: conf.metal });
-  return { tops, side, accent: new THREE.Color(th.accent), glow: new THREE.Color(th.glow), fx: th.fx.map((c) => new THREE.Color(c)) };
+  const photoReady = addPhotoDetail(themeId, tops, side, conf);
+  return { photoReady, tops, side, accent: new THREE.Color(th.accent), glow: new THREE.Color(th.glow), fx: th.fx.map((c) => new THREE.Color(c)) };
+}
+
+// Фактура клеток из фото-материалов Poly Haven (CC0): assets/cells/<тема>_diff.jpg / _rough.jpg.
+// Рисунок темы (гравировка, свечение) остаётся — фото накладывается «перекрытием» и даёт настоящий камень/металл/лёд.
+// У каждого варианта клетки свой участок фото, чтобы соседние клетки не были одинаковыми.
+const photoCache = new Map();
+const PHOTO_MIX = { iceberg: 0.35, desert: 0.55 }; // лёд должен остаться синим — фото только прожилками
+function loadPhoto(url) {
+  if (!photoCache.has(url)) photoCache.set(url, new THREE.ImageLoader().loadAsync(url).catch(() => null));
+  return photoCache.get(url);
+}
+function addPhotoDetail(themeId, tops, side, conf) {
+  return Promise.all([loadPhoto(`${ASSETS}cells/${themeId}_diff.jpg`), loadPhoto(`${ASSETS}cells/${themeId}_rough.jpg`)]).then(([diff, rough]) => {
+    if (!diff) return;
+    const S = 512;
+    const piece = (img, v, g) => { const o = (v * 0.37) % 1; g.drawImage(img, -o * S, -((v * 0.61) % 1) * S, S * 2, S * 2); };
+    tops.forEach((m, v) => {
+      const base = m.map?.image;
+      if (!base) return;
+      const c = document.createElement('canvas'); c.width = c.height = S;
+      const g = c.getContext('2d');
+      g.drawImage(base, 0, 0, S, S);
+      g.globalCompositeOperation = 'overlay'; g.globalAlpha = PHOTO_MIX[themeId] ?? 0.85;
+      piece(diff, v, g);
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+      m.map.dispose(); m.map = t;
+      if (rough) {
+        const rc = document.createElement('canvas'); rc.width = rc.height = S;
+        piece(rough, v, rc.getContext('2d'));
+        m.roughnessMap = new THREE.CanvasTexture(rc);
+        m.roughness = Math.min(1, conf.rough * 1.3);
+      }
+      m.needsUpdate = true;
+    });
+    // бока клеток — та же фактура, темнее
+    const sc = document.createElement('canvas'); sc.width = sc.height = 256;
+    const sg = sc.getContext('2d'); sg.fillStyle = conf.side; sg.fillRect(0, 0, 256, 256);
+    sg.globalCompositeOperation = 'overlay'; sg.globalAlpha = 0.9; sg.drawImage(diff, 0, 0, 256, 256);
+    side.map = new THREE.CanvasTexture(sc); side.map.colorSpace = THREE.SRGBColorSpace; side.color.set('#ffffff'); side.needsUpdate = true;
+  });
 }
