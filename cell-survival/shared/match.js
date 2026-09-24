@@ -170,26 +170,32 @@ class StopTime extends Base {
 
 // 4. Взрывное поле
 class Mines extends Base {
+  // Поле не восстанавливается: взорванные клетки исчезают насовсем, каждый раунд клеток меньше.
+  // Если погибли все — раунд не засчитан, взорванные в нём клетки возвращаются.
   constructor(m, ids, opts) {
     super(m, ids, opts);
     this.size = ids.length > 12 ? 64 : 36;
+    this.cells = Array.from({ length: this.size }, (_, k) => k);
   }
-  data() { return { size: this.size }; }
+  data() { return { size: this.size, cells: this.cells.slice() }; }
   act(pid, a) {
     const s = a?.stand, b = a?.bomb;
-    if (!(s >= 0 && s < this.size && b >= 0 && b < this.size)) return false;
+    if (!this.cells.includes(s) || !this.cells.includes(b)) return false;
     return this.record(pid, { stand: s, bomb: b });
   }
   autofill() {
-    for (const p of this.alive) if (!(p in this.moves)) { this.moves[p] = { stand: rnd(this.size), bomb: rnd(this.size) }; this.movedAt[p] = this.m.now(); }
+    for (const p of this.alive) if (!(p in this.moves)) { this.moves[p] = { stand: pick(this.cells), bomb: pick(this.cells) }; this.movedAt[p] = this.m.now(); }
   }
   resolve() {
     const bombs = new Set(this.alive.map((p) => this.moves[p].bomb));
     let eliminated = this.alive.filter((p) => bombs.has(this.moves[p].stand));
     const replay = eliminated.length === this.alive.length; // все погибли — раунд не засчитан
     if (replay) eliminated = [];
-    return { eliminated, replay, reveal: { moves: { ...this.moves }, bombs: [...bombs] } };
+    else this.cells = this.cells.filter((c) => !bombs.has(c));
+    return { eliminated, replay, reveal: { moves: { ...this.moves }, bombs: [...bombs], cellsLeft: this.cells.length } };
   }
+  // кончились клетки — оставшиеся проходят дальше вместе
+  over() { return this.alive.length <= 1 || this.cells.length <= 1; }
   revealMs() { return 9500; }
 }
 
@@ -481,7 +487,7 @@ function botMove(ch, id, cid) {
     case 'lastcell': { const taken = new Set(Object.values(ch.moves)); const free = ch.cells.filter((c) => !taken.has(c)); return free.length ? { cell: pick(free) } : null; }
     case 'doors': { const taken = new Set(Object.values(ch.moves)); const free = Array.from({ length: ch.doors }, (_, i) => i).filter((i) => !taken.has(i)); return free.length ? { door: pick(free) } : null; }
     case 'time': return { elapsed: Math.max(200, ch.target * 1000 * (1 + gauss() * 0.07)) };
-    case 'mines': return { stand: rnd(ch.size), bomb: rnd(ch.size) };
+    case 'mines': return { stand: pick(ch.cells), bomb: pick(ch.cells) };
     case 'memory': {
       const pOk = Math.max(0.15, 0.97 - (ch.number.length - 3) * 0.1);
       let ans = ch.number;

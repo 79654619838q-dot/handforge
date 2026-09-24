@@ -31,7 +31,7 @@ for (const cid of CHALLENGE_IDS) {
       const m = run(bots(n), [cid], { cells: 16 });
       assert.equal(m.phase, 'final', `${cid} n=${n}: матч не дошёл до конца`);
       const h = m.history[0];
-      const maxWin = cid === 'unique' ? 2 : cid === 'cards' ? n : 1; // «Очко» ограничено 12 раундами
+      const maxWin = cid === 'unique' ? 2 : cid === 'cards' || cid === 'mines' ? n : 1; // «Очко» — 12 раундов, «Взрывное поле» — пока есть клетки
       assert.ok(h.winners.length >= 1 && h.winners.length <= maxWin, `${cid} n=${n}: победителей ${h.winners.length}`);
       assert.equal(h.winners.length + h.order.length, n, `${cid} n=${n}: кто-то потерялся`);
       const ids = new Set([...h.winners, ...h.order.map((o) => o.id)]);
@@ -95,6 +95,22 @@ for (const cid of ['bomb', 'shoot']) {
   assert.equal(sa.phase, 'act');
   if (cid === 'bomb') assert.equal(sa.deadline, null, 'фитиль бомбы виден');
   if (cid === 'shoot') { assert.ok(sa.priv?.pos, 'своя позиция не пришла'); assert.ok(!JSON.stringify(sa).includes(JSON.stringify(m3.ch.pos.b)), 'чужая позиция утекла'); }
+  checks++;
+}
+
+// «Взрывное поле»: взорванные клетки не возвращаются (кроме переигровки)
+{
+  let now = 0; const q = [];
+  const m4 = new Match({ players: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }], chain: ['mines'], now: () => now, setTimer: (fn, ms) => { const t = { at: now + ms, fn }; q.push(t); return t; }, clearTimer: (t) => { const i = q.indexOf(t); if (i >= 0) q.splice(i, 1); } });
+  m4.start();
+  const step = () => { q.sort((x, y) => x.at - y.at); const t = q.shift(); now = t.at; t.fn(); };
+  while (m4.phase !== 'act') step();
+  m4.act('a', { stand: 0, bomb: 5 }); m4.act('b', { stand: 1, bomb: 6 }); m4.act('c', { stand: 2, bomb: 7 }); m4.act('d', { stand: 3, bomb: 8 });
+  while (m4.phase !== 'reveal') step();
+  assert.equal(m4.ch.cells.length, 32, 'взорванные клетки должны исчезнуть');
+  while (m4.phase !== 'act') step();
+  assert.equal(m4.getStateFor('a').data.cells.length, 32, 'в следующем раунде столько же клеток');
+  assert.equal(m4.act('a', { stand: 5, bomb: 0 }), false, 'на взорванную клетку встать нельзя');
   checks++;
 }
 

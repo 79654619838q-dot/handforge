@@ -140,6 +140,11 @@ export class MinesView extends FieldView {
     this.built = true;
     this.picker?.dispose(); // старое поле освобождает Stage.setWorld, обработчики нажатий — здесь
     this.setupWorld(st, st.data.size);
+    const keep = new Set(st.data.cells || []);
+    if (st.data.cells && keep.size < st.data.size) {
+      for (const c of this.grid.cells) if (!keep.has(c.id)) { c.alive = false; c.group.parent?.remove(c.group); }
+      this.grid.relayout().then(() => this.world.fitCamera(this.grid.extent));
+    }
     this.grid.intro();
     this.stand = null; this.bomb = null; this.standOk = false; this.busy = false;
     this.markers = new THREE.Group();
