@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { Match } from '../../shared/match.js';
+import { pickHeroBot } from '../../shared/heroes.js';
 
 // Две «сессии» с одним интерфейсом для экрана испытаний:
 //   onState(fn) — новое состояние матча; act(action) — ход игрока; myId; close().
@@ -22,7 +23,11 @@ export class LocalSession {
     this.myId = 'me';
     this.listeners = [];
     const players = [{ id: 'me', name: profile.name, profile }];
+    const used = new Set([profile.name]);
     for (let i = 0; i < bots; i++) {
+      // боты — супергерои без повторов; героев не хватило — обычные люди
+      const hb = pickHeroBot(used);
+      if (hb) { used.add(hb.name); players.push({ id: 'bot' + i, name: hb.name, isBot: true, profile: hb.profile }); continue; }
       const person = BOT_PEOPLE[i % BOT_PEOPLE.length];
       players.push({ id: 'bot' + i, name: BOT_NAMES[i % BOT_NAMES.length], isBot: true, profile: { person, gender: /Female/.test(person) ? 'female' : 'male', background: 'forge' } });
     }

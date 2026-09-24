@@ -4,7 +4,7 @@ const DICT = {
     tagline: 'Выживает тот, кто выбрал верно', best: 'Лучший результат',
     exitHint: 'Закройте вкладку, чтобы выйти из игры',
     // профиль
-    avatarTitle: 'Ваш аватар', tabPerson: 'Человек', tabColors: 'Цвета', outfit: 'Цвет одежды', hairTint: 'Цвет волос', skinTone: 'Тон кожи', mask: 'Маска', headphones: 'Наушники', scarf: 'Шарф', earrings: 'Серьги', backpack: 'Рюкзак', person: 'Выберите внешность', tabLook: 'Внешность', tabClothes: 'Одежда', tabAcc: 'Аксессуары', tabBg: 'Фон', tabName: 'Имя',
+    avatarTitle: 'Ваш аватар', tabPerson: 'Человек', tabHero: 'Герои', noHero: 'Обычный человек (без героя)', tabColors: 'Цвета', outfit: 'Цвет одежды', hairTint: 'Цвет волос', skinTone: 'Тон кожи', mask: 'Маска', headphones: 'Наушники', scarf: 'Шарф', earrings: 'Серьги', backpack: 'Рюкзак', person: 'Выберите внешность', tabLook: 'Внешность', tabClothes: 'Одежда', tabAcc: 'Аксессуары', tabBg: 'Фон', tabName: 'Имя',
     gender: 'Пол', male: 'Мужчина', female: 'Женщина', faceShape: 'Форма лица', skin: 'Оттенок кожи', hair: 'Причёска', hairColor: 'Цвет волос',
     eyes: 'Цвет глаз', brows: 'Брови', beard: 'Борода', mustache: 'Усы', top: 'Верх', topColor: 'Цвет верха', pants: 'Цвет брюк',
     eyewear: 'Очки', watch: 'Часы', chain: 'Цепь', rings: 'Кольца', headwear: 'Головной убор', background: 'Фон', name: 'Имя игрока',
@@ -61,7 +61,7 @@ const DICT = {
     play: 'Play', profile: 'Profile', settings: 'Settings', exit: 'Exit', back: 'Back',
     tagline: 'Only the right choice survives', best: 'Best result',
     exitHint: 'Close the tab to exit the game',
-    avatarTitle: 'Your avatar', tabPerson: 'Person', tabColors: 'Colors', outfit: 'Outfit color', hairTint: 'Hair color', skinTone: 'Skin tone', mask: 'Mask', headphones: 'Headphones', scarf: 'Scarf', earrings: 'Earrings', backpack: 'Backpack', person: 'Choose a look', tabLook: 'Look', tabClothes: 'Clothes', tabAcc: 'Accessories', tabBg: 'Backdrop', tabName: 'Name',
+    avatarTitle: 'Your avatar', tabPerson: 'Person', tabHero: 'Heroes', noHero: 'Regular person (no hero)', tabColors: 'Colors', outfit: 'Outfit color', hairTint: 'Hair color', skinTone: 'Skin tone', mask: 'Mask', headphones: 'Headphones', scarf: 'Scarf', earrings: 'Earrings', backpack: 'Backpack', person: 'Choose a look', tabLook: 'Look', tabClothes: 'Clothes', tabAcc: 'Accessories', tabBg: 'Backdrop', tabName: 'Name',
     gender: 'Gender', male: 'Male', female: 'Female', faceShape: 'Face shape', skin: 'Skin tone', hair: 'Hairstyle', hairColor: 'Hair color',
     eyes: 'Eye color', brows: 'Brows', beard: 'Beard', mustache: 'Mustache', top: 'Top', topColor: 'Top color', pants: 'Pants color',
     eyewear: 'Eyewear', watch: 'Watch', chain: 'Chain', rings: 'Rings', headwear: 'Headwear', background: 'Backdrop', name: 'Player name',

@@ -237,3 +237,13 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px;
   .hud-right { width: 190px; }
   #menu .mascot { opacity: .45; }
 }
+
+/* Герои в профиле */
+.heroes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hero-card { position: relative; padding: 10px 8px 9px; border: 1px solid rgba(255,255,255,.08); border-radius: 6px; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--hc) 22%, transparent), rgba(8,6,12,.85) 70%); cursor: pointer; text-align: center; transition: transform .15s, border-color .15s, box-shadow .15s; }
+.hero-card:hover { transform: translateY(-2px); border-color: var(--hc); }
+.hero-card.on { border-color: var(--hc); box-shadow: 0 0 18px color-mix(in srgb, var(--hc) 55%, transparent), inset 0 0 12px color-mix(in srgb, var(--hc) 25%, transparent); }
+.hero-card img { width: 54px; height: 54px; display: block; margin: 0 auto 4px; filter: drop-shadow(0 0 6px var(--hc)); }
+.hero-card b { display: block; font-family: var(--font-title); font-size: 15px; color: #fff; letter-spacing: .04em; }
+.hero-card span { display: block; font-size: 11px; line-height: 1.25; color: var(--ink-dim); margin-top: 2px; }
+@media (max-width: 760px) { .heroes { grid-template-columns: repeat(2, 1fr); } .hero-card img { width: 44px; height: 44px; } }

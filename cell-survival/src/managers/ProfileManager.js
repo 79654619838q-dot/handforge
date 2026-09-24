@@ -1,6 +1,7 @@
 import { h } from './UIManager.js';
 import { t, getLang } from '../i18n.js';
 import { CATALOG, LABELS, BACKGROUNDS, PEOPLE, randomProfile } from './AvatarManager.js';
+import { HEROES, emblemCanvas } from './heroes.js';
 import { ASSETS } from '../paths.js';
 
 const lbl = (v) => (getLang() === 'ru' ? LABELS.ru[v] : null) || (v[0].toUpperCase() + v.slice(1));
@@ -16,7 +17,8 @@ export class ProfileManager {
     if (!draft.person) draft.person = (PEOPLE.find((x) => x.gender === draft.gender) || PEOPLE[0]).id;
     const s = h('div', 'screen');
     s.id = 'profile';
-    let tab = 'person';
+    let tab = 'hero';
+    const heroIcon = new Map(HEROES.map((hr) => [hr.id, emblemCanvas(hr.emblem, hr.glow, 128).toDataURL()]));
 
     const TABS = {
       person: [
@@ -44,7 +46,7 @@ export class ProfileManager {
       <div class="nameplate"><div class="kicker">${t('profile')}</div><h2 class="title" data-np></h2></div>
       <div class="editor panel">
         <div class="tabs">
-          <button class="tab" data-t="person">${t('tabPerson')}</button><button class="tab" data-t="look">${t('tabColors')}</button>
+          <button class="tab" data-t="hero">${t('tabHero')}</button><button class="tab" data-t="person">${t('tabPerson')}</button><button class="tab" data-t="look">${t('tabColors')}</button>
           <button class="tab" data-t="acc">${t('tabAcc')}</button><button class="tab" data-t="bg">${t('tabBg')}</button><button class="tab" data-t="name">${t('tabName')}</button>
         </div>
         <div class="body" data-body></div>
@@ -63,6 +65,13 @@ export class ProfileManager {
         setTimeout(() => inp.focus(), 50);
         return;
       }
+      if (tab === 'hero') {
+        const lang = getLang() === 'ru' ? 'ru' : 'en';
+        body.innerHTML = `<div class="heroes">${HEROES.map((hr) => `<div class="hero-card ${draft.hero === hr.id ? 'on' : ''}" data-hero="${hr.id}" style="--hc:${hr.glow}">
+          <img src="${heroIcon.get(hr.id)}" alt=""><b>${hr[lang]}</b><span>${hr.tag[lang]}</span></div>`).join('')}</div>
+          <button class="chip ${!draft.hero || draft.hero === 'none' ? 'on' : ''}" data-hero="none" style="margin-top:12px">${t('noHero')}</button>`;
+        return;
+      }
       body.innerHTML = TABS[tab].map(([key, kind, opts, fmt, title]) => {
         const label = `<span class="label">${t(title || key)}</span>`;
         if (kind === 'chips') return `<div class="field">${label}<div class="chips">${opts.map((v) => `<button class="chip ${String(draft[key] ?? (key === 'skinTone' ? '0' : 'none')) === String(v) ? 'on' : ''}" data-k="${key}" data-v="${v}">${fmt ? fmt(v) : lbl(v)}</button>`).join('')}</div></div>`;
@@ -74,8 +83,18 @@ export class ProfileManager {
     };
 
     body.onclick = (e) => {
+      const hc = e.target.closest('[data-hero]');
+      if (hc) {
+        const hr = HEROES.find((x) => x.id === hc.dataset.hero);
+        draft.hero = hr ? hr.id : 'none';
+        if (hr) { draft.person = hr.person; draft.gender = hr.gender; }
+        this.game.audio.select?.();
+        render(); world.setProfile(draft);
+        return;
+      }
       const el = e.target.closest('[data-k]'); if (!el) return;
       draft[el.dataset.k] = el.dataset.v;
+      if (el.dataset.k === 'person' || el.dataset.k === 'gender') draft.hero = 'none'; // выбрал обычного человека — уже не герой
       if (el.dataset.k === 'gender' && PEOPLE.find((x) => x.id === draft.person)?.gender !== draft.gender) {
         draft.person = PEOPLE.find((x) => x.gender === draft.gender).id; // пол сменился — первый человек этого пола
       }

@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { ASSETS } from '../paths.js';
+import { HEROES, heroOf, applyHero } from './heroes.js';
 
 // ---------- Реалистичные люди (Microsoft Rocketbox, MIT) ----------
 // Файлы готовит tools/import_rocketbox.py → public/assets/avatar/people/<id>/.
@@ -128,9 +129,11 @@ const liveMixers = new Set();
 const topOf = (o) => { while (o.parent) o = o.parent; return o; };
 // Считаем движения только тех, кто стоит на показываемой сцене. Кто 10 с не на ней (прошлое испытание,
 // удалённый аватар) — забываем, иначе старые сцены жили бы в памяти вечно.
+let fxTime = 0;
 export function updateAvatars(dt, scene) {
+  fxTime += dt;
   for (const m of liveMixers) {
-    if (topOf(m.getRoot()) === scene) { m.idle = 0; m.update(dt); }
+    if (topOf(m.getRoot()) === scene) { m.idle = 0; m.update(dt); m.heroFx?.(dt, fxTime); }
     else if ((m.idle = (m.idle || 0) + dt) > 10) liveMixers.delete(m);
   }
 }
@@ -157,6 +160,7 @@ function animatePerson(root, person, female) {
   // настроение: idle / nervous / cheer / clap / sad
   root.userData.mood = (m) => { if (m === mood || !MOODS[m]) return; mood = m; play(clipOf(MOODS[m]), 0.4); };
   root.userData.mixer = mixer;
+  mixer.heroFx = root.userData.fx; // сила героя обновляется вместе с движениями
   void emoteLeft;
 }
 
@@ -291,8 +295,10 @@ function buildPerson(p, template) {
   root.add(person);
   relaxPose(person);
   person.updateMatrixWorld(true);
-  applyLooks(p, person, template);
-  addPersonAccessories(p, person);
+  const hero = heroOf(p);
+  applyLooks(hero ? { ...p, outfit: hero.suit, skinTone: '0', hairTint: 'orig' } : p, person, template);
+  if (hero) root.userData.fx = applyHero(hero, root, person); // супергерой: костюм, снаряжение, сила
+  else addPersonAccessories(p, person);
 
   const head = person.getObjectByName('Bip01_Head');
   const spine = person.getObjectByName('Bip01_Spine1');
@@ -310,7 +316,9 @@ function buildPerson(p, template) {
     root.userData.update = () => {};
     return root;
   }
+  let lastT = null;
   root.userData.update = (t) => {
+    if (root.userData.fx) { root.userData.fx(lastT === null ? 0 : Math.min(0.05, t - lastT), t); lastT = t; }
     const tt = t + phase;
     if (spine) { e.set(Math.sin(tt * 1.6) * 0.012, 0, -Math.sin(tt * 0.35) * 0.02); spine.quaternion.copy(spine0).multiply(qa.setFromEuler(e)); }
     if (pelvis) { e.set(0, 0, Math.sin(tt * 0.35) * 0.018); pelvis.quaternion.copy(pelvis0).multiply(qa.setFromEuler(e)); }
@@ -527,6 +535,7 @@ export const BACKGROUNDS = {
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 export function randomProfile(name = '') {
+  if (Math.random() < 0.7) { const hr = pick(HEROES); return { name, gender: hr.gender, person: hr.person, hero: hr.id, background: pick(CATALOG.background) }; }
   const gender = pick(CATALOG.gender);
   const person = pick(PEOPLE.filter((x) => x.gender === gender)).id;
   const male = gender === 'male';

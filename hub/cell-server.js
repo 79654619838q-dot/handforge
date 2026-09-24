@@ -4,6 +4,7 @@
 
 import { Server } from "socket.io";
 import { Match, CHALLENGE_IDS } from "../cell-survival/shared/match.js";
+import { pickHeroBot } from "../cell-survival/shared/heroes.js";
 
 const ROOM_STATUS = { WAITING: "WAITING", READY: "READY", PLAYING: "PLAYING", FINISHED: "FINISHED" };
 const CELL_COUNTS = [16, 25, 36, 50, 64, 100];
@@ -14,7 +15,7 @@ const rooms = new Map();
 const cleanStr = (s, n) => String(s ?? "").replace(/[<>]/g, "").trim().slice(0, n);
 
 // Профиль аватара приходит от клиента — берём только известные поля и короткие строки.
-const PROFILE_KEYS = ["gender", "person", "eyewear", "watch", "chain", "headwear", "background", "mask", "headphones", "scarf", "earrings", "backpack", "outfit", "hairTint", "skinTone", "faceShape", "skin", "hair", "hairColor", "eyes", "brows", "beard", "mustache", "top", "topColor", "pantsColor"];
+const PROFILE_KEYS = ["gender", "person", "hero", "eyewear", "watch", "chain", "headwear", "background", "mask", "headphones", "scarf", "earrings", "backpack", "outfit", "hairTint", "skinTone", "faceShape", "skin", "hair", "hairColor", "eyes", "brows", "beard", "mustache", "top", "topColor", "pantsColor"];
 function cleanProfile(p) {
   const out = {};
   if (p && typeof p === "object") for (const k of PROFILE_KEYS) if (typeof p[k] === "string") out[k] = cleanStr(p[k], 40);
@@ -178,10 +179,14 @@ export function attachCellServer(httpServer) {
       const r = room();
       if (!r || !isHost() || r.match || r.members.size >= r.maxPlayers) return;
       const used = new Set([...r.members.values()].map((m) => m.name));
-      const name = BOT_NAMES.find((n) => !used.has(n)) || "Бот " + r.members.size;
-      const person = BOT_PEOPLE[Math.floor(Math.random() * BOT_PEOPLE.length)];
       const id = "bot-" + Math.random().toString(36).slice(2, 9);
-      r.members.set(id, { id, name, isBot: true, ready: true, connected: true, profile: { person, gender: /Female/.test(person) ? "female" : "male", background: "forge" } });
+      const hb = pickHeroBot(used); // боты — супергерои без повторов
+      if (hb) r.members.set(id, { id, name: hb.name, isBot: true, ready: true, connected: true, profile: hb.profile });
+      else {
+        const name = BOT_NAMES.find((n) => !used.has(n)) || "Бот " + r.members.size;
+        const person = BOT_PEOPLE[Math.floor(Math.random() * BOT_PEOPLE.length)];
+        r.members.set(id, { id, name, isBot: true, ready: true, connected: true, profile: { person, gender: /Female/.test(person) ? "female" : "male", background: "forge" } });
+      }
       pushRoom(r);
     });
 
