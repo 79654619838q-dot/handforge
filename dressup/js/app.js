@@ -1,6 +1,6 @@
 // Экраны игры: место → принцесса → гардероб → оценка → выход в локацию → фотозона.
 // Принцессы и вещи — слои-картинки ChatGPT (rdoll.js), вся одежда бесплатная.
-import { dollHTML, preload, drawDoll, thumbSrc, faceSrc, FX_NAMES } from './rdoll.js';
+import { dollHTML, preload, drawDoll, thumbSrc, faceSrc, layerSrcs, FX_NAMES } from './rdoll.js';
 import { ITEMS, BY_SLOT, TOTAL, itemsWithTag, HAIR_TINTS, SLOT_NAMES, PRINCESS_IDS } from './catalog.js';
 import { PLACES, PLACE, PRINCESSES, PRINCESS, SETS, TASKS, JUDGE, BACKDROPS, checkNeed } from './data.js';
 import { bgCSS, photoURL, sceneURL } from './scenes.js';
@@ -601,5 +601,22 @@ function settings() {
 }
 
 window.dressup = { G, S, ITEMS, BY_SLOT, go: { menu, places, princesses, dressRoom, scene, photo, looks, collection, tasks, randomLook, mix, settings }, startDress };
-if (!READY.length || !BY_SLOT.dress?.length) render('<p class="empty">Принцессы ещё рисуются… ✨</p>');
-else menu();
+// Заставка: заранее грузим принцесс, стартовые наряды и фон меню, чтобы кукла не появлялась по кусочкам.
+async function boot() {
+  if (!READY.length || !BY_SLOT.dress?.length) return render('<p class="empty">Принцессы ещё рисуются… ✨</p>');
+  const urls = new Set(['assets/bg/palace.jpg']);
+  for (const p of READY) {
+    urls.add(faceSrc(p.id));
+    const st0 = { pid: p.id, outfit: { dress: BY_SLOT.dress[0].id, ...cleanOutfit(p.outfit) } };
+    for (const u of layerSrcs(st0)) urls.add(u);
+  }
+  let n = 0;
+  const all = [...urls];
+  const tick = () => { const f = $('#barFill'); if (f) f.style.width = Math.round((++n / all.length) * 100) + '%'; };
+  await Promise.race([
+    Promise.all(all.map((u) => new Promise((res) => { const i = new Image(); i.onload = i.onerror = () => { tick(); res(); }; i.src = u; }))),
+    new Promise((res) => setTimeout(res, 25000)),
+  ]);
+  menu();
+}
+boot();

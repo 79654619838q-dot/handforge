@@ -62,6 +62,8 @@ function fxHTML(kind) {
   return `<div class="fx">${o}</div>`;
 }
 
+export const layerSrcs = (st) => layerList(st).map((l) => DIR + l.f + '.webp');
+
 // Картинки заранее — чтобы переодевание было мгновенным.
 const cache = new Map();
 export function preload(st) {

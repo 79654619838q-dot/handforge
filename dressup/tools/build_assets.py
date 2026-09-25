@@ -152,6 +152,13 @@ def main():
     man = rgba(os.path.join(ART, 'mannequin.png'))
     silhouette = ndimage.binary_erosion(man[..., 3] > 128, iterations=2)
     manifest = {'w': W, 'h': H, 'princesses': {}, 'items': {}}
+    # кэш: вещь пересобирается, только если её исходные картинки изменились (или сменилась версия сборки)
+    VER = 7
+    cpath = os.path.join(ART, 'build_cache.json')
+    cache = json.load(open(cpath, encoding='utf8')) if os.path.exists(cpath) else {}
+    if cache.get('_ver') != VER:
+        cache = {'_ver': VER}
+    stamp = lambda *fs: [round(os.path.getmtime(f), 2) for f in fs if os.path.exists(f)]
 
     slip = slip_region(man)
     bun_mask = None
@@ -166,6 +173,12 @@ def main():
     for pid, _desc in PRINCESSES:
         p, pm = os.path.join(RAW, f'p_{pid}.png'), os.path.join(RAW, f'pm_{pid}.png')
         if not (os.path.exists(p) and os.path.exists(pm)):
+            continue
+        key = 'princess:' + pid
+        pbf = os.path.join(RAW, f'pb_{pid}.png')
+        if cache.get(key, {}).get('stamp') == stamp(p, pm, pbf):
+            manifest['princesses'][pid] = cache[key]['entry']
+            manifest['items']['hair_' + pid] = cache[key]['hair']
             continue
         body = rgba(p)
         hair = green_mask(body, rgba(pm))
@@ -202,12 +215,17 @@ def main():
         face.save(os.path.join(OUT, f'face_{pid}.webp'), quality=84, method=6)
         entry['face'] = f'face_{pid}'
         manifest['princesses'][pid] = entry
+        cache[key] = {'stamp': stamp(p, pm, pbf), 'entry': entry, 'hair': manifest['items'][hid]}
         print('princess', pid)
 
     items = [('ball_pink', 'dress', '', '')] + ITEMS
     for iid, slot, _what, _noun in items:
         i, g = os.path.join(RAW, f'i_{iid}.png'), os.path.join(RAW, f'g_{iid}.png')
         if not (os.path.exists(i) and os.path.exists(g)):
+            continue
+        key = 'item:' + iid
+        if cache.get(key, {}).get('stamp') == stamp(i, g):
+            manifest['items'][iid] = cache[key]['entry']
             continue
         d = rgba(i)
         m = green_mask(d, rgba(g))
@@ -236,6 +254,7 @@ def main():
             cover = (m & arms_mask).sum() / max(1, arms_mask.sum())
             e['sleeves'] = bool(cover > 0.18)
         manifest['items'][iid] = e
+        cache[key] = {'stamp': stamp(i, g), 'entry': e}
         print('item', iid, e.get('sleeves', ''))
 
     # фоны мест и обложка
@@ -258,6 +277,7 @@ def main():
         im.thumbnail((512, 512), Image.LANCZOS)
         im.save(os.path.join(ROOT, 'assets', 'cover.jpg'), 'JPEG', quality=86, optimize=True)
 
+    json.dump(cache, open(cpath, 'w', encoding='utf8'))
     js = '// Собрано tools/build_assets.py из картинок ChatGPT — не править руками.\nexport const DOLL = ' + json.dumps(manifest, ensure_ascii=False) + ';\n'
     open(os.path.join(ROOT, 'js', 'doll-manifest.js'), 'w', encoding='utf8').write(js)
     print('princesses', len(manifest['princesses']), 'items', len(manifest['items']))
