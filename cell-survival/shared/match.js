@@ -250,7 +250,7 @@ function makeShape(round) {
   const kinds = ['circle', 'square', 'triangle', 'rhombus', 'pentagon', 'hexagon', 'irregular', 'concave'];
   const kind = round <= kinds.length ? kinds[round - 1] : pick(kinds.slice(4));
   // координаты поля 0..1000; фигура смещена случайно, чтобы центр не совпадал с серединой поля
-  const ox = 440 + rnd(120), oy = 440 + rnd(120), R = 290 + rnd(70), rot = Math.random() * Math.PI * 2; // фигура на большую часть поля
+  const ox = 470 + rnd(60), oy = 470 + rnd(60), R = 380 + rnd(50), rot = Math.random() * Math.PI * 2; // фигура почти во всё поле (оператор 25.09: больше)
   let pts;
   const reg = (n) => Array.from({ length: n }, (_, i) => { const a = rot + (i / n) * Math.PI * 2; return [ox + Math.cos(a) * R, oy + Math.sin(a) * R]; });
   switch (kind) {
@@ -450,13 +450,16 @@ class Cards extends Base {
 
 // 11. Русская рулетка: барабан на 6, в раунде N — N патронов (максимум 5). Ходят по кругу, каждый крутит и жмёт.
 class Roulette extends Base {
+  // Каждый живой игрок по очереди тянет патрон; раунд кончается, когда вытянули все (оператор 25.09:
+  // «каждый должен пройти уровень»). Выбывают все, кому достался боевой. Боевых всегда меньше, чем игроков.
   realtime = true;
   begin() {
-    this.live = Math.min(5, this.round + 1);           // 1-й раунд — один боевой, дальше +1
-    this.total = 6;
+    const n = this.alive.length;
+    this.total = Math.max(6, n + 1);                   // патронов хватает на всех
+    this.live = Math.max(1, Math.min(this.round + 1, n - 1, 5)); // 1-й раунд — один боевой, дальше +1
     const idx = shuffle(Array.from({ length: this.total }, (_, k) => k));
     this.liveSet = new Set(idx.slice(0, this.live));   // где боевые — знает только сервер
-    this.taken = [];                                   // открытые патроны: { i, pid, live }
+    this.taken = [];                                   // вытянутые патроны: { i, pid, live }
     this.order = shuffle(this.alive);
     this.turn = 0;
     this.endNow = false;
@@ -464,17 +467,17 @@ class Roulette extends Base {
     return super.begin();
   }
   data() { return { total: this.total, live: this.live, order: this.order }; }
-  actMs() { return 180000; }
+  actMs() { return 300000; }
   complete() { return false; }
-  get current() { return this.order[this.turn % this.order.length]; }
+  get current() { return this.order[this.turn]; }
   free() { const t = new Set(this.taken.map((x) => x.i)); return Array.from({ length: this.total }, (_, k) => k).filter((k) => !t.has(k)); }
   act(pid, a) {
     const i = Number(a?.pick);
     if (this.endNow || pid !== this.current || !this.free().includes(i)) return false;
-    const live = this.liveSet.has(i);
-    this.taken.push({ i, pid, live });
+    this.taken.push({ i, pid, live: this.liveSet.has(i) });
     this.movedAt[pid] = this.m.now();
-    if (live) { this.loser = pid; this.endNow = true; } else { this.turn += 1; this.turnAt = this.m.now(); }
+    this.turn += 1; this.turnAt = this.m.now();
+    if (this.turn >= this.order.length) this.endNow = true; // вытянули все
     return true;
   }
   turnTimeoutMs() { return 15000; } // не выбрал за 15 с — патрон выбирается случайно
@@ -483,9 +486,12 @@ class Roulette extends Base {
   botPlan() {
     const p = this.m.player(this.current);
     if (this.endNow || !p?.isBot) return [];
-    return [{ id: this.current, ms: 1600 + rnd(1600), move: () => ({ pick: pick(this.free()) }) }];
+    return [{ id: this.current, ms: 1200 + rnd(1200), move: () => ({ pick: pick(this.free()) }) }];
   }
-  resolve() { return { eliminated: this.loser ? [this.loser] : [], replay: false, reveal: { loser: this.loser, taken: this.taken, live: [...this.liveSet] } }; }
+  resolve() {
+    const eliminated = this.taken.filter((x) => x.live).map((x) => x.pid);
+    return { eliminated, replay: false, reveal: { losers: eliminated, taken: this.taken, live: [...this.liveSet] } };
+  }
   revealMs() { return 5500; }
 }
 

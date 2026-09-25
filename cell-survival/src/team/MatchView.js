@@ -1,7 +1,7 @@
 import { h } from '../managers/UIManager.js';
 import { t, getLang } from '../i18n.js';
 import { CHALLENGE_META } from '../../shared/match.js';
-import { renderPortrait, ensurePerson } from '../managers/AvatarManager.js';
+import { portraitSrc, ensurePerson } from '../managers/AvatarManager.js';
 import { THEME_IDS } from '../scene/themes.js';
 import { VIEWS } from './views/index.js';
 
@@ -14,7 +14,7 @@ let chain = Promise.resolve();
 export function portraitOf(profile) {
   const key = JSON.stringify(profile || {});
   if (!portraitCache.has(key)) {
-    portraitCache.set(key, chain = chain.then(async () => { await ensurePerson(profile); return renderPortrait(profile, 160, 200); }).catch(() => ''));
+    portraitCache.set(key, chain = chain.then(async () => { if (!profile?.hero || profile.hero === 'none') await ensurePerson(profile); return portraitSrc(profile, 160, 200); }).catch(() => ''));
   }
   return portraitCache.get(key);
 }

@@ -97,7 +97,7 @@ function crackLines(g, r, n, x0, y0, len, width, color) {
 }
 
 // Грань клетки: цвет, нормали, свечение (рамка/гравировка — то, что светится при наведении/выборе).
-export function makeCellTextures(theme, variant = 0) {
+function makeCellTexturesRaw(theme, variant = 0) {
   const S = 256;
   const r = rng(variant * 97 + theme.length * 13 + 7);
   const seed = variant * 31 + 11;
@@ -246,9 +246,22 @@ export function smokeTexture(seed = 3) {
 }
 
 // Большая поверхность земли/стен: шум + нормали, с повтором.
-export function surfaceTextures(c1, c2, scale, seed, repeat, contrast = 1.2, normalStrength = 3) {
+function surfaceTexturesRaw(c1, c2, scale, seed, repeat, contrast = 1.2, normalStrength = 3) {
   const b = fillNoise(256, seed, c1, c2, scale, contrast);
   const map = tex(b.col, true, repeat);
   const normalMap = tex(heightToNormal(b.hgt, normalStrength), false, repeat);
   return { map, normalMap };
 }
+
+// Попиксельные текстуры считаются один раз за игру: мир создаётся дважды на испытание (заставка и поле),
+// и шум/рельеф пересчитывались каждый раз (профиль 25.09: ~1,2 с на испытание). Каждый вызов получает
+// свои копии текстур (их можно освобождать), картинка у копий общая — в видеокарту она уходит один раз.
+const texMemo = new Map();
+export function memoTextures(key, make) {
+  if (!texMemo.has(key)) texMemo.set(key, make());
+  const out = {};
+  for (const [k, v] of Object.entries(texMemo.get(key))) out[k] = v?.isTexture ? v.clone() : v;
+  return out;
+}
+export const makeCellTextures = (theme, variant = 0) => memoTextures(`cell:${theme}:${variant}`, () => makeCellTexturesRaw(theme, variant));
+export const surfaceTextures = (...a) => memoTextures('surf:' + a.join(','), () => surfaceTexturesRaw(...a));

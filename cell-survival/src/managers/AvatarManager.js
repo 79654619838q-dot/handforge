@@ -36,6 +36,16 @@ export const PEOPLE = [
 const personCache = new Map();
 const BLANK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
+class BitmapTextureLoader extends THREE.Loader {
+  load(url, onLoad, onProgress, onError) {
+    const tex = new THREE.Texture();
+    tex.userData.src = this.manager.resolveURL((this.path || '') + url);
+    const l = new THREE.ImageBitmapLoader(this.manager).setPath(this.path).setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none' });
+    l.load(url, (bmp) => { tex.image = bmp; tex.flipY = false; tex.needsUpdate = true; onLoad?.(tex); }, onProgress, onError);
+    return tex;
+  }
+}
+
 export function loadPerson(id) {
   if (personCache.has(id)) return personCache.get(id);
   const dir = `${ASSETS}avatar/people/${id}/`;
@@ -50,6 +60,9 @@ export function loadPerson(id) {
   });
   // «Готов» = FBX разобран И все его текстуры скачаны; иначе портрет рисуется без текстур.
   const allLoaded = new Promise((res) => { manager.onLoad = res; }); // ошибка одной текстуры не валит человека
+  // Картинки распаковываются в фоновом потоке (ImageBitmap): обычная <img> распаковывалась на главном потоке
+  // при загрузке в видеокарту — профиль 25.09: 1,1–1,3 с зависаний на испытание. Адрес — в userData.src.
+  if (typeof createImageBitmap === 'function') manager.addHandler(/\.tga$/i, new BitmapTextureLoader(manager));
   const loader = new FBXLoader(manager);
   loader.setResourcePath(dir);
   const job = loader.loadAsync(dir + id + '.fbx').then((fbx) => allLoaded.then(() => fbx)).then((fbx) => {
@@ -73,7 +86,7 @@ export function loadPerson(id) {
 // лицо — физический материал с тёплым «рассеиванием» (sheen) вместо пластика,
 // волосы и ресницы — alphaHash: мягкие края без «лесенки» и без проблем сортировки.
 function toPBR(m) {
-  const src = (m.map?.image?.currentSrc || m.map?.image?.src || '').split('/').pop();
+  const src = (m.map?.userData?.src || m.map?.image?.currentSrc || m.map?.image?.src || '').split('/').pop();
   const isHead = /head_color/.test(src);
   const cut = !!m.transparent || !!m.alphaMap;
   const params = {
@@ -133,10 +146,17 @@ const topOf = (o) => { while (o.parent) o = o.parent; return o; };
 // Считаем движения только тех, кто стоит на показываемой сцене. Кто 10 с не на ней (прошлое испытание,
 // удалённый аватар) — забываем, иначе старые сцены жили бы в памяти вечно.
 let fxTime = 0;
+let lowFx = false;
+export function setLowFx(v) { lowFx = v; } // «Низкое» качество: без эффектов героев
 export function updateAvatars(dt, scene) {
   fxTime += dt;
   for (const m of liveMixers) {
-    if (topOf(m.getRoot()) === scene) { m.idle = 0; m.update(dt); m.heroFx?.(dt, fxTime); }
+    if (topOf(m.getRoot()) === scene) {
+      m.idle = 0;
+      // движения — 30 раз в секунду (глазу хватает, нагрузка вдвое меньше); эффекты героя — не на «низком»
+      m.acc = (m.acc || 0) + dt;
+      if (m.acc >= 1 / 31) { m.update(m.acc); if (!lowFx) m.heroFx?.(m.acc, fxTime); m.acc = 0; }
+    }
     else if ((m.idle = (m.idle || 0) + dt) > 10) liveMixers.delete(m);
   }
 }
@@ -226,9 +246,9 @@ function tintMaterial(m, tint, skinMul, skinRef, useSkin) {
   };
   // Уникальный ключ: при одинаковом ключе three.js берёт готовую программу и не передаёт в неё наши значения —
   // все аватары получали бы цвета первого.
-  // Ключ — по значениям перекраски: одинаково перекрашенные материалы делят одну программу и одни значения,
-  // разные — получают свою. (Ключ по uuid собирал шейдер на каждый материал — рывки при появлении людей.)
-  const key = ['tint', tint || '-', skinMul.toArray().map((v) => v.toFixed(3)).join(','), skinRef.toArray().map((v) => v.toFixed(3)).join(','), useSkin ? 1 : 0].join(':');
+  // Ключ — только вид перекраски; цвета — параметры (uniform) каждого материала. Шейдер один на всех:
+  // с цветом в ключе у каждого героя был свой шейдер, а сборка шейдера на Windows — 100–200 мс (профиль 25.09).
+  const key = 'tint:' + (useSkin ? 1 : 0);
   c.customProgramCacheKey = () => key;
   return c;
 }
@@ -240,7 +260,7 @@ function skinRefOf(template) {
   template.traverse((o) => {
     if (!o.isMesh || img) return;
     for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-      const src = m.map?.image?.currentSrc || m.map?.image?.src || '';
+      const src = m.map?.userData?.src || m.map?.image?.currentSrc || m.map?.image?.src || '';
       if (/head_color/.test(src)) img = m.map.image;
     }
   });
@@ -275,7 +295,7 @@ function applyLooks(p, person, template) {
   person.traverse((o) => {
     if (!o.isMesh) return;
     const conv = (m) => {
-      const src = (m.map?.image?.currentSrc || m.map?.image?.src || '').split('/').pop();
+      const src = (m.map?.userData?.src || m.map?.image?.currentSrc || m.map?.image?.src || '').split('/').pop();
       if (/opacity/.test(src)) { // волосы/ресницы
         if (!hair) return m;
         return tintMaterial(m, hair, one, ref, false);
@@ -927,6 +947,19 @@ function portraitComposer(w, h) {
   composer.renderToScreen = false;
   return composer;
 }
+// Портрет для списка игроков/HUD/итогов. Герои — готовые картинки (tools: cellSurvival.renderPortrait),
+// остальные рисуются один раз и запоминаются в браузере. Рисование портрета в игре собирало шейдеры
+// под свой свет (профиль 25.09: портреты давали треть всех шейдеров и секунды зависаний).
+export function portraitSrc(profile, w = 160, h = 200, full = false) {
+  const hero = heroOf(profile);
+  if (hero) return `${ASSETS}heroes/${hero.id}${full ? '_full' : ''}.jpg`;
+  const key = 'cs.portrait.' + w + 'x' + h + (full ? 'f' : '') + JSON.stringify(profile || {});
+  try { const v = localStorage.getItem(key); if (v) return v; } catch { /* нет хранилища */ }
+  const url = renderPortrait(profile, w, h, full);
+  try { localStorage.setItem(key, url); } catch { /* переполнено — просто не запомним */ }
+  return url;
+}
+
 export function renderPortrait(profile, w = 480, h = 600, full = false) {
   if (!mainRenderer && !portraitRenderer) {
     portraitRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });

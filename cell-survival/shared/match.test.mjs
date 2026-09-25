@@ -36,7 +36,8 @@ for (const cid of CHALLENGE_IDS) {
       assert.equal(h.winners.length + h.order.length, n, `${cid} n=${n}: кто-то потерялся`);
       const ids = new Set([...h.winners, ...h.order.map((o) => o.id)]);
       assert.equal(ids.size, n, `${cid}: игрок посчитан дважды`);
-      if (['doors', 'time', 'memory', 'center', 'bomb', 'roulette', 'cards'].includes(cid)) {
+      if (['doors', 'time', 'memory', 'center', 'bomb', 'cards'].includes(cid)) {
+      // рулетка (с 25.09): патрон тянут все, выбывают все с боевым — за раунд может выбыть несколько, но не все
         const perRound = {};
         for (const o of h.order) perRound[o.round] = (perRound[o.round] || 0) + 1;
         assert.ok(Object.values(perRound).every((c) => c === 1), `${cid}: за раунд выбыл не один`);

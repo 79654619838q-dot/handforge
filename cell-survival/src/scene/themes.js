@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { makeCellTextures, surfaceTextures, gradientTexture, softDot, makeNoise, smokeTexture } from './textures.js';
+import { makeCellTextures, surfaceTextures, gradientTexture, softDot, makeNoise, smokeTexture, memoTextures } from './textures.js';
 import { ASSETS } from '../paths.js';
 
 // Пять утверждённых тем (п.35 ТЗ). Каждая строит окружение вокруг поля
@@ -171,7 +171,7 @@ function buildSpace(g, ctx) {
     screen.position.set(Math.cos(a) * 12.05, -2.1, Math.sin(a) * 12.05); screen.lookAt(0, -2.1, 0); g.add(screen);
   }
   // планета за «иллюминатором»
-  const planet = new THREE.Mesh(new THREE.SphereGeometry(14, 64, 48), std({ map: planetTexture(), roughness: 0.9 }));
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(14, 64, 48), std({ map: memoTextures('planet', () => ({ t: planetTexture() })).t, roughness: 0.9 }));
   planet.position.set(-18, -4, -48); g.add(planet);
   const atm = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDot('#4aa3ff'), color: '#4aa3ff', transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
   atm.scale.set(40, 40, 1); atm.position.copy(planet.position); g.add(atm);
@@ -412,7 +412,7 @@ export function buildEnvironment(themeId, scene, onBackdrop) {
       if ((o.isMesh || o.isSprite) && !o.isPoints) o.visible = false;
       if (o.isHemisphereLight) o.intensity *= 0.45; // картинка тёмная — рассеянный свет не должен высветлять клетки
     });
-    atmosphere(themeId, ctx); // пылинки над полем — после скрытия декораций, чтобы остались видны
+    // пылинки над полем (atmosphere) убраны 25.09 по слову оператора — лишняя анимация
     const catcher = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.45 }));
     catcher.rotation.x = -Math.PI / 2;
     catcher.position.y = -0.17;
@@ -449,6 +449,7 @@ export function cellMaterials(themeId) {
 // Рисунок темы (гравировка, свечение) остаётся — фото накладывается «перекрытием» и даёт настоящий камень/металл/лёд.
 // У каждого варианта клетки свой участок фото, чтобы соседние клетки не были одинаковыми.
 const photoCache = new Map();
+const photoMemo = new Map(); // тема:вариант → составленная фактура (считается один раз)
 const PHOTO_MIX = { iceberg: 0.35, desert: 0.55 }; // лёд должен остаться синим — фото только прожилками
 function loadPhoto(url) {
   if (!photoCache.has(url)) photoCache.set(url, new THREE.ImageLoader().loadAsync(url).catch(() => null));
@@ -462,6 +463,8 @@ function addPhotoDetail(themeId, tops, side, conf) {
     tops.forEach((m, v) => {
       const base = m.map?.image;
       if (!base) return;
+      const done = photoMemo.get(themeId + ':' + v);
+      if (done) { m.map.dispose(); m.map = done.map.clone(); if (done.rough) { m.roughnessMap = done.rough.clone(); m.roughness = Math.min(1, conf.rough * 1.3); } m.needsUpdate = true; return; }
       const c = document.createElement('canvas'); c.width = c.height = S;
       const g = c.getContext('2d');
       g.drawImage(base, 0, 0, S, S);
@@ -476,6 +479,8 @@ function addPhotoDetail(themeId, tops, side, conf) {
         m.roughnessMap = new THREE.CanvasTexture(rc);
         m.roughness = Math.min(1, conf.rough * 1.3);
       }
+      photoMemo.set(themeId + ':' + v, { map: m.map, rough: m.roughnessMap || null });
+      m.map = m.map.clone(); if (m.roughnessMap) m.roughnessMap = m.roughnessMap.clone(); // в памяти — образец, у материала — копия
       m.needsUpdate = true;
     });
     // бока клеток — та же фактура, темнее

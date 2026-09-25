@@ -13,7 +13,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { ASSETS } from '../paths.js';
 import { updateTweens } from './tween.js';
-import { updateAvatars, setMainRenderer } from '../managers/AvatarManager.js';
+import { updateAvatars, setMainRenderer, setLowFx } from '../managers/AvatarManager.js';
 
 // Один WebGL-холст на всю игру. Экран подменяет «мир» (scene + camera + update).
 export class Stage {
@@ -52,6 +52,7 @@ export class Stage {
 
   applySettings(s) {
     this.quality = Stage.resolveQuality(s.quality || 'auto');
+    setLowFx(this.quality === 'low');
     this.renderScale = s.renderScale;
     this.renderer.shadowMap.enabled = this.quality !== 'low';
     this.resize();

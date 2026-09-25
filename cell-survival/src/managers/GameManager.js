@@ -7,7 +7,7 @@ import { GameModeManager } from './GameModeManager.js';
 import { LobbyManager } from './LobbyManager.js';
 import { RoundManager } from './RoundManager.js';
 import { ResultManager } from './ResultManager.js';
-import { renderPortrait, ensurePerson } from './AvatarManager.js';
+import { renderPortrait, portraitSrc, ensurePerson } from './AvatarManager.js';
 import { Stage } from '../scene/Stage.js';
 import { MenuWorld, ProfileWorld } from '../scene/worlds.js';
 import { GameWorld } from '../scene/GameWorld.js';
@@ -37,6 +37,7 @@ export class GameManager {
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
     window.cellSurvival = this; // для отладки из консоли
+    this.renderPortrait = renderPortrait; // для tools: заранее нарисованные портреты героев
   }
 
   start() {
@@ -183,7 +184,7 @@ export class GameManager {
       this.menuWorld = null;
       const screen = h('div', 'screen');
       screen.id = 'game';
-      const hud = new Hud(screen, profile.name, renderPortrait(profile, 320, 400), THEMES[themeId].name[getLang()]);
+      const hud = new Hud(screen, profile.name, portraitSrc(profile, 320, 400), THEMES[themeId].name[getLang()]);
       screen.querySelector('[data-exit]').onclick = () => this.goMenu();
       const round = new RoundManager({ world, hud, audio: this.audio, onFinish: (r) => this.showResult(r, count) });
       this.round = round;
@@ -207,7 +208,7 @@ export class GameManager {
     s.id = 'result';
     const date = new Date(rec.date).toLocaleString(getLang() === 'ru' ? 'ru-RU' : 'en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     s.innerHTML = `
-      <div class="hero" style="background-image:url(${renderPortrait(profile, 480, 600, true)})"></div>
+      <div class="hero" style="background-image:url(${portraitSrc(profile, 480, 600, true)})"></div>
       <div class="info">
         <div class="kicker">${rec.won ? t('winner') : profile.name}</div>
         <h1 class="title" style="font-size:54px">${t('gameOver')}</h1>

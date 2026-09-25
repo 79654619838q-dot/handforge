@@ -81,11 +81,11 @@ function finishSuit(hero, person) {
   person.traverse((o) => {
     if (!o.isMesh) return;
     // у военных моделей своя каска, разгрузка и нож — герою они не нужны (копия материала: образец общий с обычными людьми)
-    const hide = (m) => { const src = m.map?.image?.currentSrc || m.map?.image?.src || ''; if (!/helmet|equipment|knife/.test(src)) return m; const c = m.clone(); c.visible = false; return c; };
+    const hide = (m) => { const src = m.map?.userData?.src || m.map?.image?.currentSrc || m.map?.image?.src || ''; if (!/helmet|equipment|knife/.test(src)) return m; const c = m.clone(); c.visible = false; return c; };
     o.material = Array.isArray(o.material) ? o.material.map(hide) : hide(o.material);
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) {
-      const src = (m.map?.image?.currentSrc || m.map?.image?.src || '').split('/').pop();
+      const src = (m.map?.userData?.src || m.map?.image?.currentSrc || m.map?.image?.src || '').split('/').pop();
       const isHead = /head_color/.test(src), isHair = /opacity/.test(src);
       if (!isHead && !isHair && F && m.userData.u) { m.metalness = F.metalness; m.roughness = F.roughness; if (m.roughnessMap && hero.finish !== 'cloth') m.roughnessMap = null; }
       if (hero.ghost) { m.transparent = true; m.opacity = isHair ? 0.35 : 0.55; m.depthWrite = !isHair; }
@@ -213,8 +213,7 @@ export function applyHero(hero, root, person) {
         }
         pos.needsUpdate = true; geo.computeVertexNormals();
       };
-      shape(0);
-      let acc = 0; fx.push((dt, t) => { if ((acc += dt) > 1 / 30) { acc = 0; shape(t); } }); // 30 раз в секунду хватает
+      shape(0.7); // плащ неподвижен: пересчёт формы каждый кадр давал нагрузку (оператор 25.09: меньше анимаций)
     });
   }
 
@@ -294,7 +293,7 @@ export function applyHero(hero, root, person) {
 
   // аура силы: частицы вокруг тела
   if (hero.aura && hero.aura !== 'none') {
-    const N = hero.aura === 'snow' ? 90 : 70;
+    const N = hero.aura === 'snow' ? 40 : 30; // вдвое меньше частиц (25.09)
     const pos = new Float32Array(N * 3), seed = new Float32Array(N);
     const reset = (i, y0) => { const a = Math.random() * Math.PI * 2, r = 0.25 + Math.random() * 0.3; pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = y0 ?? Math.random() * 1.9; pos[i * 3 + 2] = Math.sin(a) * r; seed[i] = Math.random(); };
     for (let i = 0; i < N; i++) reset(i);
@@ -304,7 +303,10 @@ export function applyHero(hero, root, person) {
     const mat = new THREE.PointsMaterial({ map: dotTex, color: dark && hero.aura === 'smoke' ? '#9aa4b0' : hero.glow, size: { smoke: 0.16, mist: 0.12, snow: 0.035 }[hero.aura] || 0.045, transparent: true, opacity: { smoke: 0.25, mist: 0.3 }[hero.aura] || 0.9, depthWrite: false, blending: hero.aura === 'smoke' ? THREE.NormalBlending : THREE.AdditiveBlending });
     if (hero.aura !== 'smoke' && hero.aura !== 'mist') mat.color.multiplyScalar(1.6);
     const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; root.add(pts);
+    let skip = false;
     fx.push((dt) => {
+      if ((skip = !skip)) return; // аура обновляется через кадр
+      dt *= 2;
       for (let i = 0; i < N; i++) {
         const k = i * 3;
         switch (hero.aura) {
