@@ -53,6 +53,15 @@ document.addEventListener('click', (e) => {
   const fn = acts[el.dataset.a] || modalActs[el.dataset.a];
   if (fn) { sfx.tap(); fn(el, e); }
 });
+// любая картинка, которую сервер не отдал с первого раза, пробует ещё до 3 раз
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement)) return;
+  const n = +(img.dataset.retry || 0);
+  if (n >= 3) return;
+  img.dataset.retry = n + 1;
+  setTimeout(() => { img.src = img.getAttribute('src').split('?')[0] + '?r=' + (n + 1); }, 800 * (n + 1));
+}, true);
 document.addEventListener('pointerdown', () => { if (S.settings.music) { setMusic(true); startMusic(); } }, { once: true });
 
 function modal(html) {

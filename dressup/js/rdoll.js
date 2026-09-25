@@ -104,8 +104,20 @@ export const hasPrincess = (pid) => !!DOLL.princesses[pid];
 // Показ куклы без «полуодетых» кадров: сначала грузим все слои нового образа, потом меняем разом.
 // Пока грузится — остаётся прежний образ и крутится звёздочка.
 const loaded = new Map();
+// Бесплатный хостинг иногда не отдаёт картинку с первого раза — повторяем до 4 раз.
 function loadOnce(src) {
-  if (!loaded.has(src)) loaded.set(src, new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }));
+  if (!loaded.has(src)) {
+    loaded.set(src, new Promise((res) => {
+      let n = 0;
+      const tryLoad = () => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = () => { if (++n < 4) setTimeout(tryLoad, 700 * n); else { loaded.delete(src); res(null); } };
+        i.src = n ? `${src}${src.includes('?') ? '&' : '?'}r=${n}` : src;
+      };
+      tryLoad();
+    }));
+  }
   return loaded.get(src);
 }
 export function prefetch(st) { for (const u of layerSrcs(st)) loadOnce(u); }
@@ -113,6 +125,9 @@ export function prefetch(st) { for (const u of layerSrcs(st)) loadOnce(u); }
 // Маска тела (облегающие платья) вырезается на холсте заранее: CSS-маска в Safari
 // подгружается отдельно и на мгновение прячет всё тело.
 export async function applyMasks(root) {
+  for (const img of root.querySelectorAll('.rdoll > img')) {
+    img.onerror = () => { const n = +(img.dataset.retry || 0); if (n < 3) { img.dataset.retry = n + 1; setTimeout(() => { img.src = img.getAttribute('src').split('?')[0] + '?r=' + (n + 1); }, 800 * (n + 1)); } };
+  }
   await Promise.all([...root.querySelectorAll('img[data-mask]')].map(async (img) => {
     const [body, mask] = await Promise.all([loadOnce(img.getAttribute('src')), loadOnce(img.dataset.mask)]);
     if (!body) return;
@@ -133,8 +148,15 @@ export async function showDoll(el, st, onShown) {
   const token = (el._tok = (el._tok || 0) + 1);
   const srcs = layerSrcs(st);
   const spin = setTimeout(() => { if (el._tok === token) el.classList.add('loading'); }, 200);
-  await Promise.all(srcs.map(loadOnce));
+  const imgs = await Promise.all(srcs.map(loadOnce));
   if (el._tok !== token) { clearTimeout(spin); return; }
+  if (imgs.some((i) => !i)) {
+    // какая-то вещь не загрузилась — не показываем принцессу «недоодетой», пробуем ещё раз
+    clearTimeout(spin);
+    el.classList.add('loading');
+    setTimeout(() => { if (el._tok === token) showDoll(el, st, onShown); }, 2500);
+    return;
+  }
   // собираем новую куклу вне экрана и ждём раскодирования — Safari иначе на кадр показывает пустые слои
   const box = document.createElement('div');
   box.innerHTML = dollHTML(st);
