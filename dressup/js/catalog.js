@@ -90,15 +90,21 @@ export const SLOT_NAMES = {
 // Цвет волос — фильтр на слой причёски.
 export const HAIR_TINTS = [
   ['', 'Свой цвет', 'linear-gradient(#caa56a,#7a5230)'],
-  ['sepia(.6) saturate(2.2) hue-rotate(-12deg) brightness(1.05)', 'Рыжий', 'linear-gradient(#f08a4b,#b8481f)'],
-  ['sepia(.5) saturate(1.6) brightness(1.25)', 'Блонд', 'linear-gradient(#fbe3a0,#d6aa55)'],
-  ['sepia(.6) saturate(2) hue-rotate(290deg) brightness(1.15)', 'Розовый', 'linear-gradient(#ffc0dc,#e0679e)'],
-  ['sepia(.6) saturate(2.2) hue-rotate(170deg) brightness(1.05)', 'Голубой', 'linear-gradient(#bfe2ff,#4d8fe0)'],
-  ['sepia(.6) saturate(2) hue-rotate(230deg)', 'Фиолетовый', 'linear-gradient(#d8b8ff,#7b4bc8)'],
-  ['grayscale(1) brightness(1.35) contrast(.9)', 'Серебряный', 'linear-gradient(#ffffff,#b9c0cc)'],
-  ['sepia(.9) saturate(2.4) hue-rotate(5deg) brightness(1.1)', 'Золотой', 'linear-gradient(#ffe78f,#d19a1c)'],
-  ['brightness(.55) saturate(.8)', 'Тёмный', 'linear-gradient(#5a4038,#241a18)'],
+  ['sepia(1) saturate(4) hue-rotate(-18deg) brightness(.95)', 'Рыжий', 'linear-gradient(#f08a4b,#b8481f)'],
+  ['sepia(.75) saturate(1.8) brightness(1.3)', 'Блонд', 'linear-gradient(#fbe3a0,#d6aa55)'],
+  ['sepia(1) saturate(3.2) hue-rotate(290deg) brightness(1.15)', 'Розовый', 'linear-gradient(#ffc0dc,#e0679e)'],
+  ['sepia(1) saturate(3.5) hue-rotate(175deg) brightness(1.05)', 'Голубой', 'linear-gradient(#bfe2ff,#4d8fe0)'],
+  ['sepia(1) saturate(3) hue-rotate(225deg)', 'Фиолетовый', 'linear-gradient(#d8b8ff,#7b4bc8)'],
+  ['brightness(1.35) contrast(.9)', 'Серебряный', 'linear-gradient(#ffffff,#b9c0cc)'],
+  ['sepia(1) saturate(3.4) brightness(1.2)', 'Золотой', 'linear-gradient(#ffe78f,#d19a1c)'],
+  ['sepia(.35) brightness(.45) contrast(1.1)', 'Тёмный', 'linear-gradient(#5a4038,#241a18)'],
 ];
+// Перед оттенком волосы переводятся в серый одной яркости — тогда цвет одинаковый на любых волосах.
+export function hairFilter(tint, lum) {
+  if (!tint) return '';
+  const k = Math.min(3.2, Math.max(0.8, 0.52 / (lum || 0.5)));
+  return `grayscale(1) brightness(${k.toFixed(2)}) ${tint}`;
+}
 
 export const ITEMS = {};
 export const BY_SLOT = {};

@@ -108,7 +108,9 @@ def skin_slip(body, region):
     top[398:] = False
     if top.any():
         mask = (ndimage.binary_dilation(top, iterations=2) * 255).astype(np.uint8)
-        fixed = cv2.inpaint(np.ascontiguousarray(out[..., :3].clip(0, 255).astype(np.uint8)), mask, 8, cv2.INPAINT_TELEA)
+        src = out[..., :3].copy()
+        src[body[..., 3] < 200] = skin          # фон за краем фигуры не должен подмешиваться в кожу
+        fixed = cv2.inpaint(np.ascontiguousarray(src.clip(0, 255).astype(np.uint8)), mask, 8, cv2.INPAINT_TELEA)
         out[..., :3][mask > 0] = fixed[mask > 0]
     return out
 
@@ -172,7 +174,7 @@ def main():
     silhouette = ndimage.binary_erosion(man[..., 3] > 128, iterations=2)
     manifest = {'w': W, 'h': H, 'princesses': {}, 'items': {}}
     # кэш: вещь пересобирается, только если её исходные картинки изменились (или сменилась версия сборки)
-    VER = 15
+    VER = 18
     cpath = os.path.join(ART, 'build_cache.json')
     cache = json.load(open(cpath, encoding='utf8')) if os.path.exists(cpath) else {}
     if cache.get('_ver') != VER:
@@ -238,11 +240,13 @@ def main():
             own = ndimage.binary_dilation(mine, iterations=4)
             entry['arms'] = save_layer(clean, arms_mask & ~hair_d & ~own, f'arms_{pid}', soft=0.8)
         # собственная причёска — тоже вещь (подходит всем принцессам)
-        front, back = hair & silhouette, hair & ~silhouette
+        # зад — все волосы целиком (под телом их не видно), перед — только поверх фигуры: так нет шва между слоями
+        front, back = hair & ndimage.binary_dilation(silhouette, iterations=6), hair
         hid = 'hair_' + pid
         manifest['items'][hid] = {
             'slot': 'hair', 'front': save_layer(body, front, hid + '_f'), 'back': save_layer(body, back, hid + '_b'),
             'thumb': thumb(body, hair, hid), 'princess': pid,
+            'lum': round(float((body[..., :3] @ np.array([0.3, 0.59, 0.11]))[hair].mean() / 255), 3),
         }
         entry['hair'] = hid
         # миниатюра-портрет принцессы
@@ -267,7 +271,13 @@ def main():
         if m.sum() < 200:
             print('EMPTY', iid)
             continue
-        e = {'slot': slot, 'thumb': thumb(d, m, iid)}
+        tm = m
+        if slot == 'earrings':
+            lab, n = ndimage.label(m)
+            if n > 1:
+                sizes = ndimage.sum(m, lab, range(1, n + 1))
+                tm = lab == (1 + int(np.argmax(sizes)))
+        e = {'slot': slot, 'thumb': thumb(d, tm, iid)}
         if slot == 'outer' or iid == 'head_veil':
             e['front'] = save_layer(d, m & silhouette, iid + '_f')
             e['back'] = save_layer(d, m & ~silhouette, iid + '_b')

@@ -88,7 +88,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .princesses { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; max-width: 1100px; margin: 0 auto; }
 .pcard { position: relative; border-radius: var(--r); background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255, 228, 242, .92)); box-shadow: var(--shadow); border: 3px solid #fff; overflow: hidden; padding-bottom: 10px; text-align: center; animation: pop .4s backwards; }
 .pcard .portrait { height: 190px; overflow: hidden; background: radial-gradient(circle at 50% 40%, #fff, #ffd6ea 70%); }
-.pcard .portrait svg, .pcard .portrait img { width: 100%; height: 100%; object-fit: cover; }
+
 .pcard b { display: block; font-size: 18px; font-weight: 900; margin-top: 6px; }
 .pcard small { display: block; color: var(--ink-soft); font-weight: 700; font-size: 12.5px; padding: 0 6px; }
 .pcard .fav { position: absolute; top: 8px; right: 8px; font-size: 20px; }
@@ -153,7 +153,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* сцена и фотозона */
-.scene .stage { align-items: flex-end; padding-top: clamp(70px, 12vh, 120px); }
+.scene .stage { align-items: flex-end; padding-top: clamp(96px, 16vh, 160px); }
 .enter { animation: enter 1.6s cubic-bezier(.2, .8, .2, 1) backwards; }
 @keyframes enter { 0% { transform: translateX(-70vw) scale(.8); opacity: 0; } 60% { transform: translateX(0) scale(1); opacity: 1; } 75% { transform: scaleX(-1); } 90% { transform: scaleX(1); } 100% { transform: none; } }
 .zoom { animation: camZoom 5s 1.4s ease forwards; transform-origin: 50% 40%; }
@@ -249,7 +249,6 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .look-big .rdoll { height: 97%; width: auto; }
 .icon-btn.ghost { visibility: hidden; box-shadow: none; }
 .item img.th { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
-.pcard .portrait img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
 
 .loader { margin: auto; text-align: center; z-index: 3; position: relative; }
 .loader h1 { font-family: 'Marck Script', cursive; font-weight: 400; font-size: clamp(48px, 12vw, 88px); line-height: .95; margin: 0 0 24px; color: #fff;
@@ -257,3 +256,21 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .loader .bar { width: min(320px, 70vw); height: 14px; border-radius: 999px; background: rgba(255,255,255,.6); margin: 0 auto; overflow: hidden; border: 2px solid #fff; box-shadow: var(--shadow); }
 .loader .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ff9ccb, #e8508f); transition: width .2s; }
 .loader p { color: #fff; font-weight: 800; text-shadow: 0 1px 6px rgba(90, 20, 70, .7); }
+
+/* портрет принцессы: крупно голова и плечи из той же куклы */
+.pcard .portrait { position: relative; }
+.pcard .portrait .rdoll { position: absolute; width: 210%; left: -55%; top: 2%; margin: 0; }
+
+/* компьютер: принцесса слева, меню справа */
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  .menu .hero { left: 30%; height: 90vh; width: 60vh; }
+  .menu .logo { position: absolute; right: 6vw; top: 8vh; margin: 0; width: min(520px, 42vw); }
+  .menu .menu-grid { position: absolute; right: 6vw; bottom: 10vh; margin: 0; width: min(520px, 42vw); }
+}
+/* фотозона: кукла не заходит под панель */
+.photo-frame { overflow: hidden; }
+.dress .stage .doll-wrap { max-width: 100%; }
+@media (min-width: 900px) and (min-aspect-ratio: 1/1) {
+  .photo .panel .chips { flex-wrap: wrap; overflow: visible; }
+  .photo .panel { overflow-y: auto; }
+}

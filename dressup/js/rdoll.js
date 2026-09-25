@@ -1,6 +1,6 @@
 // Кукла из слоёв-картинок ChatGPT. Холст 1024×1536; каждый слой лежит на своём месте (x, y, w, h).
 import { DOLL } from './doll-manifest.js';
-import { ITEMS } from './catalog.js';
+import { ITEMS, hairFilter } from './catalog.js';
 
 const DIR = 'assets/doll/';
 
@@ -10,7 +10,7 @@ export function layerList(st) {
   const o = st.outfit || {};
   const it = (slot) => o[slot] && ITEMS[o[slot]];
   const hair = it('hair') || ITEMS[P.hair];
-  const hairF = st.hairTint || '';
+  const hairF = hairFilter(st.hairTint || '', hair?.m.lum);
   const L = [];
   const add = (lay, filter = '', cls = '', mask = '') => { if (lay) L.push({ ...lay, filter, cls, mask }); };
   const addItem = (x, part) => { if (x) add(part ? x.m[part] : x.m.layer, x.filter, 'i-' + x.slot); };

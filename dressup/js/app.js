@@ -155,7 +155,7 @@ function princesses(mode) {
       <p class="subtitle">${mode === 'play' ? `${place.emoji} ${place.name}` : 'Выбери принцессу — и в путь!'}</p>
       <div class="princesses">
       ${READY.map((p, i) => `<div class="pcard" style="animation-delay:${i * 0.04}s" data-a="${on(() => { if (mode !== 'play') { G.place = rnd(OPEN_PLACES).id; G.task = null; } startDress(p.id); })}">
-        <div class="portrait"><img src="${faceSrc(p.id)}" alt="${p.name}"></div>
+        <div class="portrait">${dollHTML({ pid: p.id, outfit: { dress: BY_SLOT.dress[0].id, ...cleanOutfit(p.outfit) }, hairTint: hairTintOf(p.id) })}</div>
         ${place && mode === 'play' && place.tags.includes(p.fav) ? '<span class="fav">💖</span>' : ''}
         <b>${p.name}</b><small>${p.style}</small></div>`).join('')}
       </div>
@@ -407,7 +407,7 @@ function photo() {
   render(() => `${topbar('Фотозона', scene)}
     <div class="body"><div class="stage photo-frame"><div class="doll-wrap" id="doll"></div></div>
     <div class="panel"><div id="photoRows"></div>
-      <div style="display:flex;justify-content:center;padding:6px"><button class="btn gold" data-a="${on(takePhoto)}">📸 Сделать фото</button></div></div></div>`, 'dress');
+      <div style="display:flex;justify-content:center;padding:6px"><button class="btn gold" data-a="${on(takePhoto)}">📸 Сделать фото</button></div></div></div>`, 'dress photo');
   redraw();
   rows();
 }
