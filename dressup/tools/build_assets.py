@@ -71,6 +71,23 @@ def slip_region(man):
     return ndimage.binary_dilation(core, iterations=7)
 
 
+def own_slip(body):
+    """Нижнее платье этой принцессы: всё «не цвета кожи» на туловище, связанное с животом."""
+    rgb = body[..., :3]
+    skin = np.median(rgb[345:385, 460:560].reshape(-1, 3), 0)
+    dev = np.sqrt(((rgb - skin) ** 2).sum(-1))
+    cand = (dev > 34) & (body[..., 3] > 200)
+    cand[:330] = False
+    cand[:, :330] = False
+    cand[:, 694:] = False
+    lab, _ = ndimage.label(cand)
+    c = lab[600, 512]
+    if not c:
+        return np.zeros_like(cand)
+    core = ndimage.binary_fill_holes(ndimage.binary_closing(lab == c, iterations=3))
+    return ndimage.binary_dilation(core, iterations=5)
+
+
 def skin_slip(body, region):
     """Нижнее платье принцессы перекрашиваем в тон её кожи, сохраняя светотень.
     Под любым вырезом платья тогда видна кожа, а не бельё."""
@@ -86,7 +103,7 @@ def skin_slip(body, region):
     soft = ndimage.gaussian_filter(reg.astype(np.float32), 2.0)[..., None]
     out = body.copy()
     out[..., :3] = rgb * (1 - soft) + rec * soft
-    # бретели (выше выреза) — дорисовываем окружающей кожей, чтобы не осталось даже контура
+    # бретели (выше выреза) и подол на бёдрах — дорисовываем окружающей кожей, чтобы не осталось даже контура
     top = reg.copy()
     top[398:] = False
     if top.any():
@@ -153,7 +170,7 @@ def main():
     silhouette = ndimage.binary_erosion(man[..., 3] > 128, iterations=2)
     manifest = {'w': W, 'h': H, 'princesses': {}, 'items': {}}
     # кэш: вещь пересобирается, только если её исходные картинки изменились (или сменилась версия сборки)
-    VER = 7
+    VER = 10
     cpath = os.path.join(ART, 'build_cache.json')
     cache = json.load(open(cpath, encoding='utf8')) if os.path.exists(cpath) else {}
     if cache.get('_ver') != VER:
@@ -200,7 +217,17 @@ def main():
             clean[..., 3][bun_mask] = 0
         else:
             clean = fill_under_hair(body, man, hair_d, silhouette)
-        clean = skin_slip(clean, slip)
+        mine = own_slip(clean)
+        # ниже подола манекена у принцессы бывает длиннее нижнее платье — там берём ноги манекена в её тоне кожи
+        longer = mine & ~ndimage.binary_dilation(slip, iterations=3)
+        longer[:700] = False
+        if longer.any():
+            ks, km = skin_mean(clean), skin_mean(man)
+            if ks is not None and km is not None:
+                legs = man[..., :3] * (ks / np.maximum(km, 1))
+                clean[..., :3][longer] = legs[longer]
+                clean[..., 3][longer] = np.where(man[..., 3][longer] > 128, 255, 0)
+        clean = skin_slip(clean, slip | (mine & ~longer))
         entry = {'body': save_layer(clean, clean[..., 3] > 5, f'body_{pid}', soft=0)}
         if arms_mask is not None:
             entry['arms'] = save_layer(body, arms_mask & ~hair_d, f'arms_{pid}', soft=0.8)
@@ -250,6 +277,22 @@ def main():
                     d[..., :3][hole] = rgb[hole]
                     d[..., 3][hole] = 255
                     m = m | hole
+            if slot == 'dress' and arms_mask is not None:
+                ys = np.nonzero(m.any(1))[0]
+                if len(ys):
+                    rows = np.zeros_like(m)
+                    rows[ys.min():ys.max() + 1] = True
+                    gap = (man[..., 3] > 200) & ~arms_mask & ~m & (d[..., 3] < 60) & rows
+                    gap &= ndimage.binary_dilation(m, iterations=40)
+                    gap &= ~(ndimage.binary_dilation(arms_mask, iterations=4))
+                    if gap.sum() > 50:
+                        gm = (gap * 255).astype(np.uint8)
+                        rgb = cv2.inpaint(np.ascontiguousarray(d[..., :3].clip(0, 255).astype(np.uint8)), gm, 13, cv2.INPAINT_TELEA)
+                        d = d.copy()
+                        d[..., :3][gap] = rgb[gap]
+                        d[..., 3][gap] = 255
+                        m = m | gap
+                        print('  widened', iid, int(gap.sum()))
             e['layer'] = save_layer(d, m, iid)
         # рукава: вещь закрывает руки манекена
         if arms_mask is not None and slot in ('dress', 'outer', 'gloves'):
