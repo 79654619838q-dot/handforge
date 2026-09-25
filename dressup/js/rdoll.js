@@ -1,8 +1,12 @@
-// Кукла из слоёв-картинок ChatGPT. Холст 1024×1536; каждый слой лежит на своём месте (x, y, w, h).
+// Кукла из слоёв-картинок ChatGPT. Слои сводятся в ОДИН холст в самой игре, на экран идёт готовая картинка:
+// так вид одинаковый в любом браузере (Safari на iPhone сам раскладывал слои с ошибками).
+// Координаты слоёв — на холсте 1024×1536 (x, y, w, h), файлы слоёв могут быть уменьшены.
 import { DOLL } from './doll-manifest.js';
 import { ITEMS, hairFilter } from './catalog.js';
 
 const DIR = 'assets/doll/';
+const S = 0.7;                                   // холст куклы в 0,7 от 1024×1536 — как и файлы слоёв
+const CW = Math.round(DOLL.w * S), CH = Math.round(DOLL.h * S);
 
 // Порядок слоёв снизу вверх.
 export function layerList(st) {
@@ -12,15 +16,15 @@ export function layerList(st) {
   const hair = it('hair') || ITEMS[P.hair];
   const hairF = hairFilter(st.hairTint || '', hair?.m.lum);
   const L = [];
-  const add = (lay, filter = '', cls = '', mask = '') => { if (lay) L.push({ ...lay, filter, cls, mask }); };
-  const addItem = (x, part) => { if (x) add(part ? x.m[part] : x.m.layer, x.filter, 'i-' + x.slot); };
+  const add = (lay, filter = '', mask = '') => { if (lay) L.push({ ...lay, filter, mask }); };
+  const addItem = (x, part) => { if (x) add(part ? x.m[part] : x.m.layer, x.filter); };
 
-  if (it('wings')) add(it('wings').m.layer, it('wings').filter, 'wings');
+  if (it('wings')) add(it('wings').m.layer, it('wings').filter);
   if (hair) add(hair.m.back, hairF);
   if (it('outer')?.m.back) addItem(it('outer'), 'back');
   if (it('head')?.m.back) addItem(it('head'), 'back');
   // облегающее платье уже фигуры принцессы — тело вне платья прячем маской
-  add(P.body, '', 'body', it('dress')?.m.bodymask || '');
+  add(P.body, '', it('dress')?.m.bodymask || '');
   addItem(it('shoes'));
   addItem(it('dress'));
   if (it('outer')) addItem(it('outer'), it('outer').m.front ? 'front' : null);
@@ -38,12 +42,145 @@ export function layerList(st) {
   addItem(it('held'));
   return L;
 }
+export const layerSrcs = (st) => layerList(st).flatMap((l) => [DIR + l.f + '.webp', ...(l.mask ? [DIR + l.mask + '.png'] : [])]);
 
-const pct = (v, t) => ((v / t) * 100).toFixed(3) + '%';
+// ---------- загрузка с повтором (бесплатный хостинг иногда не отдаёт картинку с первого раза) ----------
+const loaded = new Map();
+function loadOnce(src) {
+  if (!loaded.has(src)) {
+    loaded.set(src, new Promise((res) => {
+      let n = 0;
+      const tryLoad = () => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = () => { if (++n < 4) setTimeout(tryLoad, 700 * n); else { loaded.delete(src); res(null); } };
+        i.src = n ? `${src}?r=${n}` : src;
+      };
+      tryLoad();
+    }));
+  }
+  return loaded.get(src);
+}
+export function prefetch(st) { for (const u of layerSrcs(st)) loadOnce(u); }
+export const preload = prefetch;
+
+// ---------- перекраска без ctx.filter (его нет в Safari): CSS-фильтры как матрицы цвета ----------
+function filterSteps(f) {
+  const steps = [];
+  for (const [, name, arg] of f.matchAll(/([a-z-]+)\(([^)]*)\)/g)) {
+    const v = parseFloat(arg);
+    const a = Math.min(1, Math.max(0, v));
+    let m;
+    switch (name) {
+      case 'grayscale': { const b = 1 - a; m = [0.2126 + 0.7874 * b, 0.7152 - 0.7152 * b, 0.0722 - 0.0722 * b, 0.2126 - 0.2126 * b, 0.7152 + 0.2848 * b, 0.0722 - 0.0722 * b, 0.2126 - 0.2126 * b, 0.7152 - 0.7152 * b, 0.0722 + 0.9278 * b]; break; }
+      case 'sepia': { const b = 1 - a; m = [0.393 + 0.607 * b, 0.769 - 0.769 * b, 0.189 - 0.189 * b, 0.349 - 0.349 * b, 0.686 + 0.314 * b, 0.168 - 0.168 * b, 0.272 - 0.272 * b, 0.534 - 0.534 * b, 0.131 + 0.869 * b]; break; }
+      case 'saturate': m = [0.213 + 0.787 * v, 0.715 - 0.715 * v, 0.072 - 0.072 * v, 0.213 - 0.213 * v, 0.715 + 0.285 * v, 0.072 - 0.072 * v, 0.213 - 0.213 * v, 0.715 - 0.715 * v, 0.072 + 0.928 * v]; break;
+      case 'hue-rotate': {
+        const t = (v * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t);
+        m = [0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928,
+          0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.140, 0.072 - c * 0.072 - s * 0.283,
+          0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072];
+        break;
+      }
+      case 'brightness': m = [v, 0, 0, 0, v, 0, 0, 0, v]; break;
+      case 'contrast': m = [v, 0, 0, 0, v, 0, 0, 0, v, (0.5 - 0.5 * v) * 255]; break;
+      default: continue;
+    }
+    steps.push(m);
+  }
+  return steps;
+}
+const tinted = new Map();
+function tintedLayer(img, filter) {
+  const key = img.src + '|' + filter;
+  if (tinted.has(key)) return tinted.get(key);
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height);
+  const p = d.data;
+  const steps = filterSteps(filter);
+  for (let i = 0; i < p.length; i += 4) {
+    if (!p[i + 3]) continue;
+    let r = p[i], gg = p[i + 1], b = p[i + 2];
+    for (const m of steps) {                      // после каждого шага — в пределы 0…255, как в браузере
+      const o = m[9] || 0;
+      const nr = m[0] * r + m[1] * gg + m[2] * b + o, ng = m[3] * r + m[4] * gg + m[5] * b + o, nb = m[6] * r + m[7] * gg + m[8] * b + o;
+      r = nr < 0 ? 0 : nr > 255 ? 255 : nr; gg = ng < 0 ? 0 : ng > 255 ? 255 : ng; b = nb < 0 ? 0 : nb > 255 ? 255 : nb;
+    }
+    p[i] = r; p[i + 1] = gg; p[i + 2] = b;
+  }
+  g.putImageData(d, 0, 0);
+  if (tinted.size > 60) tinted.delete(tinted.keys().next().value);
+  tinted.set(key, c);
+  return c;
+}
+
+// ---------- сведение слоёв в холст ----------
+async function compose(st) {
+  const L = layerList(st);
+  const imgs = await Promise.all(L.map((l) => loadOnce(DIR + l.f + '.webp')));
+  const masks = await Promise.all(L.map((l) => (l.mask ? loadOnce(DIR + l.mask + '.png') : null)));
+  if (imgs.some((i) => !i) || L.some((l, k) => l.mask && !masks[k])) return null;
+  const c = document.createElement('canvas');
+  c.width = CW; c.height = CH;
+  const g = c.getContext('2d');
+  L.forEach((l, k) => {
+    let src = l.filter ? tintedLayer(imgs[k], l.filter) : imgs[k];
+    if (l.mask) {
+      const t = document.createElement('canvas');
+      t.width = src.width || src.naturalWidth; t.height = src.height || src.naturalHeight;
+      const tg = t.getContext('2d');
+      tg.drawImage(src, 0, 0);
+      tg.globalCompositeOperation = 'destination-in';
+      tg.drawImage(masks[k], 0, 0, t.width, t.height);
+      src = t;
+    }
+    g.drawImage(src, l.x * S, l.y * S, l.w * S, l.h * S);
+  });
+  return c;
+}
+
+// Разметка куклы: пустой холст-заготовка; рисует его applyMasks (после вставки на страницу) или showDoll.
 export function dollHTML(st, cls = '') {
-  const W = DOLL.w, H = DOLL.h;
-  const imgs = layerList(st).map((l) => `<img class="${l.cls}" src="${DIR}${l.f}.webp" alt="" draggable="false" style="left:${pct(l.x, W)};top:${pct(l.y, H)};width:${pct(l.w, W)};${l.filter ? `filter:${l.filter};` : ''}${l.mask ? 'visibility:hidden;' : ''}"${l.mask ? ` data-mask="${DIR}${l.mask}.png"` : ''}>`).join('');
-  return `<div class="rdoll ${cls}">${imgs}${st.fx ? fxHTML(st.fx) : ''}</div>`;
+  return `<div class="rdoll ${cls}"><canvas class="doll-cv" width="${CW}" height="${CH}" data-st='${JSON.stringify({ pid: st.pid, outfit: st.outfit, hairTint: st.hairTint || '' }).replace(/'/g, '&#39;')}'></canvas>${st.fx ? fxHTML(st.fx) : ''}</div>`;
+}
+async function paint(cv) {
+  const st = JSON.parse(cv.dataset.st);
+  let c = await compose(st);
+  for (let n = 0; !c && n < 3; n++) { await new Promise((r) => setTimeout(r, 2000)); c = await compose(st); }
+  if (!c) return;
+  cv.getContext('2d').drawImage(c, 0, 0);
+  delete cv.dataset.st;
+}
+// Нарисовать все ещё пустые куклы внутри root (имя осталось от прошлой версии — вызывается из app.js).
+export async function applyMasks(root) {
+  await Promise.all([...root.querySelectorAll('canvas.doll-cv[data-st]')].map(paint));
+}
+
+// Показ куклы в гардеробе: прежний образ остаётся, пока новый не сведён целиком; быстрые нажатия — показываем последнее.
+export async function showDoll(el, st, onShown) {
+  const token = (el._tok = (el._tok || 0) + 1);
+  const spin = setTimeout(() => { if (el._tok === token) el.classList.add('loading'); }, 200);
+  let c = await compose(st);
+  while (!c && el._tok === token) { await new Promise((r) => setTimeout(r, 2500)); c = await compose(st); }
+  clearTimeout(spin);
+  if (el._tok !== token) return;
+  el.classList.remove('loading');
+  const box = document.createElement('div');
+  box.innerHTML = dollHTML(st);
+  const cv = box.querySelector('canvas');
+  cv.getContext('2d').drawImage(c, 0, 0);
+  delete cv.dataset.st;
+  el.replaceChildren(...box.childNodes);
+  if (onShown) onShown();
+}
+
+// Снимок на холсте (фотозона).
+export async function drawDoll(g, st, X, Y, Wd, Hd) {
+  const c = await compose(st);
+  if (c) g.drawImage(c, X, Y, Wd, Hd);
 }
 
 // Волшебные эффекты — частицы поверх куклы.
@@ -63,108 +200,6 @@ function fxHTML(kind) {
   return `<div class="fx">${o}</div>`;
 }
 
-export const layerSrcs = (st) => layerList(st).flatMap((l) => [DIR + l.f + '.webp', ...(l.mask ? [DIR + l.mask + '.png'] : [])]);
-
-// Картинки заранее — чтобы переодевание было мгновенным.
-const cache = new Map();
-export function preload(st) {
-  for (const l of layerList(st)) {
-    const src = DIR + l.f + '.webp';
-    if (!cache.has(src)) { const i = new Image(); i.src = src; cache.set(src, i); }
-  }
-}
-
-// Снимок на холсте (фотозона).
-export async function drawDoll(g, st, X, Y, Wd, Hd) {
-  const load = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
-  const sx = Wd / DOLL.w, sy = Hd / DOLL.h;
-  for (const l of layerList(st)) {
-    let img = await load(DIR + l.f + '.webp');
-    if (l.mask) {
-      // маска тела: рисуем тело на отдельном холсте и оставляем только разрешённое
-      const m = await load(DIR + l.mask + '.png');
-      const c = document.createElement('canvas');
-      c.width = img.width; c.height = img.height;
-      const cg = c.getContext('2d');
-      cg.drawImage(img, 0, 0);
-      cg.globalCompositeOperation = 'destination-in';
-      cg.drawImage(m, 0, 0, c.width, c.height);
-      img = c;
-    }
-    g.save();
-    if (l.filter && 'filter' in g) g.filter = l.filter;
-    g.drawImage(img, X + l.x * sx, Y + l.y * sy, l.w * sx, l.h * sy);
-    g.restore();
-  }
-}
 export const thumbSrc = (it) => DIR + it.m.thumb + '.webp';
 export const faceSrc = (pid) => DIR + (DOLL.princesses[pid]?.face || '') + '.webp';
 export const hasPrincess = (pid) => !!DOLL.princesses[pid];
-
-// Показ куклы без «полуодетых» кадров: сначала грузим все слои нового образа, потом меняем разом.
-// Пока грузится — остаётся прежний образ и крутится звёздочка.
-const loaded = new Map();
-// Бесплатный хостинг иногда не отдаёт картинку с первого раза — повторяем до 4 раз.
-function loadOnce(src) {
-  if (!loaded.has(src)) {
-    loaded.set(src, new Promise((res) => {
-      let n = 0;
-      const tryLoad = () => {
-        const i = new Image();
-        i.onload = () => res(i);
-        i.onerror = () => { if (++n < 4) setTimeout(tryLoad, 700 * n); else { loaded.delete(src); res(null); } };
-        i.src = n ? `${src}${src.includes('?') ? '&' : '?'}r=${n}` : src;
-      };
-      tryLoad();
-    }));
-  }
-  return loaded.get(src);
-}
-export function prefetch(st) { for (const u of layerSrcs(st)) loadOnce(u); }
-
-// Маска тела (облегающие платья) вырезается на холсте заранее: CSS-маска в Safari
-// подгружается отдельно и на мгновение прячет всё тело.
-export async function applyMasks(root) {
-  for (const img of root.querySelectorAll('.rdoll > img')) {
-    img.onerror = () => { const n = +(img.dataset.retry || 0); if (n < 3) { img.dataset.retry = n + 1; setTimeout(() => { img.src = img.getAttribute('src').split('?')[0] + '?r=' + (n + 1); }, 800 * (n + 1)); } };
-  }
-  await Promise.all([...root.querySelectorAll('img[data-mask]')].map(async (img) => {
-    const [body, mask] = await Promise.all([loadOnce(img.getAttribute('src')), loadOnce(img.dataset.mask)]);
-    if (!body) return;
-    const c = document.createElement('canvas');
-    c.width = body.naturalWidth; c.height = body.naturalHeight;
-    const g = c.getContext('2d');
-    g.drawImage(body, 0, 0);
-    if (mask) { g.globalCompositeOperation = 'destination-in'; g.drawImage(mask, 0, 0, c.width, c.height); }
-    c.className = img.className;
-    c.style.cssText = img.style.cssText;
-    c.style.visibility = '';
-    c.style.height = 'auto';
-    img.replaceWith(c);
-  }));
-}
-
-export async function showDoll(el, st, onShown) {
-  const token = (el._tok = (el._tok || 0) + 1);
-  const srcs = layerSrcs(st);
-  const spin = setTimeout(() => { if (el._tok === token) el.classList.add('loading'); }, 200);
-  const imgs = await Promise.all(srcs.map(loadOnce));
-  if (el._tok !== token) { clearTimeout(spin); return; }
-  if (imgs.some((i) => !i)) {
-    // какая-то вещь не загрузилась — не показываем принцессу «недоодетой», пробуем ещё раз
-    clearTimeout(spin);
-    el.classList.add('loading');
-    setTimeout(() => { if (el._tok === token) showDoll(el, st, onShown); }, 2500);
-    return;
-  }
-  // собираем новую куклу вне экрана и ждём раскодирования — Safari иначе на кадр показывает пустые слои
-  const box = document.createElement('div');
-  box.innerHTML = dollHTML(st);
-  await applyMasks(box);
-  await Promise.all([...box.querySelectorAll('img')].map((i) => (i.decode ? i.decode().catch(() => {}) : null)));
-  clearTimeout(spin);
-  if (el._tok !== token) return;       // пока грузилось, выбрали другое — показываем только последнее
-  el.classList.remove('loading');
-  el.replaceChildren(...box.childNodes);
-  if (onShown) onShown();
-}
