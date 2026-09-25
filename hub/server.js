@@ -1,6 +1,6 @@
 // Единая точка входа под одну публичную ссылку. Ничего не переписывает изнутри
 // Poker и PhotoQuest — просто раскладывает трафик по путям: "/" — меню выбора,
-// "/poker" — HandForge Poker, "/quest" — PhotoQuest, "/cell" — Cell Survival.
+// "/poker" — HandForge Poker, "/quest" — PhotoQuest, "/cell" — Cell Survival, "/dressup" — «Наряди принцессу».
 // PhotoQuest отдаёт готовую сборку (npm run build), Poker работает как обычно.
 
 import express from "express";
@@ -15,6 +15,7 @@ const POKER_TARGET = process.env.POKER_TARGET || "http://localhost:3000";
 const QUEST_API_TARGET = process.env.QUEST_API_TARGET || "http://localhost:4000";
 const QUEST_DIST = path.join(__dirname, "..", "web", "dist");
 const CELL_DIST = path.join(__dirname, "..", "cell-survival", "dist");
+const DRESSUP_DIR = path.join(__dirname, "..", "dressup");
 
 const app = express();
 
@@ -87,6 +88,21 @@ app.use("/cell", express.static(CELL_DIST, {
   },
 }));
 
+// «Наряди принцессу» — статическая игра без сборки: раздаём папку как есть.
+// test.html — служебная страница проверки отрисовки, наружу её не отдаём.
+app.get("/dressup", (req, res, next) => {
+  if (req.path === "/dressup") return res.redirect(301, "/dressup/");
+  next();
+});
+app.get("/dressup/test.html", (_req, res) => res.sendStatus(404));
+app.use("/dressup", express.static(DRESSUP_DIR, {
+  index: "index.html",
+  setHeaders: (res, file) => {
+    if (/\.(html|js|css)$/.test(file)) res.setHeader("Cache-Control", "no-cache");
+    else res.setHeader("Cache-Control", "public, max-age=604800");
+  },
+}));
+
 // PhotoQuest — SPA на React Router: любой путь внутри /quest отдаём одним
 // и тем же index.html, дальше маршрутизацией занимается сам React Router.
 app.get(["/quest", "/quest/*"], (_req, res) => {
@@ -99,6 +115,7 @@ const server = app.listen(PORT, () => {
   console.log(`  /poker   → ${POKER_TARGET}`);
   console.log(`  /quest   → ${QUEST_DIST}`);
   console.log(`  /cell    → ${CELL_DIST}`);
+  console.log(`  /dressup → ${DRESSUP_DIR}`);
   console.log(`  /api     → ${QUEST_API_TARGET}`);
 });
 

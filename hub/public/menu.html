@@ -33,7 +33,8 @@
   }
   h1 span { color: var(--gold); }
   .sub { color: var(--mute); margin: 0 0 34px; font-size: 14px; }
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .cards { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
   a.card {
     display: block; text-decoration: none; color: inherit;
@@ -80,6 +81,11 @@
         <div class="art"><img src="/cell/assets/modes/single.jpg" alt="" onerror="this.style.display='none'" /></div>
         <b>Cell Survival</b>
         <p>Выбери клетку и переживи обрушение — остаться должен один</p>
+      </a>
+      <a class="card" href="/dressup/">
+        <div class="art"><img src="/dressup/assets/cover.jpg" alt="" onerror="this.src='/dressup/icon.svg'" /></div>
+        <b>Наряди принцессу</b>
+        <p>Выбери, куда идёт принцесса, и собери ей образ из сотен нарядов</p>
       </a>
     </div>
   </div>

@@ -14,3 +14,6 @@ poker/data/ledgers/
 .mcp.json
 .playwright-mcp/
 claude-skills/
+
+# исходники картинок одевалки (большие PNG из ChatGPT)
+dressup-art/
