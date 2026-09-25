@@ -333,7 +333,12 @@ def main():
                 im.thumbnail((1024, 1024), Image.LANCZOS)
                 im.save(dst, 'JPEG', quality=84, optimize=True, progressive=True)
                 print('bg', f[3:-4])
-    ids = sorted(x[:-4] for x in os.listdir(bgdir) if x.endswith('.jpg'))
+    for x in os.listdir(bgdir):
+        if x.endswith('.jpg') and not x.startswith('t_') and not os.path.exists(os.path.join(bgdir, 't_' + x)):
+            im = Image.open(os.path.join(bgdir, x)).convert('RGB')
+            im.thumbnail((320, 320), Image.LANCZOS)
+            im.save(os.path.join(bgdir, 't_' + x), 'JPEG', quality=78, optimize=True, progressive=True)
+    ids = sorted(x[:-4] for x in os.listdir(bgdir) if x.endswith('.jpg') and not x.startswith('t_'))
     open(os.path.join(ROOT, 'js', 'bg-list.js'), 'w', encoding='utf8').write(
         '// Какие реалистичные фоны лежат в assets/bg (<id>.jpg). Обновляет tools/build_assets.py.' + chr(10)
         + 'export const BG_FILES = ' + json.dumps(ids) + ';' + chr(10))

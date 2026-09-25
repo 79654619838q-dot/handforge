@@ -140,7 +140,7 @@ function places() {
   setBg('palace', 'blur');
   render(() => `${topbar('Куда идёт принцесса?', menu)}
     <div class="scroll"><div class="places">
-      ${OPEN_PLACES.map((p, i) => `<button class="place" style="background-image:${bgStyle(p.id)};animation-delay:${i * 0.03}s" data-a="${on(() => { G.place = p.id; G.task = null; G.lookId = null; sfx.magic(); princesses('play'); })}">
+      ${OPEN_PLACES.map((p, i) => `<button class="place" style="background-image:url('assets/bg/t_${p.id}.jpg');animation-delay:${i * 0.03}s" data-a="${on(() => { G.place = p.id; G.task = null; G.lookId = null; sfx.magic(); princesses('play'); })}">
         <em>${p.emoji}</em>${S.stats.places[p.id] ? '<b class="done">✅</b>' : ''}<span>${p.name}</span></button>`).join('')}
     </div></div>`);
 }
