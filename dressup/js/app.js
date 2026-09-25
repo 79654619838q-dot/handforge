@@ -386,10 +386,10 @@ function scene() {
     <div class="stage zoom" id="sceneStage"><div class="doll-wrap enter" id="doll"></div></div>
     <div class="look-title">${esc(lookName())}</div>
     <div class="bottom-bar">
-      <button class="btn gold" data-a="${on(photo)}">📸 Фотозона</button>
-      <button class="btn" data-a="${on(() => saveLookDialog())}">💾 Сохранить образ</button>
-      <button class="btn white small" data-a="${on(dressRoom)}">👗 Переодеть</button>
-      <button class="btn white small" data-a="${on(() => places())}">🗺️ Новое место</button>
+      <button class="btn gold" data-a="${on(photo)}"><i>📸</i>Фотозона</button>
+      <button class="btn" data-a="${on(() => saveLookDialog())}"><i>💾</i>Сохранить</button>
+      <button class="btn white small" data-a="${on(dressRoom)}"><i>👗</i>Переодеть</button>
+      <button class="btn white small" data-a="${on(() => places())}"><i>🗺️</i>Место</button>
     </div>`, 'scene');
   $('#doll').innerHTML = dollHTML(cur());
   burst($('#sceneStage'));
@@ -606,22 +606,23 @@ function settings() {
 }
 
 window.dressup = { G, S, ITEMS, BY_SLOT, go: { menu, places, princesses, dressRoom, scene, photo, looks, collection, tasks, randomLook, mix, settings }, startDress };
-// Заставка: заранее грузим принцесс, стартовые наряды и фон меню, чтобы кукла не появлялась по кусочкам.
+// Заставка ждёт только то, что нужно для меню; остальное грузится в фоне, пока девочка выбирает место.
+const loadImg = (u) => new Promise((res) => { const i = new Image(); i.onload = i.onerror = () => res(); i.src = u; });
 async function boot() {
   if (!READY.length || !BY_SLOT.dress?.length) return render('<p class="empty">Принцессы ещё рисуются… ✨</p>');
-  const urls = new Set(['assets/bg/palace.jpg']);
-  for (const p of READY) {
-    urls.add(faceSrc(p.id));
-    const st0 = { pid: p.id, outfit: { dress: BY_SLOT.dress[0].id, ...cleanOutfit(p.outfit) } };
-    for (const u of layerSrcs(st0)) urls.add(u);
-  }
+  const p0 = READY[0];
+  const first = ['assets/bg/palace.jpg', ...layerSrcs({ pid: p0.id, outfit: { dress: BY_SLOT.dress[0].id, ...cleanOutfit(p0.outfit) } })];
   let n = 0;
-  const all = [...urls];
-  const tick = () => { const f = $('#barFill'); if (f) f.style.width = Math.round((++n / all.length) * 100) + '%'; };
-  await Promise.race([
-    Promise.all(all.map((u) => new Promise((res) => { const i = new Image(); i.onload = i.onerror = () => { tick(); res(); }; i.src = u; }))),
-    new Promise((res) => setTimeout(res, 25000)),
-  ]);
+  const tick = () => { const f = $('#barFill'); if (f) f.style.width = Math.round((++n / first.length) * 100) + '%'; };
+  await Promise.race([Promise.all(first.map((u) => loadImg(u).then(tick))), new Promise((res) => setTimeout(res, 12000))]);
   menu();
+  // фоновая подгрузка: принцессы в стартовых нарядах, фоны мест, миниатюры
+  const rest = new Set();
+  for (const p of READY) for (const u of layerSrcs({ pid: p.id, outfit: { dress: BY_SLOT.dress[0].id, ...cleanOutfit(p.outfit) } })) rest.add(u);
+  for (const pl of OPEN_PLACES) rest.add(`assets/bg/${pl.id}.jpg`);
+  for (const it of Object.values(ITEMS)) if (!it.variant) rest.add(thumbSrc(it));
+  const q = [...rest];
+  const worker = async () => { while (q.length) await loadImg(q.shift()); };
+  worker(); worker(); worker();
 }
 boot();
