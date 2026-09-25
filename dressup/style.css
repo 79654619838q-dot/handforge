@@ -238,7 +238,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 
 /* кукла из слоёв-картинок */
 .rdoll { position: relative; width: 100%; aspect-ratio: 2 / 3; margin: 0 auto; }
-.rdoll > img { position: absolute; height: auto; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.rdoll > img, .rdoll > canvas { position: absolute; height: auto; user-select: none; -webkit-user-drag: none; pointer-events: none; }
 .stage .doll-wrap { aspect-ratio: 2 / 3 !important; }
 .stage .doll-wrap .rdoll { height: 100%; width: auto; }
 .menu .hero { width: 45.3vh; }
@@ -337,3 +337,8 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
   .scene .bottom-bar .btn i { font-size: 20px; }
 }
 .card h3 { padding: 0 34px; }
+
+/* пока грузится новый наряд — прежний образ чуть приглушён, над ним звёздочка */
+.doll-wrap.loading .rdoll { opacity: .85; transition: opacity .2s; }
+.doll-wrap.loading::before { content: '✨'; position: absolute; left: 50%; top: 45%; z-index: 5; font-size: 42px; transform: translate(-50%, -50%); animation: spinStar 1s linear infinite; filter: drop-shadow(0 0 8px #fff); }
+@keyframes spinStar { to { transform: translate(-50%, -50%) rotate(360deg); } }

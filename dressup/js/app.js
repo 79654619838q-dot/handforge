@@ -1,6 +1,6 @@
 // Экраны игры: место → принцесса → гардероб → оценка → выход в локацию → фотозона.
 // Принцессы и вещи — слои-картинки ChatGPT (rdoll.js), вся одежда бесплатная.
-import { dollHTML, preload, drawDoll, thumbSrc, faceSrc, layerSrcs, FX_NAMES } from './rdoll.js';
+import { dollHTML, preload, drawDoll, thumbSrc, faceSrc, layerSrcs, showDoll, prefetch, applyMasks, FX_NAMES } from './rdoll.js';
 import { ITEMS, BY_SLOT, TOTAL, itemsWithTag, HAIR_TINTS, SLOT_NAMES, PRINCESS_IDS } from './catalog.js';
 import { PLACES, PLACE, PRINCESSES, PRINCESS, SETS, TASKS, JUDGE, BACKDROPS, checkNeed } from './data.js';
 import { bgCSS, photoURL, hasBg } from './scenes.js';
@@ -45,6 +45,7 @@ const on = (fn) => { const k = 'a' + ++actN; acts[k] = fn; return k; };
 const mon = (fn) => { const k = 'm' + ++actN; modalActs[k] = fn; return k; };
 function render(html, cls = '') {
   app.innerHTML = `<div class="screen ${cls}">${typeof html === 'function' ? html() : html}</div>`;
+  applyMasks(app);
 }
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-a]');
@@ -58,6 +59,7 @@ function modal(html) {
   const m = $('#modal');
   m.innerHTML = html ? `<div class="card">${html}</div>` : '';
   if (!html) modalActs = {};
+  else applyMasks(m);
 }
 const closeModal = () => modal('');
 function toast(t) {
@@ -219,8 +221,7 @@ function dressRoom() {
 function redraw(pop) {
   const d = $('#doll');
   if (!d) return;
-  d.innerHTML = dollHTML(cur());
-  if (pop) { d.classList.remove('pop'); void d.offsetWidth; d.classList.add('pop'); }
+  showDoll(d, cur(), () => { if (pop) { d.classList.remove('pop'); void d.offsetWidth; d.classList.add('pop'); } });
   if (G.task) {
     const t = TASKS.find((x) => x.id === G.task);
     const box = $('#taskBox');
@@ -290,6 +291,9 @@ function strip() {
   const none = slot && slot !== 'dress' && slot !== 'hair' ? `<button class="item none" data-none="${slot}" title="Снять">✕</button>` : '';
   el.innerHTML = none + items.map((it) => itemBtn(it, tags)).join('');
   el.scrollLeft = 0;
+  // заранее грузим сами вещи этой вкладки (без повторов по цветам) — нажатие потом срабатывает сразу
+  const seen = new Set();
+  for (const it of items) { if (seen.has(it.base) || seen.size >= 8) continue; seen.add(it.base); prefetch({ ...cur(), outfit: { ...G.outfit, [it.slot]: it.id } }); }
 }
 document.addEventListener('click', (e) => {
   const tb = e.target.closest('#tabs [data-tab]');
@@ -391,7 +395,7 @@ function scene() {
       <button class="btn white small" data-a="${on(dressRoom)}"><i>👗</i>Переодеть</button>
       <button class="btn white small" data-a="${on(() => places())}"><i>🗺️</i>Место</button>
     </div>`, 'scene');
-  $('#doll').innerHTML = dollHTML(cur());
+  showDoll($('#doll'), cur());
   burst($('#sceneStage'));
   setTimeout(sfx.magic, 1200);
 }

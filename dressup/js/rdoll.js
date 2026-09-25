@@ -42,7 +42,7 @@ export function layerList(st) {
 const pct = (v, t) => ((v / t) * 100).toFixed(3) + '%';
 export function dollHTML(st, cls = '') {
   const W = DOLL.w, H = DOLL.h;
-  const imgs = layerList(st).map((l) => `<img class="${l.cls}" src="${DIR}${l.f}.webp" alt="" draggable="false" style="left:${pct(l.x, W)};top:${pct(l.y, H)};width:${pct(l.w, W)};${l.filter ? `filter:${l.filter};` : ''}${l.mask ? `-webkit-mask-image:url(${DIR}${l.mask}.png);mask-image:url(${DIR}${l.mask}.png);-webkit-mask-size:100% 100%;mask-size:100% 100%;` : ''}">`).join('');
+  const imgs = layerList(st).map((l) => `<img class="${l.cls}" src="${DIR}${l.f}.webp" alt="" draggable="false" style="left:${pct(l.x, W)};top:${pct(l.y, H)};width:${pct(l.w, W)};${l.filter ? `filter:${l.filter};` : ''}${l.mask ? 'visibility:hidden;' : ''}"${l.mask ? ` data-mask="${DIR}${l.mask}.png"` : ''}>`).join('');
   return `<div class="rdoll ${cls}">${imgs}${st.fx ? fxHTML(st.fx) : ''}</div>`;
 }
 
@@ -100,3 +100,49 @@ export async function drawDoll(g, st, X, Y, Wd, Hd) {
 export const thumbSrc = (it) => DIR + it.m.thumb + '.webp';
 export const faceSrc = (pid) => DIR + (DOLL.princesses[pid]?.face || '') + '.webp';
 export const hasPrincess = (pid) => !!DOLL.princesses[pid];
+
+// Показ куклы без «полуодетых» кадров: сначала грузим все слои нового образа, потом меняем разом.
+// Пока грузится — остаётся прежний образ и крутится звёздочка.
+const loaded = new Map();
+function loadOnce(src) {
+  if (!loaded.has(src)) loaded.set(src, new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }));
+  return loaded.get(src);
+}
+export function prefetch(st) { for (const u of layerSrcs(st)) loadOnce(u); }
+
+// Маска тела (облегающие платья) вырезается на холсте заранее: CSS-маска в Safari
+// подгружается отдельно и на мгновение прячет всё тело.
+export async function applyMasks(root) {
+  await Promise.all([...root.querySelectorAll('img[data-mask]')].map(async (img) => {
+    const [body, mask] = await Promise.all([loadOnce(img.getAttribute('src')), loadOnce(img.dataset.mask)]);
+    if (!body) return;
+    const c = document.createElement('canvas');
+    c.width = body.naturalWidth; c.height = body.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(body, 0, 0);
+    if (mask) { g.globalCompositeOperation = 'destination-in'; g.drawImage(mask, 0, 0, c.width, c.height); }
+    c.className = img.className;
+    c.style.cssText = img.style.cssText;
+    c.style.visibility = '';
+    c.style.height = 'auto';
+    img.replaceWith(c);
+  }));
+}
+
+export async function showDoll(el, st, onShown) {
+  const token = (el._tok = (el._tok || 0) + 1);
+  const srcs = layerSrcs(st);
+  const spin = setTimeout(() => { if (el._tok === token) el.classList.add('loading'); }, 200);
+  await Promise.all(srcs.map(loadOnce));
+  if (el._tok !== token) { clearTimeout(spin); return; }
+  // собираем новую куклу вне экрана и ждём раскодирования — Safari иначе на кадр показывает пустые слои
+  const box = document.createElement('div');
+  box.innerHTML = dollHTML(st);
+  await applyMasks(box);
+  await Promise.all([...box.querySelectorAll('img')].map((i) => (i.decode ? i.decode().catch(() => {}) : null)));
+  clearTimeout(spin);
+  if (el._tok !== token) return;       // пока грузилось, выбрали другое — показываем только последнее
+  el.classList.remove('loading');
+  el.replaceChildren(...box.childNodes);
+  if (onShown) onShown();
+}

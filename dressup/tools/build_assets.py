@@ -22,6 +22,7 @@ ART = os.path.join(os.path.dirname(ROOT), 'dressup-art')
 RAW = os.path.join(ART, 'raw')
 OUT = os.path.join(ROOT, 'assets', 'doll')
 W, H = 1024, 1536
+LAYER_SCALE = 0.7
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from make_jobs import ITEMS, PRINCESSES  # noqa: E402
 import cut_green  # noqa: E402
@@ -140,7 +141,11 @@ def save_layer(arr, mask, name, soft=0.7, full=False):
     x0, y0, x1, y1 = int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1)
     if full:
         x0, y0, x1, y1 = 0, 0, W, H
-    Image.fromarray(out[y0:y1, x0:x1], 'RGBA').save(os.path.join(OUT, name + '.webp'), quality=80, method=6)
+    im = Image.fromarray(out[y0:y1, x0:x1], 'RGBA')
+    # файл в 0,7 размера: на телефоне кукла ~1000 px по высоте, разницы не видно, а грузится вдвое быстрее;
+    # положение слоя в манифесте остаётся в координатах холста 1024×1536
+    im = im.resize((max(1, round(im.width * LAYER_SCALE)), max(1, round(im.height * LAYER_SCALE))), Image.LANCZOS)
+    im.save(os.path.join(OUT, name + '.webp'), quality=82, method=6)
     return {'f': name, 'x': x0, 'y': y0, 'w': x1 - x0, 'h': y1 - y0}
 
 
@@ -174,7 +179,7 @@ def main():
     silhouette = ndimage.binary_erosion(man[..., 3] > 128, iterations=2)
     manifest = {'w': W, 'h': H, 'princesses': {}, 'items': {}}
     # кэш: вещь пересобирается, только если её исходные картинки изменились (или сменилась версия сборки)
-    VER = 19
+    VER = 20
     cpath = os.path.join(ART, 'build_cache.json')
     cache = json.load(open(cpath, encoding='utf8')) if os.path.exists(cpath) else {}
     if cache.get('_ver') != VER:
