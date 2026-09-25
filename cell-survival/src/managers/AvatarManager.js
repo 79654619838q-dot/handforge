@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { ASSETS } from '../paths.js';
 import { HEROES, heroOf, applyHero } from './heroes.js';
@@ -223,7 +226,10 @@ function tintMaterial(m, tint, skinMul, skinRef, useSkin) {
   };
   // Уникальный ключ: при одинаковом ключе three.js берёт готовую программу и не передаёт в неё наши значения —
   // все аватары получали бы цвета первого.
-  c.customProgramCacheKey = () => 'tint:' + c.uuid;
+  // Ключ — по значениям перекраски: одинаково перекрашенные материалы делят одну программу и одни значения,
+  // разные — получают свою. (Ключ по uuid собирал шейдер на каждый материал — рывки при появлении людей.)
+  const key = ['tint', tint || '-', skinMul.toArray().map((v) => v.toFixed(3)).join(','), skinRef.toArray().map((v) => v.toFixed(3)).join(','), useSkin ? 1 : 0].join(':');
+  c.customProgramCacheKey = () => key;
   return c;
 }
 
@@ -287,7 +293,8 @@ function buildPerson(p, template) {
   root.name = 'avatar';
   const person = SkeletonUtils.clone(template);
   // Rocketbox в сантиметрах: переводим в метры (рост у всех свой), ступни — на ноль.
-  const box = new THREE.Box3().setFromObject(person);
+  // Габариты анимированной модели three.js считает по каждой вершине с костями (~100+ мс) — считаем раз на образец.
+  const box = template.userData.box || (template.userData.box = new THREE.Box3().setFromObject(person));
   const h = box.max.y - box.min.y;
   const k = h > 100 && h < 250 ? 0.01 : 1.8 / h;
   person.scale.multiplyScalar(k);
@@ -910,14 +917,23 @@ export function buildAvatar(p) {
 }
 
 // Портрет (по грудь) для панелей HUD и экрана результата: картинка собирается из того же 3D-аватара.
-let portraitRenderer = null;
+// Рисуется ОСНОВНЫМ окном отрисовки игры (setMainRenderer из Stage) в отдельную цель: шейдеры и текстуры
+// общие с игрой. Раньше было своё окно — в нём всё собиралось и загружалось второй раз (долгие задачи 250–900 мс).
+let portraitRenderer = null, mainRenderer = null;
+export function setMainRenderer(r) { mainRenderer = r; }
+function portraitComposer(w, h) {
+  const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.UnsignedByteType });
+  const composer = new EffectComposer(mainRenderer, rt);
+  composer.renderToScreen = false;
+  return composer;
+}
 export function renderPortrait(profile, w = 480, h = 600, full = false) {
-  if (!portraitRenderer) {
+  if (!mainRenderer && !portraitRenderer) {
     portraitRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     portraitRenderer.toneMapping = THREE.ACESFilmicToneMapping;
     portraitRenderer.outputColorSpace = THREE.SRGBColorSpace;
   }
-  portraitRenderer.setSize(w, h, false);
+  portraitRenderer?.setSize(w, h, false);
   const scene = new THREE.Scene();
   const bg = BACKGROUNDS[profile.background] || BACKGROUNDS.forge;
   scene.add(new THREE.HemisphereLight('#ffffff', '#302018', 0.45));
@@ -931,7 +947,27 @@ export function renderPortrait(profile, w = 480, h = 600, full = false) {
   const cam = new THREE.PerspectiveCamera(full ? 30 : 24, w / h, 0.1, 50);
   if (full) { cam.position.set(0.9, 1.2 * s, 3.6); cam.lookAt(0, 0.95 * s, 0); }
   else { cam.position.set(0.35, 1.58 * s, 1.35); cam.lookAt(0, 1.45 * s, 0); }
-  portraitRenderer.render(scene, cam);
+  let shot = null;
+  if (mainRenderer) {
+    const composer = portraitComposer(w, h);
+    composer.addPass(new RenderPass(scene, cam));
+    composer.addPass(new OutputPass()); // тон и sRGB — как в игре
+    const shadows = mainRenderer.shadowMap.enabled; mainRenderer.shadowMap.enabled = false;
+    const prevTM = mainRenderer.toneMapping; mainRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    const prevClear = mainRenderer.getClearColor(new THREE.Color()), prevAlpha = mainRenderer.getClearAlpha();
+    mainRenderer.setClearColor(0x000000, 0); // прозрачный фон: под портретом рисуется градиент фона игрока
+    composer.render();
+    mainRenderer.setClearColor(prevClear, prevAlpha);
+    mainRenderer.shadowMap.enabled = shadows; mainRenderer.toneMapping = prevTM;
+    const px = new Uint8Array(w * h * 4);
+    mainRenderer.readRenderTargetPixels(composer.readBuffer, 0, 0, w, h, px);
+    composer.renderTarget1.dispose(); composer.renderTarget2.dispose(); composer.passes.forEach((p) => p.dispose?.());
+    const oc = document.createElement('canvas'); oc.width = w; oc.height = h;
+    const og = oc.getContext('2d'), id = og.createImageData(w, h);
+    for (let y = 0; y < h; y++) id.data.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4); // строки снизу вверх
+    og.putImageData(id, 0, 0);
+    shot = oc;
+  } else portraitRenderer.render(scene, cam);
 
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -939,7 +975,7 @@ export function renderPortrait(profile, w = 480, h = 600, full = false) {
   const grd = g.createRadialGradient(w * 0.5, h * 0.35, 10, w * 0.5, h * 0.5, h * 0.8);
   grd.addColorStop(0, bg[0]); grd.addColorStop(1, bg[1]);
   g.fillStyle = grd; g.fillRect(0, 0, w, h);
-  g.drawImage(portraitRenderer.domElement, 0, 0);
+  g.drawImage(shot || portraitRenderer.domElement, 0, 0);
   const vg = g.createLinearGradient(0, h * 0.6, 0, h);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
   g.fillStyle = vg; g.fillRect(0, 0, w, h);

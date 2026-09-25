@@ -3,6 +3,7 @@ import { h } from '../../managers/UIManager.js';
 import { t } from '../../i18n.js';
 import { GameWorld } from '../../scene/GameWorld.js';
 import { clearTweens } from '../../scene/tween.js';
+import { ensurePerson, buildAvatar } from '../../managers/AvatarManager.js';
 
 // Выбор 3D-объекта мышью: наведение и клик по списку мешей.
 export class Picker {
@@ -91,4 +92,31 @@ export class BaseView {
   alive(st) { return st.alive?.includes(this.myId); }
   canAct(st) { return st.phase === 'act' && this.alive(st) && !st.done?.includes(this.myId); }
   name(st, id) { return st.players.find((p) => p.id === id)?.name ?? '?'; }
+}
+
+// Людей рисуем один раз заранее — в невидимый кадр 64×64, с настоящими лампами и тенями сцены.
+// Так собираются все шейдеры (и теневые) и в видеокарту уходят текстуры. Без этого в момент появления
+// человека кадр стоял: замер 25.09 в «Дверях» — 275 мс, 74 шейдера за раскрытие.
+// Вызывать ПОСЛЕ постройки сцены (число ламп входит в шейдер). extra — объекты, которые появятся позже.
+export async function prewarmAvatars(stage, world, players, extra = [], tooLate = () => false) {
+  try {
+    await Promise.all(players.map((p) => ensurePerson(p.profile)));
+    // пока грузились модели, заставка могла смениться полем — готовим для той сцены, что показана сейчас
+    // (раньше здесь была отмена, и на холодном старте подготовка не делалась вовсе)
+    world = stage.world;
+    if (!world?.scene || tooLate()) return;
+    const g = new THREE.Group();
+    players.forEach((p, i) => { const a = buildAvatar({ ...p.profile, name: p.name }); a.position.set(i * 0.8 - players.length * 0.4, 0, 0); g.add(a); });
+    for (const o of extra) g.add(o);
+    // сначала шейдеры в фоне (не останавливая кадры): группа НЕ в сцене, лампы берутся из сцены (третий аргумент).
+    // Если добавить группу в сцену до конца сборки, обычные кадры рисуют её и собирают всё синхронно (замер: кадр 5,6 с).
+    await stage.renderer.compileAsync(g, world.camera, world.scene);
+    if (stage.world !== world || tooLate()) world = stage.world;
+    if (!world?.scene || tooLate()) return;
+    // потом один невидимый кадр — теневые шейдеры и текстуры
+    world.scene.add(g);
+    const r = stage.renderer, rt = new THREE.WebGLRenderTarget(64, 64), prev = r.getRenderTarget();
+    r.setRenderTarget(rt); r.render(world.scene, world.camera); r.setRenderTarget(prev);
+    world.scene.remove(g); rt.dispose();
+  } catch { /* не удалось — соберётся при первом показе */ }
 }

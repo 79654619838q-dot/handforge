@@ -13,7 +13,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { ASSETS } from '../paths.js';
 import { updateTweens } from './tween.js';
-import { updateAvatars } from '../managers/AvatarManager.js';
+import { updateAvatars, setMainRenderer } from '../managers/AvatarManager.js';
 
 // Один WebGL-холст на всю игру. Экран подменяет «мир» (scene + camera + update).
 export class Stage {
@@ -28,6 +28,7 @@ export class Stage {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.localClippingEnabled = true; // срез фигуры при уходе «под землю» (cinematics.js)
     container.appendChild(this.renderer.domElement);
+    setMainRenderer(this.renderer); // портреты игроков рисуются этим же окном (общие шейдеры и текстуры)
 
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
     this.envMap = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture;

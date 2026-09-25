@@ -8,7 +8,7 @@ import { PLAYER } from '../../managers/PlayerManager.js';
 import { EliminationManager } from '../../managers/EliminationManager.js';
 import { ensurePerson, buildAvatar } from '../../managers/AvatarManager.js';
 import { tween, wait, ease } from '../../scene/tween.js';
-import { BaseView, Picker, confirmBox, labelSprite } from './common.js';
+import { BaseView, Picker, confirmBox, labelSprite, prewarmAvatars } from './common.js';
 
 const OTHER = new THREE.Color('#a78bfa');
 
@@ -26,6 +26,7 @@ class FieldView extends BaseView {
     this.elim = new EliminationManager(this.world, this.audio);
     this.pl = new Map();
     this.ready = Promise.all(st.players.map((p) => ensurePerson(p.profile)));
+    if (!this.warmed) { this.warmed = true; prewarmAvatars(this.stage, this.world, st.players, [], () => this.st?.phase === 'reveal'); } // один раз на испытание: поля перестраиваются каждый раунд
     this.picker = new Picker(this.world.camera, () => this.grid.alive.flatMap((c) => [c.base, c.top]), {
       onHover: (m) => { this.grid.cells.forEach((c) => { c.hover = false; }); const c = m?.userData.cell; if (c && this.pickable(c)) { c.hover = true; this.audio.hover(); } },
       onClick: (m) => this.onCell(m.userData.cell),
@@ -75,7 +76,11 @@ class FieldView extends BaseView {
 // ---------- 1. Последняя клетка ----------
 export class LastCellView extends FieldView {
   revealFxSec = 5.5;
-  enter(st) { if (st.data) this.build(st); else this.world = backdrop(this); }
+  enter(st) {
+    if (st.data) this.build(st); else this.world = backdrop(this);
+    // люди готовятся во время заставки: лампы заставки и поля одинаковые — шейдеры подойдут
+    if (!this.warmed) { this.warmed = true; prewarmAvatars(this.stage, this.world, st.players, [], () => this.st?.phase === 'reveal'); }
+  }
   build(st) {
     this.built = true;
     this.setupWorld(st, st.data.total);
@@ -138,7 +143,11 @@ export class LastCellView extends FieldView {
 // ---------- 4. Взрывное поле ----------
 export class MinesView extends FieldView {
   revealFxSec = 3.2;
-  enter(st) { if (st.data) this.build(st); else this.world = backdrop(this); }
+  enter(st) {
+    if (st.data) this.build(st); else this.world = backdrop(this);
+    // люди готовятся во время заставки: лампы заставки и поля одинаковые — шейдеры подойдут
+    if (!this.warmed) { this.warmed = true; prewarmAvatars(this.stage, this.world, st.players, [], () => this.st?.phase === 'reveal'); }
+  }
   build(st) {
     this.built = true;
     this.picker?.dispose(); // старое поле освобождает Stage.setWorld, обработчики нажатий — здесь
@@ -266,7 +275,11 @@ const numGeo = new THREE.PlaneGeometry(0.72, 0.72);
 
 export class UniqueFieldView extends FieldView {
   revealFxSec = 5;
-  enter(st) { if (st.data) this.build(st); else this.world = backdrop(this); }
+  enter(st) {
+    if (st.data) this.build(st); else this.world = backdrop(this);
+    // люди готовятся во время заставки: лампы заставки и поля одинаковые — шейдеры подойдут
+    if (!this.warmed) { this.warmed = true; prewarmAvatars(this.stage, this.world, st.players, [], () => this.st?.phase === 'reveal'); }
+  }
   build(st) {
     this.built = true;
     this.round = st.round;
@@ -339,6 +352,14 @@ export class UniqueFieldView extends FieldView {
 }
 
 // ---------- 2. Двери ----------
+// материалы монстра создаются при входе в испытание — их шейдеры собираются заранее (prewarmAvatars)
+function monsterMats() {
+  return {
+    dark: new THREE.MeshStandardMaterial({ color: '#050304', roughness: 0.55, metalness: 0.2, emissive: '#3a0000', emissiveIntensity: 0.4 }),
+    eyeM: new THREE.MeshBasicMaterial({ color: '#ff2a1a', transparent: true, opacity: 0 }),
+    tm: new THREE.MeshStandardMaterial({ color: '#0a0406', roughness: 0.4, emissive: '#5a0010', emissiveIntensity: 0.6 }),
+  };
+}
 function doorNumberTexture(n) {
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const g = c.getContext('2d');
@@ -354,6 +375,12 @@ export class DoorsView extends BaseView {
     this.world = new GameWorld(this.theme);
     this.stage.setWorld(this.world);
     this.ready = Promise.all(st.players.map((p) => ensurePerson(p.profile)));
+    this.mm = monsterMats();
+    this.warmLight = new THREE.PointLight('#ffcf70', 0, 9, 1.6); this.warmLight.position.set(0, 1.4, -0.5);
+    this.redLight = new THREE.PointLight('#ff2020', 0, 6, 1.6);
+    this.world.scene.add(this.warmLight, this.redLight);
+    // подготовка людей и монстра — во время заставки, пока игрок читает правила
+    prewarmAvatars(this.stage, this.world, st.players, Object.values(this.mm).map((m) => new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), m)), () => this.st?.phase === 'reveal');
     this.picker = new Picker(this.world.camera, () => (this.doors || []).map((d) => d.leaf), {
       onHover: (m) => { (this.doors || []).forEach((d) => { d.hover = d.leaf === m; }); if (m) this.audio.hover(); },
       onClick: (m) => this.onDoor(this.doors.find((d) => d.leaf === m)),
@@ -395,6 +422,10 @@ export class DoorsView extends BaseView {
       this.group.add(d);
       this.doors.push({ i, g: d, hinge, leaf, leafM, inner, glow, hover: false, owner: null, avatar: null });
     }
+    // Свет раскрытия создаётся сразу и только включается: новая лампа посреди раунда заставляет three.js
+    // пересобирать шейдеры всех материалов сцены (замер 25.09: +74 шейдера, рывки до 172 мс).
+    // (лампы — в enter, один раз на испытание)
+    this.warmLight.intensity = 0; this.redLight.intensity = 0;
     const width = Math.min(perRow, n) * gap;
     const rows = n > 8 ? 2 : 1;
     // отъезд так, чтобы ряд дверей влез по ширине экрана (важно для телефона в портрете)
@@ -461,9 +492,10 @@ export class DoorsView extends BaseView {
     for (const d of order) {
       const death = d.i === r.death;
       d.inner.material.color.set(death ? '#120000' : '#ffd27a');
-      const light = new THREE.PointLight(death ? '#ff2020' : '#ffcf70', 0, 6, 1.6);
-      light.position.set(0, 1.2, -0.4); d.g.add(light);
-      tween(0.8, (k) => { d.hinge.rotation.y = -k * 1.8; light.intensity = k * (death ? 30 : 18); }, ease.outCubic);
+      let light = this.warmLight;
+      if (death) { light = this.redLight; d.g.getWorldPosition(light.position).add(new THREE.Vector3(0, 1.2, -0.4)); }
+      const i0 = light.intensity;
+      tween(0.8, (k) => { d.hinge.rotation.y = -k * 1.8; light.intensity = death ? k * 30 : Math.max(i0, Math.min(40, i0 + k * 8)); }, ease.outCubic);
       if (death) { await wait(0.4); await this.monster(d, light); }
       else {
         // выживший шагает в свет своей двери и исчезает
@@ -480,15 +512,15 @@ export class DoorsView extends BaseView {
     const g = new THREE.Group();
     g.position.set(0, 0, -0.35);
     d.g.add(g);
-    const dark = new THREE.MeshStandardMaterial({ color: '#050304', roughness: 0.55, metalness: 0.2, emissive: '#3a0000', emissiveIntensity: 0.4 });
+    const { dark, eyeM, tm } = this.mm || (this.mm = monsterMats());
+    eyeM.opacity = 0;
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.9, 6, 16), dark); body.position.set(0, 1.0, -0.25); body.scale.set(1, 1, 0.7); g.add(body);
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 14), dark); head.position.set(0, 1.78, -0.1); head.scale.set(1.1, 0.9, 1); g.add(head);
     for (const sx of [-1, 1]) {
       const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.35, 10), dark); horn.position.set(sx * 0.16, 2.0, -0.12); horn.rotation.z = -sx * 0.5; g.add(horn);
     }
-    const eyeM = new THREE.MeshBasicMaterial({ color: '#ff2a1a', transparent: true, opacity: 0 });
     for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), eyeM); e.position.set(sx * 0.09, 1.8, 0.1); e.scale.set(1.4, 0.7, 1); g.add(e); }
-    const eyeLight = new THREE.PointLight('#ff2020', 0, 3, 2); eyeLight.position.set(0, 1.8, 0.4); g.add(eyeLight);
+    const eyeLight = { intensity: 0 }; // без настоящей лампы: глаза светятся сами (свечение bloom), шейдеры не пересобираются
     g.scale.setScalar(0.001);
 
     this.audio.monster();
@@ -499,7 +531,6 @@ export class DoorsView extends BaseView {
       // щупальца тянутся от монстра к игроку (координаты в системе монстра)
       g.updateMatrixWorld(true);
       const target = g.worldToLocal(a.getWorldPosition(new THREE.Vector3()));
-      const tm = new THREE.MeshStandardMaterial({ color: '#0a0406', roughness: 0.4, emissive: '#5a0010', emissiveIntensity: 0.6 });
       const tentacles = [];
       for (let i = 0; i < 4; i++) {
         const h = 0.55 + i * 0.3, side = i % 2 ? 1 : -1;
