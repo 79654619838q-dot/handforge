@@ -347,6 +347,7 @@ def main():
     js = '// Собрано tools/build_assets.py из картинок ChatGPT — не править руками.\nexport const DOLL = ' + json.dumps(manifest, ensure_ascii=False) + ';\n'
     open(os.path.join(ROOT, 'js', 'doll-manifest.js'), 'w', encoding='utf8').write(js)
     print('princesses', len(manifest['princesses']), 'items', len(manifest['items']))
+    subprocess.run(['node', os.path.join(ROOT, 'tools', 'preload.mjs')], check=False)
 
 
 if __name__ == '__main__':
