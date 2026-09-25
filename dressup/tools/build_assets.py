@@ -176,6 +176,8 @@ def main():
             continue
         key = 'princess:' + pid
         pbf = os.path.join(RAW, f'pb_{pid}.png')
+        if not os.path.exists(pbf):
+            continue          # без картинки «волосы в пучке» тело получается с дефектами — ждём её
         if cache.get(key, {}).get('stamp') == stamp(p, pm, pbf):
             manifest['princesses'][pid] = cache[key]['entry']
             manifest['items']['hair_' + pid] = cache[key]['hair']
