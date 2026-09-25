@@ -126,7 +126,7 @@ def green_mask(dressed, green):
     return m
 
 
-def save_layer(arr, mask, name, soft=0.7):
+def save_layer(arr, mask, name, soft=0.7, full=False):
     a = ndimage.gaussian_filter(mask.astype(np.float32), soft) if soft else mask.astype(np.float32)
     a = np.clip(a * 1.2, 0, 1) * (arr[..., 3] / 255.0)
     out = arr.copy()
@@ -136,6 +136,8 @@ def save_layer(arr, mask, name, soft=0.7):
     if not len(ys):
         return None
     x0, y0, x1, y1 = int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1)
+    if full:
+        x0, y0, x1, y1 = 0, 0, W, H
     Image.fromarray(out[y0:y1, x0:x1], 'RGBA').save(os.path.join(OUT, name + '.webp'), quality=86, method=6)
     return {'f': name, 'x': x0, 'y': y0, 'w': x1 - x0, 'h': y1 - y0}
 
@@ -170,7 +172,7 @@ def main():
     silhouette = ndimage.binary_erosion(man[..., 3] > 128, iterations=2)
     manifest = {'w': W, 'h': H, 'princesses': {}, 'items': {}}
     # кэш: вещь пересобирается, только если её исходные картинки изменились (или сменилась версия сборки)
-    VER = 10
+    VER = 15
     cpath = os.path.join(ART, 'build_cache.json')
     cache = json.load(open(cpath, encoding='utf8')) if os.path.exists(cpath) else {}
     if cache.get('_ver') != VER:
@@ -186,6 +188,8 @@ def main():
     if os.path.exists(os.path.join(RAW, 'm_arms.png')):
         arms_mask = green_mask(man, rgba(os.path.join(RAW, 'm_arms.png')))
         arms_mask = ndimage.binary_dilation(arms_mask, iterations=1)
+        # заливку рук ChatGPT делает шире самих рук — бока туловища (где нижнее платье) рукам не принадлежат
+        arms_mask &= ~ndimage.binary_dilation(slip_region(man), iterations=2)
 
     for pid, _desc in PRINCESSES:
         p, pm = os.path.join(RAW, f'p_{pid}.png'), os.path.join(RAW, f'pm_{pid}.png')
@@ -228,9 +232,11 @@ def main():
                 clean[..., :3][longer] = legs[longer]
                 clean[..., 3][longer] = np.where(man[..., 3][longer] > 128, 255, 0)
         clean = skin_slip(clean, slip | (mine & ~longer))
-        entry = {'body': save_layer(clean, clean[..., 3] > 5, f'body_{pid}', soft=0)}
+        entry = {'body': save_layer(clean, clean[..., 3] > 5, f'body_{pid}', soft=0, full=True)}
         if arms_mask is not None:
-            entry['arms'] = save_layer(body, arms_mask & ~hair_d, f'arms_{pid}', soft=0.8)
+            # руки — из очищенного тела, без боков туловища (нижнее платье у принцесс бывает шире манекена)
+            own = ndimage.binary_dilation(mine, iterations=4)
+            entry['arms'] = save_layer(clean, arms_mask & ~hair_d & ~own, f'arms_{pid}', soft=0.8)
         # собственная причёска — тоже вещь (подходит всем принцессам)
         front, back = hair & silhouette, hair & ~silhouette
         hid = 'hair_' + pid
@@ -278,21 +284,26 @@ def main():
                     d[..., 3][hole] = 255
                     m = m | hole
             if slot == 'dress' and arms_mask is not None:
+                # Маска тела для этого платья: между руками, в высоту платья, тело принцессы видно только там,
+                # где на картинке ChatGPT было платье или открытая кожа. Фигуры принцесс чуть шире манекена —
+                # без маски их бока или нижнее платье выглядывали бы из облегающих платьев.
                 ys = np.nonzero(m.any(1))[0]
-                if len(ys):
-                    rows = np.zeros_like(m)
-                    rows[ys.min():ys.max() + 1] = True
-                    gap = (man[..., 3] > 200) & ~arms_mask & ~m & (d[..., 3] < 60) & rows
-                    gap &= ndimage.binary_dilation(m, iterations=40)
-                    gap &= ~(ndimage.binary_dilation(arms_mask, iterations=4))
-                    if gap.sum() > 50:
-                        gm = (gap * 255).astype(np.uint8)
-                        rgb = cv2.inpaint(np.ascontiguousarray(d[..., :3].clip(0, 255).astype(np.uint8)), gm, 13, cv2.INPAINT_TELEA)
-                        d = d.copy()
-                        d[..., :3][gap] = rgb[gap]
-                        d[..., 3][gap] = 255
-                        m = m | gap
-                        print('  widened', iid, int(gap.sum()))
+                hide = np.zeros_like(m)
+                am = ndimage.binary_dilation(arms_mask, iterations=3)
+                for y in range(ys.min(), ys.max() + 1):
+                    la = np.nonzero(am[y, :512])[0]
+                    ra = np.nonzero(am[y, 512:])[0]
+                    x0 = la.max() + 1 if len(la) else 0
+                    x1 = 512 + ra.min() if len(ra) else W
+                    hide[y, x0:x1] = True
+                hide &= ~m & (d[..., 3] < 60)
+                hide = ndimage.binary_opening(hide, iterations=2)
+                if hide.sum() > 200:
+                    bm = np.where(hide, 0, 255).astype(np.uint8)
+                    # браузер берёт маску по прозрачности, поэтому маска — белая картинка с альфа-каналом
+                    a = Image.fromarray(bm, 'L').resize((W // 2, H // 2), Image.LANCZOS)
+                    Image.merge('LA', (Image.new('L', a.size, 255), a)).save(os.path.join(OUT, f'bm_{iid}.png'), optimize=True)
+                    e['bodymask'] = f'bm_{iid}'
             e['layer'] = save_layer(d, m, iid)
         # рукава: вещь закрывает руки манекена
         if arms_mask is not None and slot in ('dress', 'outer', 'gloves'):

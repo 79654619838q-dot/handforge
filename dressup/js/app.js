@@ -3,7 +3,7 @@
 import { dollHTML, preload, drawDoll, thumbSrc, faceSrc, layerSrcs, FX_NAMES } from './rdoll.js';
 import { ITEMS, BY_SLOT, TOTAL, itemsWithTag, HAIR_TINTS, SLOT_NAMES, PRINCESS_IDS } from './catalog.js';
 import { PLACES, PLACE, PRINCESSES, PRINCESS, SETS, TASKS, JUDGE, BACKDROPS, checkNeed } from './data.js';
-import { bgCSS, photoURL, sceneURL } from './scenes.js';
+import { bgCSS, photoURL, hasBg } from './scenes.js';
 import * as st from './store.js';
 import { sfx, startMusic, setMusic, setSound } from './audio.js';
 import { esc, rnd } from './util.js';
@@ -15,6 +15,10 @@ setSound(S.settings.sound);
 
 // Только принцессы, чьи картинки уже готовы.
 const READY = PRINCESSES.filter((p) => PRINCESS_IDS.includes(p.id));
+// Места и фоны фотозоны — только те, у которых уже есть картинка ChatGPT.
+const OPEN_PLACES = PLACES.filter((p) => hasBg(p.id));
+const OPEN_BACKDROPS = BACKDROPS.filter((b) => hasBg(b.id));
+const bgOr = (id) => (hasBg(id) ? id : 'palace');
 
 // Текущая партия.
 const G = { place: null, pid: null, outfit: {}, hairTint: '', fx: null, task: null, backdrop: null, lookId: null, tab: null, sub: null };
@@ -64,11 +68,12 @@ function toast(t) {
   setTimeout(() => d.remove(), 2700);
 }
 function setBg(id, mode = 'soft') {
+  id = bgOr(id);
   const b = $('#bg');
   b.style.backgroundImage = bgCSS(id);
   b.className = mode;
 }
-const bgStyle = (id) => bgCSS(id).replace(/"/g, "'");
+const bgStyle = (id) => bgCSS(bgOr(id)).replace(/"/g, "'");
 const topbar = (title, back) => `<div class="topbar">${back ? `<button class="icon-btn" data-a="${on(back)}" aria-label="Назад">←</button>` : ''}<h2>${title}</h2>${back ? '<span class="icon-btn ghost"></span>' : ''}</div>`;
 
 (function sparkles() {
@@ -135,7 +140,7 @@ function places() {
   setBg('palace', 'blur');
   render(() => `${topbar('Куда идёт принцесса?', menu)}
     <div class="scroll"><div class="places">
-      ${PLACES.map((p, i) => `<button class="place" style="background-image:${bgStyle(p.id)};animation-delay:${i * 0.03}s" data-a="${on(() => { G.place = p.id; G.task = null; G.lookId = null; sfx.magic(); princesses('play'); })}">
+      ${OPEN_PLACES.map((p, i) => `<button class="place" style="background-image:${bgStyle(p.id)};animation-delay:${i * 0.03}s" data-a="${on(() => { G.place = p.id; G.task = null; G.lookId = null; sfx.magic(); princesses('play'); })}">
         <em>${p.emoji}</em>${S.stats.places[p.id] ? '<b class="done">✅</b>' : ''}<span>${p.name}</span></button>`).join('')}
     </div></div>`);
 }
@@ -149,7 +154,7 @@ function princesses(mode) {
     <div class="scroll">
       <p class="subtitle">${mode === 'play' ? `${place.emoji} ${place.name}` : 'Выбери принцессу — и в путь!'}</p>
       <div class="princesses">
-      ${READY.map((p, i) => `<div class="pcard" style="animation-delay:${i * 0.04}s" data-a="${on(() => { if (mode !== 'play') { G.place = rnd(PLACES).id; G.task = null; } startDress(p.id); })}">
+      ${READY.map((p, i) => `<div class="pcard" style="animation-delay:${i * 0.04}s" data-a="${on(() => { if (mode !== 'play') { G.place = rnd(OPEN_PLACES).id; G.task = null; } startDress(p.id); })}">
         <div class="portrait"><img src="${faceSrc(p.id)}" alt="${p.name}"></div>
         ${place && mode === 'play' && place.tags.includes(p.fav) ? '<span class="fav">💖</span>' : ''}
         <b>${p.name}</b><small>${p.style}</small></div>`).join('')}
@@ -396,7 +401,7 @@ function photo() {
   if (!G.backdrop) G.backdrop = G.place;
   setBg(G.backdrop, 'soft');
   const rows = () => {
-    $('#photoRows').innerHTML = `<div class="opt-row"><h4>Фон</h4><div class="chips">${BACKDROPS.map((b) => `<button class="chip ${G.backdrop === b.id ? 'on' : ''}" data-a="${on(() => { G.backdrop = b.id; setBg(b.id, 'soft'); rows(); })}">${b.name}</button>`).join('')}</div></div>
+    $('#photoRows').innerHTML = `<div class="opt-row"><h4>Фон</h4><div class="chips">${OPEN_BACKDROPS.map((b) => `<button class="chip ${G.backdrop === b.id ? 'on' : ''}" data-a="${on(() => { G.backdrop = b.id; setBg(b.id, 'soft'); rows(); })}">${b.name}</button>`).join('')}</div></div>
       <div class="opt-row"><h4>Эффект</h4><div class="chips"><button class="chip ${!G.fx ? 'on' : ''}" data-a="${on(() => { G.fx = null; redraw(true); rows(); })}">Без эффекта</button>${Object.entries(FX_NAMES).map(([k, n]) => `<button class="chip ${G.fx === k ? 'on' : ''}" data-a="${on(() => { G.fx = k; sfx.magic(); redraw(true); rows(); })}">${FX_ICONS[k]} ${n}</button>`).join('')}</div></div>`;
   };
   render(() => `${topbar('Фотозона', scene)}
@@ -414,9 +419,9 @@ async function renderPhoto(state, backdrop, title) {
   const g = c.getContext('2d');
   const load = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
   const cover = (img) => { const s = Math.max(W / img.width, H / img.height); const w = img.width * s, h = img.height * s; g.drawImage(img, (W - w) / 2, (H - h) / 2, w, h); };
-  cover(await load(sceneURL(backdrop)));
-  const ph = photoURL(backdrop);
-  if (ph) { try { cover(await load(ph)); } catch { /* рисованный фон остаётся */ } }
+  g.fillStyle = '#f7d6e8'; g.fillRect(0, 0, W, H);
+  const ph = photoURL(backdrop) || photoURL('palace');
+  if (ph) { try { cover(await load(ph)); } catch { /* остаётся цвет */ } }
   const dh = H * 0.9, dw = dh * (2 / 3);
   await drawDoll(g, state, (W - dw) / 2, H - dh - 16, dw, dh);
   g.lineWidth = 28; g.strokeStyle = '#fff'; g.strokeRect(14, 14, W - 28, H - 28);
@@ -510,7 +515,7 @@ function itemView(it) {
     <p>${SLOT_NAMES[it.slot][1]} ${SLOT_NAMES[it.slot][0]}</p>
     <div class="row"><button class="btn" data-a="${mon(() => {
       closeModal();
-      G.place = G.place || rnd(PLACES).id;
+      G.place = G.place || rnd(OPEN_PLACES).id;
       const pid = G.pid && PRINCESS_IDS.includes(G.pid) ? G.pid : READY[0].id;
       startDress(pid, { ...PRINCESS[pid].outfit, [it.slot]: it.id });
     })}">👗 Примерить</button></div>
@@ -521,7 +526,7 @@ function itemView(it) {
 function tasks() {
   setBg('coronation', 'blur');
   render(() => `${topbar('Задания', menu)}
-    <div class="scroll"><div class="list">${TASKS.map((t, i) => {
+    <div class="scroll"><div class="list">${TASKS.filter((t) => !t.place || hasBg(t.place)).map((t, i) => {
       const doneT = S.tasksDone[t.id];
       const progress = t.count ? ` (${Math.min(S.stats.looks, t.count)}/${t.count})` : t.places ? ` (${Math.min(Object.keys(S.stats.places).length, t.places)}/${t.places})` : '';
       return `<div class="task ${doneT ? 'done' : ''}" style="animation-delay:${i * 0.03}s">
@@ -534,7 +539,7 @@ function tasks() {
 // ---------- СЛУЧАЙНЫЙ ОБРАЗ ----------
 function randomLook() {
   const roll = () => {
-    const p = rnd(PLACES);
+    const p = rnd(OPEN_PLACES);
     G.place = p.id; G.backdrop = p.id; G.pid = rnd(READY).id;
     G.outfit = randomOutfit(p.tags);
     G.hairTint = Math.random() < 0.25 ? rnd(HAIR_TINTS)[0] : hairTintOf(G.pid);
@@ -560,7 +565,7 @@ function randomLook() {
 // ---------- СМЕШАЙ ----------
 function mix(step) {
   if (step === 0) {
-    G.pid = rnd(READY).id; G.place = rnd(PLACES).id; G.task = null; G.lookId = null; G.fx = null;
+    G.pid = rnd(READY).id; G.place = rnd(OPEN_PLACES).id; G.task = null; G.lookId = null; G.fx = null;
     G.outfit = {}; G.hairTint = hairTintOf(G.pid);
   }
   const STEPS = ['Платье', 'Причёска', 'Аксессуары'];

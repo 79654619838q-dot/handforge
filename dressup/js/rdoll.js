@@ -12,14 +12,15 @@ export function layerList(st) {
   const hair = it('hair') || ITEMS[P.hair];
   const hairF = st.hairTint || '';
   const L = [];
-  const add = (lay, filter = '', cls = '') => { if (lay) L.push({ ...lay, filter, cls }); };
+  const add = (lay, filter = '', cls = '', mask = '') => { if (lay) L.push({ ...lay, filter, cls, mask }); };
   const addItem = (x, part) => { if (x) add(part ? x.m[part] : x.m.layer, x.filter, 'i-' + x.slot); };
 
   if (it('wings')) add(it('wings').m.layer, it('wings').filter, 'wings');
   if (hair) add(hair.m.back, hairF);
   if (it('outer')?.m.back) addItem(it('outer'), 'back');
   if (it('head')?.m.back) addItem(it('head'), 'back');
-  add(P.body);
+  // облегающее платье уже фигуры принцессы — тело вне платья прячем маской
+  add(P.body, '', 'body', it('dress')?.m.bodymask || '');
   addItem(it('shoes'));
   addItem(it('dress'));
   if (it('outer')) addItem(it('outer'), it('outer').m.front ? 'front' : null);
@@ -41,7 +42,7 @@ export function layerList(st) {
 const pct = (v, t) => ((v / t) * 100).toFixed(3) + '%';
 export function dollHTML(st, cls = '') {
   const W = DOLL.w, H = DOLL.h;
-  const imgs = layerList(st).map((l) => `<img class="${l.cls}" src="${DIR}${l.f}.webp" alt="" draggable="false" style="left:${pct(l.x, W)};top:${pct(l.y, H)};width:${pct(l.w, W)};${l.filter ? `filter:${l.filter};` : ''}">`).join('');
+  const imgs = layerList(st).map((l) => `<img class="${l.cls}" src="${DIR}${l.f}.webp" alt="" draggable="false" style="left:${pct(l.x, W)};top:${pct(l.y, H)};width:${pct(l.w, W)};${l.filter ? `filter:${l.filter};` : ''}${l.mask ? `-webkit-mask-image:url(${DIR}${l.mask}.png);mask-image:url(${DIR}${l.mask}.png);-webkit-mask-size:100% 100%;mask-size:100% 100%;` : ''}">`).join('');
   return `<div class="rdoll ${cls}">${imgs}${st.fx ? fxHTML(st.fx) : ''}</div>`;
 }
 
@@ -62,7 +63,7 @@ function fxHTML(kind) {
   return `<div class="fx">${o}</div>`;
 }
 
-export const layerSrcs = (st) => layerList(st).map((l) => DIR + l.f + '.webp');
+export const layerSrcs = (st) => layerList(st).flatMap((l) => [DIR + l.f + '.webp', ...(l.mask ? [DIR + l.mask + '.png'] : [])]);
 
 // Картинки заранее — чтобы переодевание было мгновенным.
 const cache = new Map();
@@ -78,7 +79,18 @@ export async function drawDoll(g, st, X, Y, Wd, Hd) {
   const load = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
   const sx = Wd / DOLL.w, sy = Hd / DOLL.h;
   for (const l of layerList(st)) {
-    const img = await load(DIR + l.f + '.webp');
+    let img = await load(DIR + l.f + '.webp');
+    if (l.mask) {
+      // маска тела: рисуем тело на отдельном холсте и оставляем только разрешённое
+      const m = await load(DIR + l.mask + '.png');
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const cg = c.getContext('2d');
+      cg.drawImage(img, 0, 0);
+      cg.globalCompositeOperation = 'destination-in';
+      cg.drawImage(m, 0, 0, c.width, c.height);
+      img = c;
+    }
     g.save();
     if (l.filter && 'filter' in g) g.filter = l.filter;
     g.drawImage(img, X + l.x * sx, Y + l.y * sy, l.w * sx, l.h * sy);
