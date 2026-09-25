@@ -9,7 +9,6 @@ import { EliminationManager } from '../../managers/EliminationManager.js';
 import { ensurePerson, buildAvatar } from '../../managers/AvatarManager.js';
 import { tween, wait, ease } from '../../scene/tween.js';
 import { BaseView, Picker, confirmBox, labelSprite } from './common.js';
-import { Cinematic } from '../../scene/cinematics.js';
 
 const OTHER = new THREE.Color('#a78bfa');
 
@@ -33,12 +32,9 @@ class FieldView extends BaseView {
     });
   }
   pickable() { return true; }
-  async closeUp(pos, dist = 2.6) {
-    this.cine = new Cinematic(this.world, this.audio, this.mv.el);
-    this.cine.darken(true);
-    await this.cine.focus(pos, dist, 1.4, 0.7);
-  }
-  closeUpEnd() { this.cine?.release(); this.cine = null; }
+  // Крупный план при выбывании убран (оператор 25.09: лаги) — камера остаётся на всём поле.
+  async closeUp() {}
+  closeUpEnd() {}
   player(st, id) {
     if (!this.pl.has(id)) {
       const info = st.players.find((p) => p.id === id);
@@ -481,10 +477,6 @@ export class DoorsView extends BaseView {
   // Монстр за смертельной дверью: из темноты загораются глаза, щупальца хватают игрока,
   // утаскивают внутрь, дверь захлопывается.
   async monster(d, light) {
-    const cine = new Cinematic(this.world, this.audio, this.mv.el);
-    cine.darken(true);
-    await cine.focus(d.g.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0, 0.8)), 2.6, 1.3, 0.6);
-    this.doorCine = cine;
     const g = new THREE.Group();
     g.position.set(0, 0, -0.35);
     d.g.add(g);
@@ -550,7 +542,6 @@ export class DoorsView extends BaseView {
     this.world.effects.burst(p, new THREE.Color('#2a2a2a'), 120, 2.5, 0.35, false, -1, 1.8);
     d.dead = true;
     await wait(0.5);
-    this.doorCine?.release();
     this.mv.showOut();
   }
 }

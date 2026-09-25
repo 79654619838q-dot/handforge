@@ -102,7 +102,7 @@ class LastCell extends Base {
     return { eliminated, replay: false, reveal: { target, stand: { ...this.moves } } };
   }
   over() { return this.alive.length <= 1 || this.cells.length <= 1; }
-  revealMs() { return 9500; }
+  revealMs() { return 7500; }
 }
 
 // 2. Двери
@@ -145,7 +145,7 @@ class Doors extends Base {
     return { eliminated, replay: false, reveal: { death: this.death, doors: this.moves } };
   }
   over() { return this.solo ? this.alive.length === 0 || this.finished : this.alive.length <= 1; }
-  revealMs() { return 11500; }
+  revealMs() { return 9000; }
 }
 
 // 3. Останови время
@@ -165,7 +165,7 @@ class StopTime extends Base {
     for (const p of this.alive) results[p] = { elapsed: this.moves[p] ?? null, dev: Number.isFinite(dev(p)) ? dev(p) : null };
     return { eliminated, replay: false, reveal: { target: this.target, results } };
   }
-  revealMs() { return 12500; }
+  revealMs() { return 6000; }
 }
 
 // 4. Взрывное поле
@@ -196,7 +196,7 @@ class Mines extends Base {
   }
   // кончились клетки — оставшиеся проходят дальше вместе
   over() { return this.alive.length <= 1 || this.cells.length <= 1; }
-  revealMs() { return 9500; }
+  revealMs() { return 6500; }
 }
 
 // 5. Запомни число
@@ -231,7 +231,7 @@ class Memory extends Base {
     for (const p of this.alive) results[p] = { answer: this.moves[p]?.answer ?? '', ok: this.moves[p]?.answer === n, ms: this.moves[p]?.ms ?? null };
     return { eliminated, replay: false, reveal: { number: n, results } };
   }
-  revealMs() { return 12000; }
+  revealMs() { return 6000; }
 }
 
 // 6. Центр
@@ -284,7 +284,7 @@ class Center extends Base {
     for (const p of this.alive) results[p] = { point: this.moves[p] ?? null, dist: Number.isFinite(dist(p)) ? dist(p) : null };
     return { eliminated, replay: false, reveal: { center: [cx, cy], results } };
   }
-  revealMs() { return 12000; }
+  revealMs() { return 6000; }
 }
 
 // 7. Уникальное число
@@ -313,7 +313,7 @@ class Unique extends Base {
   }
   // двое оставшихся проходят оба; чисел не хватает на всех — испытание окончено
   over() { return this.alive.length <= 2 || this.pool.length < this.alive.length; }
-  revealMs() { return 12000; }
+  revealMs() { return 8000; }
 }
 
 
@@ -355,7 +355,7 @@ class Shoot extends Base {
     return { eliminated, replay, reveal: { pos, marks, hits, zone: this.zone, radius: this.radius } };
   }
   over() { return this.alive.length <= 1 || this.round >= 15; } // 15 раундов без развязки — оставшиеся проходят
-  revealMs() { return 10500; }
+  revealMs() { return 6500; }
 }
 
 // 9. Бомба: у кого бомба в момент взрыва — выбывает. Фитиль 4–25 с, никто его не видит.
@@ -386,7 +386,7 @@ class Bomb extends Base {
     return [{ id: this.holder, ms: 1100 + rnd(2600), move: () => ({ to: pick(this.alive.filter((x) => x !== this.holder)) }) }];
   }
   resolve() { return { eliminated: [this.holder], replay: false, reveal: { holder: this.holder, passes: this.passes } }; }
-  revealMs() { return 10500; }
+  revealMs() { return 5000; }
 }
 
 // 10. Очко (как блэкджек): 2 карты, «ещё»/«хватит», туз 1 или 11, картинки по 10, дилер добирает до 17.
@@ -445,7 +445,7 @@ class Cards extends Base {
     return { eliminated, replay: false, reveal: { dealer: this.dealer, dealerValue: d, results: res } };
   }
   over() { return this.alive.length <= 1 || this.round >= 12; }
-  revealMs() { return 12500; }
+  revealMs() { return 8500; }
 }
 
 // 11. Русская рулетка: барабан на 6, в раунде N — N патронов (максимум 5). Ходят по кругу, каждый крутит и жмёт.
@@ -486,7 +486,7 @@ class Roulette extends Base {
     return [{ id: this.current, ms: 1600 + rnd(1600), move: () => ({ pick: pick(this.free()) }) }];
   }
   resolve() { return { eliminated: this.loser ? [this.loser] : [], replay: false, reveal: { loser: this.loser, taken: this.taken, live: [...this.liveSet] } }; }
-  revealMs() { return 10500; }
+  revealMs() { return 5500; }
 }
 
 const CLASSES = { lastcell: LastCell, doors: Doors, time: StopTime, mines: Mines, memory: Memory, center: Center, unique: Unique, shoot: Shoot, bomb: Bomb, cards: Cards, roulette: Roulette };

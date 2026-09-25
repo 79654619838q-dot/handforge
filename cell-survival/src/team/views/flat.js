@@ -2,7 +2,6 @@
 // Сцена — задник темы, всё управление — HTML/canvas поверх.
 import { t } from '../../i18n.js';
 import { BaseView, backdropWorld, confirmBox } from './common.js';
-import { Cinematic } from '../../scene/cinematics.js';
 import { wait } from '../../scene/tween.js';
 import { esc } from '../MatchView.js';
 
@@ -32,14 +31,11 @@ export class FlatView extends BaseView {
   async playOut(st) {
     const out = st.reveal?.replay ? [] : st.reveal?.eliminated || [];
     if (!out.length) { this.render(st); return; }
+    // Отдельной сцены выбывания больше нет (оператор 25.09: давала лаги) — итог раунда и надпись о выбывших.
     this.fxBusy = true;
-    if (this.holdSec) { this.render(st); await wait(this.holdSec); }
-    this.el.innerHTML = '';
-    this.cine?.dispose();
-    this.cine = new Cinematic(this.world, this.audio, this.mv.el);
-    const players = out.map((id) => { const info = st.players.find((p) => p.id === id); return { profile: { ...info?.profile, name: info?.name } }; });
-    try { await this.cine.play(st.cid, players, this.cineInfo(st, out)); } catch (e) { console.error(e); }
-    this.cine.release();
+    this.render(st);
+    this.audio.destroy?.();
+    if (this.holdSec) await wait(this.holdSec);
     this.mv.showOut();
     this.fxBusy = false;
     if (this.mv.st?.phase === 'reveal') this.render(this.mv.st);
