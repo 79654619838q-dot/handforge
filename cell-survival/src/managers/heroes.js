@@ -2,12 +2,13 @@
 // Герой = реалистичный человек Rocketbox + костюм (перекраска + отделка) + снаряжение + эффект силы.
 // Всё снаряжение пристёгивается к костям и движется вместе с живыми движениями.
 import * as THREE from 'three';
+import { addArmor } from './armor.js';
 
 export const HEROES = [
   { id: 'forge', ru: 'Горн', en: 'Forge', tag: { ru: 'Кузнец из раскалённой стали', en: 'Molten steel smith' }, person: 'Military_Male_01', gender: 'male',
-    suit: '#2a2622', finish: 'armor', glow: '#ff7a1a', emblem: 'anvil', head: 'none', eyes: '#ffa040', extra: ['bracers'], aura: 'rise' },
+    suit: '#2a2622', finish: 'armor', glow: '#ff7a1a', emblem: 'anvil', head: 'none', eyes: '#ffa040', aura: 'rise' },
   { id: 'volta', ru: 'Вольта', en: 'Volta', tag: { ru: 'Живая молния', en: 'Living lightning' }, person: 'Sports_Female_02', gender: 'female',
-    suit: '#14203a', finish: 'glossy', glow: '#4ad8ff', emblem: 'bolt', head: 'visor', extra: ['bracers'], aura: 'spark' },
+    suit: '#14203a', finish: 'glossy', glow: '#4ad8ff', emblem: 'bolt', head: 'visor', aura: 'spark' },
   { id: 'kronos', ru: 'Кронос', en: 'Kronos', tag: { ru: 'Хозяин времени', en: 'Master of time' }, person: 'Business_Male_05', gender: 'male',
     suit: '#141210', finish: 'glossy', glow: '#f2c14e', emblem: 'hourglass', head: 'none', eyes: '#ffd76a', cape: '#1a1408', extra: ['halo'], aura: 'mist' },
   { id: 'abyss', ru: 'Бездна', en: 'Abyss', tag: { ru: 'Тьма, что поглощает свет', en: 'Darkness that eats light' }, person: 'Male_Adult_17', gender: 'male',
@@ -17,7 +18,7 @@ export const HEROES = [
   { id: 'phoenix', ru: 'Феникс', en: 'Phoenix', tag: { ru: 'Возрождается из пламени', en: 'Reborn from flame' }, person: 'Female_Adult_04', gender: 'female',
     suit: '#6b0f14', finish: 'glossy', glow: '#ff5a1a', emblem: 'bird', head: 'none', eyes: '#ffb040', extra: ['wings'], aura: 'fire' },
   { id: 'bastion', ru: 'Бастион', en: 'Bastion', tag: { ru: 'Непробиваемая крепость', en: 'Unbreakable fortress' }, person: 'Military_Female_01', gender: 'female',
-    suit: '#3a3f45', finish: 'armor', glow: '#ff2a2a', emblem: 'shield', head: 'helmet', extra: ['shoulders'], aura: 'none' },
+    suit: '#3a3f45', finish: 'armor', glow: '#ff2a2a', emblem: 'shield', head: 'helmet', aura: 'none' },
   { id: 'neuron', ru: 'Нейрон', en: 'Neuron', tag: { ru: 'Разум, управляющий машинами', en: 'Mind over machines' }, person: 'Male_Adult_10', gender: 'male',
     suit: '#0f3a3c', finish: 'glossy', glow: '#3dffd8', emblem: 'hex', head: 'visor', extra: ['drones'], aura: 'none' },
   { id: 'graviton', ru: 'Гравитон', en: 'Graviton', tag: { ru: 'Сгибает притяжение', en: 'Bends gravity' }, person: 'Female_Adult_12', gender: 'female',
@@ -27,8 +28,10 @@ export const HEROES = [
   { id: 'phantom', ru: 'Призрак', en: 'Phantom', tag: { ru: 'Проходит сквозь стены', en: 'Walks through walls' }, person: 'Male_Adult_04', gender: 'male',
     suit: '#5a6068', finish: 'cloth', glow: '#cfe6ff', emblem: 'crescent', head: 'mask', maskColor: '#e8eef4', ghost: true, aura: 'smoke' },
   { id: 'mirage', ru: 'Мираж', en: 'Mirage', tag: { ru: 'Обман зрения во плоти', en: 'Illusion made flesh' }, person: 'Business_Female_02', gender: 'female',
-    suit: '#2a1040', finish: 'glossy', glow: '#ff4fd8', emblem: 'eye', head: 'mask', maskColor: '#3a0f52', extra: ['bracers'], aura: 'mist' },
+    suit: '#2a1040', finish: 'glossy', glow: '#ff4fd8', emblem: 'eye', head: 'mask', maskColor: '#3a0f52', aura: 'mist' },
 ];
+// полный профиль игрока-героя: тело Rocketbox и пол берутся у героя
+export const heroProfile = (id) => { const h = HEROES.find((x) => x.id === id) || HEROES[0]; return { hero: h.id, person: h.person, gender: h.gender, background: 'violet' }; };
 export const heroOf = (p) => (p?.hero && p.hero !== 'none' ? HEROES.find((h) => h.id === p.hero) : null);
 
 // ---------- Эмблемы: рисуются на холсте, светятся (попадают в свечение bloom) ----------
@@ -116,6 +119,7 @@ export function applyHero(hero, root, person) {
   const fx = [];
   const glow = new THREE.Color(hero.glow);
   finishSuit(hero, person);
+  const armor = addArmor(hero.id, person); // броня по арту (armor.js)
   const hp = wp(head);
 
   // эмблема на груди: точку груди ищем лучом по самой модели (у всех разная фигура)
@@ -124,6 +128,7 @@ export function applyHero(hero, root, person) {
     const ray = new THREE.Raycaster(c.clone().addScaledVector(fwd, 0.6), fwd.clone().negate(), 0, 0.6);
     const meshes = []; person.traverse((o) => { if (o.isSkinnedMesh) meshes.push(o); });
     const hit = ray.intersectObjects(meshes, false)[0];
+    if (armor?.chestFront) return armor.chestFront; // эмблема — поверх нагрудника
     return hit ? hit.point.addScaledVector(fwd, 0.012) : c.addScaledVector(fwd, 0.14);
   })();
   mount(spine2, chestAt, (g) => {

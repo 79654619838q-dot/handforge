@@ -562,7 +562,7 @@ export const BACKGROUNDS = {
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 export function randomProfile(name = '') {
-  if (Math.random() < 0.7) { const hr = pick(HEROES); return { name, gender: hr.gender, person: hr.person, hero: hr.id, background: pick(CATALOG.background) }; }
+  { const hr = pick(HEROES); return { name, gender: hr.gender, person: hr.person, hero: hr.id, background: 'violet' }; } // только герои (26.09)
   const gender = pick(CATALOG.gender);
   const person = pick(PEOPLE.filter((x) => x.gender === gender)).id;
   const male = gender === 'male';

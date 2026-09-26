@@ -300,7 +300,7 @@
 
 /* Секундомер «Останови время» */
 .tm-watch { width: 150px; height: 150px; margin: 0 auto 6px; background: var(--img-stopwatch) center/contain no-repeat; filter: drop-shadow(0 10px 24px rgba(0,0,0,.6)) drop-shadow(0 0 18px rgba(217,178,95,.25)); }
-.tm-watch.run { animation: beat 1s infinite; }
+/* секундомер неподвижен: пульс раз в секунду подсказывал время (оператор 26.09) */
 @media (max-width: 760px) { .tm-watch { width: 96px; height: 96px; } }
 @media (max-height: 500px) and (orientation: landscape) { .tm-watch { display: none; } }
 /* Финал матча: фон — пьедестал в золотом свете; корона над победителем */

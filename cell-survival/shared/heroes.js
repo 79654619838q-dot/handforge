@@ -11,7 +11,11 @@ export const HERO_BOTS = [
 // бот-герой, которого ещё нет среди занятых имён
 export function pickHeroBot(usedNames = new Set()) {
   const free = HERO_BOTS.filter(([, name]) => !usedNames.has(name));
-  if (!free.length) return null;
-  const [hero, name, person, gender] = free[Math.floor(Math.random() * free.length)];
+  // героев 12; если ботов больше — герои повторяются с номером («Горн II»)
+  const pool = free.length ? free : HERO_BOTS;
+  const [hero, base, person, gender] = pool[Math.floor(Math.random() * pool.length)];
+  let name = base;
+  const ROMAN = ['', '', 'II', 'III', 'IV', 'V', 'VI'];
+  for (let k = 2; usedNames.has(name); k++) name = base + ' ' + (ROMAN[k] || k);
   return { name, profile: { hero, person, gender, background: 'violet' } };
 }

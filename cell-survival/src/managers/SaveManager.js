@@ -1,3 +1,4 @@
+import { randomProfile } from './AvatarManager.js';
 // Локальное сохранение. Весь доступ к хранилищу — только здесь,
 // чтобы потом заменить localStorage на сервер без правок остального кода.
 const KEY = 'cellsurvival.save.v1';
@@ -43,7 +44,12 @@ export class SaveManager {
     try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch { /* приватное окно — игра работает без сохранения */ }
   }
 
-  get profile() { return this.data.profile; }
+  // только герои (26.09): старый профиль обычного человека получает случайного героя, имя остаётся
+  get profile() {
+    const p = this.data.profile;
+    if (p && !(p.hero && p.hero !== 'none')) { Object.assign(p, randomProfile(p.name)); p.name = p.name || ''; this.save(); }
+    return p;
+  }
   setProfile(p) { this.data.profile = p; this.save(); }
 
   get settings() { return this.data.settings; }
