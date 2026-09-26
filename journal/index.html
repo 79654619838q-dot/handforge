@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101713">
+<link rel="icon" href="cover.svg" type="image/svg+xml">
+<title>Журнал покерной сессии</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#EEF2EF; --panel:#FFFFFF; --ink:#15201A; --muted:#63726A; --line:#D5DDD8;
+  --felt:#1D5E43; --felt-ink:#FFFFFF; --win:#17804B; --loss:#C23A33; --fold:#7A857F;
+  --win-bg:#E3F3EA; --loss-bg:#FBE7E5; --chip:#E6ECE8;
+  --card:#FFFFFF; --red:#C8322B;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#101713; --panel:#18221C; --ink:#E7EEE9; --muted:#93A399; --line:#2A3830;
+    --felt:#2F8A62; --felt-ink:#FFFFFF; --win:#4CC486; --loss:#F0716A; --fold:#8C988F;
+    --win-bg:#173427; --loss-bg:#3A1C1B; --chip:#223029;
+    --card:#233029; --red:#FF7F75;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#101713; --panel:#18221C; --ink:#E7EEE9; --muted:#93A399; --line:#2A3830;
+  --felt:#2F8A62; --felt-ink:#FFFFFF; --win:#4CC486; --loss:#F0716A; --fold:#8C988F;
+  --win-bg:#173427; --loss-bg:#3A1C1B; --chip:#223029;
+  --card:#233029; --red:#FF7F75;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,sans-serif;padding-inline:max(16px, env(safe-area-inset-left, 0px));padding-block:calc(16px + env(safe-area-inset-top, 0px)) calc(40px + env(safe-area-inset-bottom, 0px));-webkit-text-size-adjust:100%}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.num{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible{outline:2px solid var(--felt);outline-offset:2px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+h1{font:600 26px/1.1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.02em;margin:0;text-transform:uppercase}
+.sub{color:var(--muted);font-size:13px}
+.hbtns{display:flex;gap:8px}
+.ghost{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:14px}
+.ghost.warn{border-color:var(--loss);color:var(--loss)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.example{background:var(--chip);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted)}
+.example[hidden]{display:none}
+.total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.total .big{font-size:56px;font-weight:700;line-height:1}
+.lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat b{font:600 22px/1 "Barlow Condensed","Arial Narrow",sans-serif;font-variant-numeric:tabular-nums}
+.extra{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--muted)}
+.extra span b{color:var(--ink);font-weight:600}
+svg.chart{display:block;width:100%;height:110px;margin-top:14px}
+.pos{color:var(--win)} .neg{color:var(--loss)} .zero{color:var(--fold)}
+
+.entry{display:flex;flex-direction:column;gap:12px}
+.amt{display:flex;align-items:center;gap:10px}
+.amt input{flex:1;min-width:0;font:600 34px/1 "Barlow Condensed","Arial Narrow",sans-serif;font-variant-numeric:tabular-nums;
+  padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+.clear{padding:10px 12px;border-radius:10px;background:var(--chip);font-size:14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{padding:6px 10px;border-radius:999px;background:var(--chip);font:600 16px/1 "Barlow Condensed","Arial Narrow",sans-serif}
+.note{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;width:100%}
+.acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.acts button{padding:16px 6px;border-radius:10px;font:700 22px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.04em;text-transform:uppercase}
+.b-fold{background:var(--chip);color:var(--ink)}
+.b-loss{background:var(--loss);color:#fff}
+.b-win{background:var(--win);color:#fff}
+.acts button:active{transform:translateY(1px)}
+.msg{min-height:20px;font-size:13px;color:var(--muted)}
+.row2{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+
+.list{display:flex;flex-direction:column}
+.hand{display:grid;grid-template-columns:44px 1fr auto auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.hand:first-child{border-top:0}
+.hand .n{color:var(--muted);font-size:18px}
+.hand .res{font-size:22px;font-weight:600}
+.hand .bal{color:var(--muted);font-size:13px;text-align:right}
+.hand .nt{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.w{background:var(--win-bg);color:var(--win)} .pill.l{background:var(--loss-bg);color:var(--loss)} .pill.f{background:var(--chip);color:var(--fold)}
+.del{width:32px;height:32px;border-radius:8px;color:var(--muted);font-size:18px}
+.del.armed{width:auto;padding:0 8px;background:var(--loss);color:#fff;font-size:12px}
+.empty{color:var(--muted);text-align:center;padding:12px 0}
+h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px}
+.sess{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.sess:first-of-type{border-top:0}
+.sess .res{font-size:22px;font-weight:600}
+.myhand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pc{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:38px;height:52px;border-radius:6px;
+  background:var(--card);border:1px solid var(--line);font:700 20px/1 "Barlow Condensed","Arial Narrow",sans-serif;color:var(--ink)}
+.pc i{font-style:normal;font-size:17px;line-height:1}
+.pc.r{color:var(--red)}
+.pc.sm{width:auto;height:auto;flex-direction:row;gap:1px;padding:2px 5px;font-size:16px;border-radius:4px;vertical-align:middle}
+.pc.sm i{font-size:13px}
+.deck{display:flex;flex-direction:column;gap:10px}
+.slots{display:flex;gap:10px}
+.slot{display:flex;align-items:center;justify-content:center;width:72px;height:100px;padding:0;border-radius:10px;border:2px dashed var(--line);background:var(--bg);font-size:13px;line-height:1.2;color:var(--muted);text-align:center}
+.slot.full{border-style:solid;background:var(--card)}
+.slot .pc{width:auto;height:auto;border:0;background:none;font-size:36px;gap:2px}
+.slot .pc i{font-size:30px}
+.slot.cur{border-color:var(--felt);border-style:solid;box-shadow:0 0 0 2px var(--felt)}
+.step{font-size:14px;color:var(--muted)}
+.suits{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.suits button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:96px;border-radius:12px;background:var(--card);border:1px solid var(--line);color:var(--ink);font-size:15px}
+.suits button b{font-size:46px;line-height:1;font-weight:400}
+.suits button.r{color:var(--red)}
+.ranks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ranks button{min-height:60px;border-radius:10px;background:var(--card);border:1px solid var(--line);color:var(--ink);font:700 28px/1 "Barlow Condensed","Arial Narrow",sans-serif;min-width:0}
+.ranks.r button{color:var(--red)}
+.ranks button:disabled{opacity:.25;cursor:default}
+.ranks button.back{font:500 15px/1.2 "IBM Plex Sans",system-ui,sans-serif;color:var(--muted);background:var(--chip)}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--loss-bg);border-radius:10px;padding:10px 12px;font-size:14px}
+@media (max-width:420px){ .total .big{font-size:46px} .stats{grid-template-columns:repeat(2,1fr)} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Покерная сессия</h1>
+      <div class="sub" id="sessInfo"></div>
+    </div>
+    <div class="hbtns">
+      <button class="ghost" id="btnHist">Прошлые сессии</button>
+      <button class="ghost" id="btnEnd">Завершить</button>
+    </div>
+  </header>
+
+  <div class="confirm" id="confirmEnd" hidden>
+    <span>Завершить сессию и сохранить в историю?</span>
+    <button class="ghost warn" id="endYes">Да, завершить</button>
+    <button class="ghost" id="endNo">Отмена</button>
+  </div>
+
+  <div class="example" id="exampleNote" hidden>Сейчас показан пример. Первая введённая раздача уберёт его и начнёт вашу сессию.</div>
+
+  <section class="panel">
+    <div class="total">
+      <div>
+        <div class="lbl">Итог сессии</div>
+        <div class="big num" id="total">0</div>
+      </div>
+      <div style="text-align:right">
+        <div class="lbl">Раздач</div>
+        <div class="num" style="font-size:34px;font-weight:600;line-height:1" id="hands">0</div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="lbl">Выиграл</span><b class="pos" id="sWin">0</b></div>
+      <div class="stat"><span class="lbl">Проиграл</span><b class="neg" id="sLoss">0</b></div>
+      <div class="stat"><span class="lbl">Пас</span><b class="zero" id="sFold">0</b></div>
+      <div class="stat"><span class="lbl">Играл</span><b id="sPlay">0%</b></div>
+    </div>
+    <div class="extra">
+      <span>Лучшая: <b id="xBest">—</b></span>
+      <span>Худшая: <b id="xWorst">—</b></span>
+      <span>Время: <b id="xTime">—</b></span>
+    </div>
+    <svg class="chart" id="chart" viewBox="0 0 500 110" preserveAspectRatio="none" aria-label="График баланса по раздачам"></svg>
+  </section>
+
+  <section class="panel entry">
+    <div class="lbl" id="nextLbl">Раздача №1</div>
+    <div class="myhand">
+      <div class="slots">
+        <button type="button" class="slot" id="slot0" data-slot="0"></button>
+        <button type="button" class="slot" id="slot1" data-slot="1"></button>
+      </div>
+      <button type="button" class="ghost" id="btnCardsClr">Сбросить карты</button>
+    </div>
+    <div class="deck" id="deck" hidden></div>
+    <div class="amt">
+      <input id="amount" class="num" inputmode="decimal" autocomplete="off" placeholder="Сумма">
+      <button class="clear" id="btnClr">Стереть</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <input id="note" class="note" autocomplete="off" placeholder="Заметка (необязательно): AK против QQ, блеф на ривере…">
+    <div class="acts">
+      <button class="b-fold" id="bFold">Пас</button>
+      <button class="b-loss" id="bLoss">− Минус</button>
+      <button class="b-win" id="bWin">+ Плюс</button>
+    </div>
+    <div class="row2">
+      <div class="msg" id="msg"></div>
+      <div style="display:flex;gap:8px">
+        <button class="ghost" id="btnUndo">Отменить последнюю</button>
+        <button class="ghost" id="btnCopy">Копировать отчёт</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Раздачи</h2>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section class="panel" id="histPanel" hidden>
+    <h2>Прошлые сессии</h2>
+    <div class="sub" id="histTotal" style="margin-bottom:8px"></div>
+    <div id="hist"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var KEY = 'poker-session-journal-v1';
+  var fmt = new Intl.NumberFormat('ru-RU');
+  function $(id){ return document.getElementById(id); }
+  function signed(v){ return v > 0 ? '+' + fmt.format(v) : v < 0 ? '−' + fmt.format(-v) : '0'; }
+  function cls(v){ return v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero'; }
+  function now(){ return Date.now(); }
+
+  function example(){
+    var r = [0,0,1500,0,-800,0,0,-2400,0,4200,0,0,-600,0,0,2750,0,-1200,0,0];
+    var t0 = now() - 55*60000;
+    return { id: 'ex', start: t0, example: true,
+      hands: r.map(function(v,i){ return { r: v, cards: i===9 ? ["Ah","Ks"] : i===7 ? ["Jc","Jd"] : [], note: i===9 ? 'AK, выиграл против QQ' : '', t: t0 + i*160000 }; }) };
+  }
+  function fresh(){ return { id: String(now()), start: now(), hands: [] }; }
+
+  var state;
+  try { state = JSON.parse(localStorage.getItem(KEY)); } catch(e) { state = null; }
+  if (!state || !state.current) state = { current: example(), history: [] };
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} }
+
+  function sum(hs){ return hs.reduce(function(a,h){ return a + h.r; }, 0); }
+  function dur(ms){
+    var m = Math.max(0, Math.round(ms/60000)), h = Math.floor(m/60);
+    return h ? h + ' ч ' + (m%60) + ' мин' : m + ' мин';
+  }
+  function dt(t){ return new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+
+  function readAmount(){
+    var s = $('amount').value.replace(/\s/g,'').replace(',', '.').replace(/[^\d.]/g,'');
+    var v = parseFloat(s);
+    return isFinite(v) ? Math.round(v*100)/100 : NaN;
+  }
+
+  function flash(t){ $('msg').textContent = t; }
+
+  // --- карты руки ---
+  var RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+  var SUITS = [['s','♠'],['h','♥'],['d','♦'],['c','♣']];
+  var SYM = { s:'♠', h:'♥', d:'♦', c:'♣' };
+  var SUITNAME = { s:'Пики', h:'Червы', d:'Бубны', c:'Трефы' };
+  var picked = [null, null];   // две карты руки
+  var slot = 0, suit = null;   // какую карту выбираем и выбранная масть
+  function rankTxt(r){ return r === 'T' ? '10' : r; }
+  function isRed(c){ return c[1] === 'h' || c[1] === 'd'; }
+  function cardHtml(c, small){
+    return '<span class="pc' + (small ? ' sm' : '') + (isRed(c) ? ' r' : '') + '">' + rankTxt(c[0]) + '<i>' + SYM[c[1]] + '</i></span>';
+  }
+  function cardsTxt(cs){ return (cs || []).map(function(c){ return rankTxt(c[0]) + SYM[c[1]]; }).join(' '); }
+  function pickedList(){ return picked.filter(Boolean); }
+  var open = false;             // открыт ли выбор карты
+  function renderPicked(){
+    [0,1].forEach(function(i){
+      var el = $('slot' + i);
+      el.innerHTML = picked[i] ? cardHtml(picked[i]) : 'Карта ' + (i+1) + '<br>нажмите';
+      el.className = 'slot' + (picked[i] ? ' full' : '') + (open && i === slot ? ' cur' : '');
+      el.setAttribute('aria-label', picked[i] ? 'Карта ' + (i+1) + ': ' + cardsTxt([picked[i]]) + ', нажмите чтобы изменить' : 'Выбрать карту ' + (i+1));
+    });
+    $('btnCardsClr').hidden = !pickedList().length;
+    $('deck').hidden = !open;
+    if (open) renderDeck();
+  }
+  function renderDeck(){
+    var html;
+    if (!suit){
+      html = '<div class="step">Карта ' + (slot+1) + ': выберите масть</div><div class="suits">' +
+        SUITS.map(function(x){
+          return '<button type="button" data-suit="' + x[0] + '" class="' + (x[0]==='h'||x[0]==='d' ? 'r' : '') + '"><b>' + x[1] + '</b>' + SUITNAME[x[0]] + '</button>';
+        }).join('') + '</div>';
+    } else {
+      var other = picked[1 - slot];
+      html = '<div class="step">Карта ' + (slot+1) + ', ' + SUITNAME[suit].toLowerCase() + ' ' + SYM[suit] + ': выберите номинал</div>' +
+        '<div class="ranks' + (suit==='h'||suit==='d' ? ' r' : '') + '">' +
+        RANKS.map(function(r){
+          var c = r + suit;
+          return '<button type="button" data-c="' + c + '"' + (c === other ? ' disabled' : '') + '>' + rankTxt(r) + SYM[suit] + '</button>';
+        }).join('') + '<button type="button" class="back" data-back="1">← Масть</button></div>';
+    }
+    $('deck').innerHTML = html;
+  }
+  function resetPicker(){ picked = [null, null]; slot = 0; suit = null; open = false; }
+  function onSlot(){
+    var i = +this.dataset.slot;
+    if (open && slot === i){ open = false; }        // повторное нажатие закрывает выбор
+    else { open = true; slot = i; suit = null; }
+    renderPicked();
+  }
+  $('slot0').onclick = onSlot; $('slot1').onclick = onSlot;
+  $('btnCardsClr').onclick = function(){ resetPicker(); renderPicked(); };
+  $('deck').onclick = function(e){
+    var b = e.target.closest('button'); if (!b || b.disabled) return;
+    if (b.dataset.back){ suit = null; }
+    else if (b.dataset.suit){ suit = b.dataset.suit; }
+    else if (b.dataset.c){ picked[slot] = b.dataset.c; suit = null; open = false; }
+    renderPicked();
+  };
+
+  function add(sign){
+    var v = 0;
+    if (sign !== 0){
+      v = readAmount();
+      if (!(v > 0)){ flash('Введите сумму, потом нажмите плюс или минус.'); $('amount').focus(); return; }
+      v = sign * v;
+    }
+    if (state.current.example){ state.current = fresh(); }
+    state.current.hands.push({ r: v, cards: pickedList(), note: $('note').value.trim(), t: now() });
+    var ct = cardsTxt(pickedList());
+    $('amount').value = ''; $('note').value = '';
+    resetPicker(); renderPicked();
+    save(); render();
+    var n = state.current.hands.length;
+    flash('Раздача №' + n + (ct ? ' (' + ct + ')' : '') + ': ' + (v === 0 ? 'пас' : signed(v)));
+  }
+
+  function drawChart(hs){
+    var svg = $('chart'), W = 500, H = 110, pad = 8;
+    var pts = [0], b = 0;
+    hs.forEach(function(h){ b += h.r; pts.push(b); });
+    var mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts);
+    if (mn === mx){ mn -= 1; mx += 1; }
+    var x = function(i){ return pts.length < 2 ? 0 : i * W / (pts.length - 1); };
+    var y = function(v){ return pad + (mx - v) * (H - 2*pad) / (mx - mn); };
+    var line = pts.map(function(v,i){ return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); }).join(' ');
+    var y0 = y(0).toFixed(1);
+    var last = pts[pts.length-1];
+    var col = last > 0 ? 'var(--win)' : last < 0 ? 'var(--loss)' : 'var(--fold)';
+    svg.innerHTML =
+      '<line x1="0" x2="' + W + '" y1="' + y0 + '" y2="' + y0 + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>' +
+      (pts.length > 1 ? '<path d="' + line + ' L' + W + ' ' + y0 + ' L0 ' + y0 + ' Z" fill="' + col + '" fill-opacity=".12"/>' +
+      '<path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>' : '');
+  }
+
+  var armed = null;
+  function renderList(hs){
+    var el = $('list');
+    if (!hs.length){ el.innerHTML = '<div class="empty">Раздач пока нет. Введите первую выше.</div>'; return; }
+    var bal = [], b = 0;
+    hs.forEach(function(h){ b += h.r; bal.push(b); });
+    var html = '';
+    for (var i = hs.length - 1; i >= 0; i--){
+      var h = hs[i];
+      var pill = h.r > 0 ? '<span class="pill w">плюс</span>' : h.r < 0 ? '<span class="pill l">минус</span>' : '<span class="pill f">пас</span>';
+      html += '<div class="hand">' +
+        '<span class="n num">№' + (i+1) + '</span>' +
+        '<div><div>' + (h.cards && h.cards.length ? h.cards.map(function(c){ return cardHtml(c, true); }).join(' ') + ' ' : '') + (h.r === 0 ? pill : '<span class="res num ' + cls(h.r) + '">' + signed(h.r) + '</span> ' + pill) + '</div>' +
+          (h.note ? '<div class="nt"></div>' : '') + '</div>' +
+        '<span class="bal num">итог ' + signed(bal[i]) + '</span>' +
+        '<button class="del' + (armed === i ? ' armed' : '') + '" data-i="' + i + '" aria-label="Удалить раздачу ' + (i+1) + '">' + (armed === i ? 'Удалить?' : '×') + '</button>' +
+      '</div>';
+    }
+    el.innerHTML = html;
+    // заметки вставляем как текст
+    var notes = el.querySelectorAll('.hand'), k = 0;
+    for (var j = hs.length - 1; j >= 0; j--, k++){
+      if (hs[j].note){ notes[k].querySelector('.nt').textContent = hs[j].note; }
+    }
+  }
+
+  function renderHist(){
+    var h = state.history;
+    var tot = sum(h.map(function(s){ return { r: sum(s.hands) }; }));
+    $('histTotal').innerHTML = h.length ? 'Всего сессий: ' + h.length + ' · общий итог: <b class="num ' + cls(tot) + '" style="font-size:18px">' + signed(tot) + '</b>' : '';
+    if (!h.length){ $('hist').innerHTML = '<div class="empty">Завершённых сессий пока нет.</div>'; return; }
+    $('hist').innerHTML = h.slice().reverse().map(function(s){
+      var t = sum(s.hands);
+      return '<div class="sess"><div><div>' + dt(s.start) + '</div><div class="sub">' + s.hands.length + ' раздач · ' + dur((s.end||s.start) - s.start) + '</div></div>' +
+        '<span class="res num ' + cls(t) + '">' + signed(t) + '</span>' +
+        '<button class="del" data-sid="' + s.id + '" aria-label="Удалить сессию">×</button></div>';
+    }).join('');
+  }
+
+  function render(){
+    var c = state.current, hs = c.hands;
+    var t = sum(hs);
+    var wins = hs.filter(function(h){ return h.r > 0; }), losses = hs.filter(function(h){ return h.r < 0; });
+    var folds = hs.length - wins.length - losses.length;
+    $('total').textContent = signed(t); $('total').className = 'big num ' + cls(t);
+    $('hands').textContent = hs.length;
+    $('sWin').textContent = wins.length; $('sLoss').textContent = losses.length; $('sFold').textContent = folds;
+    $('sPlay').textContent = hs.length ? Math.round((wins.length + losses.length) * 100 / hs.length) + '%' : '0%';
+    var best = wins.length ? Math.max.apply(null, wins.map(function(h){ return h.r; })) : null;
+    var worst = losses.length ? Math.min.apply(null, losses.map(function(h){ return h.r; })) : null;
+    $('xBest').textContent = best === null ? '—' : signed(best); $('xBest').className = best === null ? '' : 'pos';
+    $('xWorst').textContent = worst === null ? '—' : signed(worst); $('xWorst').className = worst === null ? '' : 'neg';
+    var last = hs.length ? hs[hs.length-1].t : c.start;
+    $('xTime').textContent = hs.length ? dur(Math.max(last, now()) - c.start) : '—';
+    $('sessInfo').textContent = (c.example ? 'Пример · ' : 'Начата ') + dt(c.start);
+    $('exampleNote').hidden = !c.example;
+    $('nextLbl').textContent = 'Раздача №' + (c.example ? 1 : hs.length + 1);
+    drawChart(hs); renderList(hs); renderHist();
+  }
+
+  // кнопки быстрых сумм добавляют к полю
+  [100, 500, 1000, 5000, 10000].forEach(function(v){
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = '+' + fmt.format(v);
+    b.onclick = function(){ var cur = readAmount(); $('amount').value = fmt.format((isFinite(cur) ? cur : 0) + v); };
+    $('chips').appendChild(b);
+  });
+
+  $('bFold').onclick = function(){ add(0); };
+  $('bWin').onclick = function(){ add(1); };
+  $('bLoss').onclick = function(){ add(-1); };
+  $('btnClr').onclick = function(){ $('amount').value = ''; $('amount').focus(); };
+  $('btnUndo').onclick = function(){
+    var c = state.current;
+    if (c.example || !c.hands.length){ flash('Отменять нечего.'); return; }
+    var h = c.hands.pop(); save(); render();
+    flash('Отменена раздача №' + (c.hands.length + 1) + ' (' + (h.r === 0 ? 'пас' : signed(h.r)) + ')');
+  };
+  $('list').onclick = function(e){
+    var b = e.target.closest('.del'); if (!b) return;
+    var i = +b.dataset.i;
+    if (armed !== i){ armed = i; render(); return; }
+    armed = null;
+    if (state.current.example){ state.current = fresh(); }
+    else { state.current.hands.splice(i, 1); }
+    save(); render(); flash('Раздача удалена, номера пересчитаны.');
+  };
+  document.addEventListener('click', function(e){
+    if (armed !== null && !e.target.closest('#list .del')){ armed = null; render(); }
+  }, true);
+
+  $('btnEnd').onclick = function(){
+    if (state.current.example || !state.current.hands.length){ flash('В сессии ещё нет раздач.'); return; }
+    $('confirmEnd').hidden = false;
+  };
+  $('endNo').onclick = function(){ $('confirmEnd').hidden = true; };
+  $('endYes').onclick = function(){
+    var c = state.current; c.end = c.hands[c.hands.length-1].t;
+    state.history.push(c); state.current = fresh();
+    $('confirmEnd').hidden = true; $('histPanel').hidden = false;
+    save(); render(); flash('Сессия сохранена. Началась новая.');
+  };
+  $('btnHist').onclick = function(){ $('histPanel').hidden = !$('histPanel').hidden; if (!$('histPanel').hidden) $('histPanel').scrollIntoView({behavior:'smooth'}); };
+  var sArmed = null;
+  $('hist').onclick = function(e){
+    var b = e.target.closest('.del'); if (!b) return;
+    var id = b.dataset.sid;
+    if (sArmed !== id){ sArmed = id; b.classList.add('armed'); b.textContent = 'Удалить?'; return; }
+    sArmed = null;
+    state.history = state.history.filter(function(s){ return s.id !== id; });
+    save(); render();
+  };
+
+  $('btnCopy').onclick = function(){
+    var c = state.current, hs = c.hands, b = 0;
+    var lines = ['Покерная сессия ' + dt(c.start), 'Раздач: ' + hs.length + ', итог: ' + signed(sum(hs)), ''];
+    hs.forEach(function(h,i){ b += h.r; lines.push('№' + (i+1) + '  ' + (h.cards && h.cards.length ? cardsTxt(h.cards) + '  ' : '') + (h.r === 0 ? 'пас' : signed(h.r)) + '  (итог ' + signed(b) + ')' + (h.note ? '  ' + h.note : '')); });
+    var txt = lines.join('\n');
+    try {
+      navigator.clipboard.writeText(txt).then(function(){ flash('Отчёт скопирован.'); }, function(){ flash('Не удалось скопировать: браузер запретил доступ к буферу.'); });
+    } catch(e){ flash('Не удалось скопировать: браузер запретил доступ к буферу.'); }
+  };
+
+  $('amount').addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ e.preventDefault(); flash('Нажмите «+ Плюс» или «− Минус».'); }
+  });
+
+  renderPicked(); render();
+  setInterval(function(){ if (!state.current.example && state.current.hands.length) $('xTime').textContent = dur(now() - state.current.start); }, 30000);
+})();
+</script>
+
+</body>
+</html>

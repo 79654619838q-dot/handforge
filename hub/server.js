@@ -1,6 +1,7 @@
 // Единая точка входа под одну публичную ссылку. Ничего не переписывает изнутри
 // Poker и PhotoQuest — просто раскладывает трафик по путям: "/" — меню выбора,
-// "/poker" — HandForge Poker, "/quest" — PhotoQuest, "/cell" — Cell Survival, "/dressup" — «Наряди принцессу».
+// "/poker" — HandForge Poker, "/quest" — PhotoQuest, "/cell" — Cell Survival, "/dressup" — «Наряди принцессу»,
+// "/journal" — журнал покерной сессии.
 // PhotoQuest отдаёт готовую сборку (npm run build), Poker работает как обычно.
 
 import express from "express";
@@ -16,6 +17,7 @@ const QUEST_API_TARGET = process.env.QUEST_API_TARGET || "http://localhost:4000"
 const QUEST_DIST = path.join(__dirname, "..", "web", "dist");
 const CELL_DIST = path.join(__dirname, "..", "cell-survival", "dist");
 const DRESSUP_DIR = path.join(__dirname, "..", "dressup");
+const JOURNAL_DIR = path.join(__dirname, "..", "journal");
 
 const app = express();
 
@@ -103,6 +105,16 @@ app.use("/dressup", express.static(DRESSUP_DIR, {
   },
 }));
 
+// Журнал покерной сессии — одна статическая страница, данные только в браузере игрока.
+app.get("/journal", (req, res, next) => {
+  if (req.path === "/journal") return res.redirect(301, "/journal/");
+  next();
+});
+app.use("/journal", express.static(JOURNAL_DIR, {
+  index: "index.html",
+  setHeaders: (res) => res.setHeader("Cache-Control", "no-cache"),
+}));
+
 // PhotoQuest — SPA на React Router: любой путь внутри /quest отдаём одним
 // и тем же index.html, дальше маршрутизацией занимается сам React Router.
 app.get(["/quest", "/quest/*"], (_req, res) => {
@@ -116,6 +128,7 @@ const server = app.listen(PORT, () => {
   console.log(`  /quest   → ${QUEST_DIST}`);
   console.log(`  /cell    → ${CELL_DIST}`);
   console.log(`  /dressup → ${DRESSUP_DIR}`);
+  console.log(`  /journal → ${JOURNAL_DIR}`);
   console.log(`  /api     → ${QUEST_API_TARGET}`);
 });
 
