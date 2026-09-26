@@ -66,6 +66,11 @@ h1{overflow-wrap:anywhere}
 .pill.b{background:var(--chip);color:var(--felt)}
 .hand.buy .res{font-size:20px}
 .sess .nm{font-weight:600;overflow-wrap:anywhere}
+.sess{cursor:pointer;border-radius:8px}
+.sess:hover .nm{text-decoration:underline}
+.sess .go{color:var(--felt);font-size:13px;font-weight:600}
+.viewbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.b-back{padding:10px 16px;border-radius:10px;background:var(--felt);color:var(--felt-ink);font-weight:600;font-size:15px}
 .total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .total .big{font-size:56px;font-weight:700;line-height:1}
 .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
@@ -168,6 +173,12 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
     <button class="ghost" id="endNo">Отмена</button>
   </div>
 
+  <div class="viewbar" id="viewBar" hidden>
+    <button class="b-back" id="btnBack">← Назад</button>
+    <button class="ghost" id="btnCopyView">Копировать отчёт</button>
+    <span class="msg" id="viewMsg"></span>
+  </div>
+
   <div id="live" hidden>
     <section class="panel">
       <div class="total">
@@ -176,7 +187,7 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
           <div class="big num" id="total">0</div>
         </div>
         <div style="text-align:right">
-          <div class="lbl">Стек сейчас</div>
+          <div class="lbl" id="stackLbl">Стек сейчас</div>
           <div class="num stacknow" id="stackNow">0</div>
         </div>
       </div>
@@ -196,7 +207,7 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
       <svg class="chart" id="chart" viewBox="0 0 500 110" preserveAspectRatio="none" aria-label="График итога по раздачам"></svg>
     </section>
 
-    <section class="panel entry">
+    <section class="panel entry" id="entryPanel">
       <div class="lbl" id="nextLbl">Раздача №1</div>
       <div class="myhand">
         <div class="slots">
@@ -244,6 +255,9 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
       <h2>Раздачи</h2>
       <div class="list" id="list"></div>
     </section>
+    <div class="viewbar" id="viewBar2" hidden>
+      <button class="b-back" id="btnBack2">← Назад к сессиям</button>
+    </div>
   </div>
 
   <section class="panel" id="histPanel">
@@ -391,6 +405,8 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
   }
 
   // --- ребай и аддон ---
+  var viewing = null;   // id прошлой сессии, открытой для просмотра
+  function viewed(){ return viewing ? state.history.filter(function(s){ return s.id === viewing; })[0] || null : null; }
   var buyKind = null;
   function openBuy(kind){
     var c = state.current; if (!c) return;
@@ -441,13 +457,13 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
   }
 
   var armed = null;   // 'h3' или 'b1' — строка, ждущая подтверждения удаления
-  function renderList(c){
+  function renderList(c, ro){
     var el = $('list'), ev = events(c);
-    if (!ev.length){ el.innerHTML = '<div class="empty">Раздач пока нет. Введите первую выше.</div>'; return; }
+    if (!ev.length){ el.innerHTML = '<div class="empty">' + (ro ? 'В этой сессии не было раздач.' : 'Раздач пока нет. Введите первую выше.') + '</div>'; return; }
     var html = '';
     for (var k = ev.length - 1; k >= 0; k--){
       var e = ev[k], key = (e.type === 'hand' ? 'h' : 'b') + e.i, on = armed === key;
-      var del = '<button class="del' + (on ? ' armed' : '') + '" data-k="' + key + '" aria-label="Удалить">' + (on ? 'Удалить?' : '×') + '</button>';
+      var del = ro ? '<span></span>' : '<button class="del' + (on ? ' armed' : '') + '" data-k="' + key + '" aria-label="Удалить">' + (on ? 'Удалить?' : '×') + '</button>';
       if (e.type === 'buy'){
         html += '<div class="hand buy"><span class="n num">' + (e.b.kind === 'rebuy' ? 'RB' : 'AD') + '</span>' +
           '<div><span class="pill b">' + BUYNAME[e.b.kind].toLowerCase() + '</span> <span class="res num">' + fmt.format(e.b.amt) + '</span></div>' +
@@ -482,18 +498,21 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
       if (s.stack0) buys.push('старт ' + fmt.format(s.stack0));
       if (buyCount(s, 'rebuy')) buys.push('ребаев ' + buyCount(s, 'rebuy'));
       if (buyCount(s, 'addon')) buys.push('аддон ' + fmt.format(buySum(s, 'addon')));
-      return '<div class="sess"><div><div class="nm">' + esc(sessName(s)) + '</div>' +
+      return '<div class="sess" data-open="' + s.id + '" role="button" tabindex="0" aria-label="Открыть сессию ' + esc(sessName(s)) + '"><div><div class="nm">' + esc(sessName(s)) + '</div>' +
         '<div class="sub">' + dt(s.start) + ' · ' + nHands(s.hands.length) + ' · ' + dur((s.end||s.start) - s.start) + '</div>' +
-        (buys.length ? '<div class="sub">' + buys.join(' · ') + (s.stack0 || s.buys.length ? ' · в конце ' + money(stackNow(s)) : '') + '</div>' : '') + '</div>' +
+        (buys.length ? '<div class="sub">' + buys.join(' · ') + (s.stack0 || s.buys.length ? ' · в конце ' + money(stackNow(s)) : '') + '</div>' : '') +
+        '<div class="go">Открыть раздачи →</div></div>' +
         '<span class="res num ' + cls(t) + '">' + signed(t) + '</span>' +
         '<button class="del" data-sid="' + s.id + '" aria-label="Удалить сессию">×</button></div>';
     }).join('');
   }
 
   function render(){
-    var c = state.current;
-    $('startScr').hidden = !!c; $('live').hidden = !c; $('btnEnd').hidden = !c;
-    if (!c) $('confirmEnd').hidden = true;
+    var v = viewed(); if (!v) viewing = null;
+    var c = v || state.current;
+    $('viewBar').hidden = !v; $('viewBar2').hidden = !v; $('entryPanel').hidden = !!v; $('histPanel').hidden = !!v;
+    $('startScr').hidden = !!c; $('live').hidden = !c; $('btnEnd').hidden = !state.current || !!v;
+    if (!state.current || v) $('confirmEnd').hidden = true;
     $('title').textContent = c ? sessName(c) : 'Покерная сессия';
     renderHist();
     if (!c){ $('sessInfo').textContent = state.history.length ? 'Сохранено сессий: ' + state.history.length : 'Введите название и стек, затем начните сессию'; return; }
@@ -502,6 +521,7 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
     var folds = hs.length - wins.length - losses.length;
     $('total').textContent = signed(t); $('total').className = 'big num ' + cls(t);
     $('stackNow').textContent = money(stackNow(c));
+    $('stackLbl').textContent = v ? 'Стек в конце' : 'Стек сейчас';
     var m = ['Старт <b>' + fmt.format(c.stack0) + '</b>'];
     var rb = buyCount(c, 'rebuy'), ad = buyCount(c, 'addon');
     if (rb) m.push('Ребаи <b>' + rb + ' × = ' + fmt.format(buySum(c, 'rebuy')) + '</b>');
@@ -515,10 +535,10 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
     var worst = losses.length ? Math.min.apply(null, losses.map(function(h){ return h.r; })) : null;
     $('xBest').textContent = best === null ? '—' : signed(best); $('xBest').className = best === null ? '' : 'pos';
     $('xWorst').textContent = worst === null ? '—' : signed(worst); $('xWorst').className = worst === null ? '' : 'neg';
-    $('xTime').textContent = dur(now() - c.start);
-    $('sessInfo').textContent = 'Начата ' + dt(c.start);
+    $('xTime').textContent = dur((v ? (v.end || v.start) : now()) - c.start);
+    $('sessInfo').textContent = v ? 'Сыграна ' + dt(c.start) + ' · прошлая сессия' : 'Начата ' + dt(c.start);
     $('nextLbl').textContent = 'Раздача №' + (hs.length + 1);
-    drawChart(hs); renderList(c);
+    drawChart(hs); renderList(c, !!v);
   }
 
   // кнопки быстрых сумм добавляют к полю
@@ -583,9 +603,17 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
     closeBuy(); save(); render();
     $('startMsg').textContent = saved ? 'Сессия «' + sessName(c) + '» сохранена: ' + signed(sum(c.hands)) + '.' : 'Сессия без раздач не сохранена.';
   };
+  function openView(id){ viewing = id; closeBuy(); resetPicker(); renderPicked(); $('viewMsg').textContent = ''; render(); window.scrollTo(0, 0); }
+  function closeView(){ viewing = null; render(); window.scrollTo(0, 0); }
+  $('btnBack').onclick = closeView; $('btnBack2').onclick = closeView;
+  $('hist').addEventListener('keydown', function(e){
+    var row = e.target.closest('.sess[data-open]');
+    if (row && (e.key === 'Enter' || e.key === ' ') && !e.target.closest('.del')){ e.preventDefault(); openView(row.dataset.open); }
+  });
   var sArmed = null;
   $('hist').onclick = function(e){
-    var b = e.target.closest('.del'); if (!b) return;
+    var b = e.target.closest('.del');
+    if (!b){ var row = e.target.closest('.sess[data-open]'); if (row) openView(row.dataset.open); return; }
     var id = b.dataset.sid;
     if (sArmed !== id){ sArmed = id; b.classList.add('armed'); b.textContent = 'Удалить?'; return; }
     sArmed = null;
@@ -593,8 +621,8 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
     save(); render();
   };
 
-  $('btnCopy').onclick = function(){
-    var c = state.current; if (!c) return;
+  function copyReport(c, say){
+    if (!c) return;
     var lines = [sessName(c) + ' — ' + dt(c.start),
       'Старт ' + fmt.format(c.stack0) + (c.buys.length ? ', докупки ' + fmt.format(buySum(c)) : '') + ', стек сейчас ' + money(stackNow(c)),
       'Раздач: ' + c.hands.length + ', итог: ' + signed(sum(c.hands)), ''];
@@ -605,16 +633,18 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
     });
     var txt = lines.join('\n');
     try {
-      navigator.clipboard.writeText(txt).then(function(){ flash('Отчёт скопирован.'); }, function(){ flash('Не удалось скопировать: браузер запретил доступ к буферу.'); });
-    } catch(e){ flash('Не удалось скопировать: браузер запретил доступ к буферу.'); }
-  };
+      navigator.clipboard.writeText(txt).then(function(){ say('Отчёт скопирован.'); }, function(){ say('Не удалось скопировать: браузер запретил доступ к буферу.'); });
+    } catch(e){ say('Не удалось скопировать: браузер запретил доступ к буферу.'); }
+  }
+  $('btnCopy').onclick = function(){ copyReport(state.current, flash); };
+  $('btnCopyView').onclick = function(){ copyReport(viewed(), function(t){ $('viewMsg').textContent = t; }); };
 
   $('amount').addEventListener('keydown', function(e){
     if (e.key === 'Enter'){ e.preventDefault(); flash('Нажмите «+ Плюс» или «− Минус».'); }
   });
 
   renderPicked(); render();
-  setInterval(function(){ if (state.current) $('xTime').textContent = dur(now() - state.current.start); }, 30000);
+  setInterval(function(){ if (state.current && !viewing) $('xTime').textContent = dur(now() - state.current.start); }, 30000);
 })();
 </script>
 </body>
