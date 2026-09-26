@@ -8,6 +8,7 @@ import { LobbyManager } from './LobbyManager.js';
 import { RoundManager } from './RoundManager.js';
 import { ResultManager } from './ResultManager.js';
 import { renderPortrait, portraitSrc, ensurePerson } from './AvatarManager.js';
+import { ASSETS, ART_V } from '../paths.js';
 import { Stage } from '../scene/Stage.js';
 import { MenuWorld, ProfileWorld } from '../scene/worlds.js';
 import { GameWorld } from '../scene/GameWorld.js';
@@ -20,6 +21,11 @@ import { MatchView } from '../team/MatchView.js';
 // Точка сборки: знает все системы и переводит игру между экранами.
 export class GameManager {
   constructor() {
+    // картинки интерфейса (нарисованы в ChatGPT) — в CSS как переменные: путь зависит от базы сборки (/cell/)
+    const ui = (n) => `url("${ASSETS}ui/${n}${ART_V}")`;
+    for (const n of ['card_back.jpg', 'card_face.jpg', 'bullet_blank.png', 'bullet_live.png', 'bomb.png', 'stopwatch.png', 'victory.jpg', 'defeat.jpg', 'panel_frame.png', 'icon_crown.png', 'icon_skull.png', 'icon_star.png']) {
+      document.documentElement.style.setProperty('--img-' + n.split('.')[0].replace('_', '-'), ui(n));
+    }
     this.save = new SaveManager();
     setLang(this.save.settings.lang);
     this.audio = new AudioManager(this.save.settings);
@@ -206,6 +212,7 @@ export class GameManager {
     const profile = this.save.profile;
     const s = h('div', 'screen');
     s.id = 'result';
+    s.classList.add(rec.won ? 'won' : 'lost'); // фон: пьедестал в золотом свете / рушащаяся клетка
     const date = new Date(rec.date).toLocaleString(getLang() === 'ru' ? 'ru-RU' : 'en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     s.innerHTML = `
       <div class="hero" style="background-image:url(${portraitSrc(profile, 480, 600, true)})"></div>

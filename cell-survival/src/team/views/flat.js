@@ -72,7 +72,7 @@ export class TimeView extends FlatView {
     let body = '';
     if (st.phase === 'act' || st.phase === 'intro' || st.phase === 'show') {
       const mine = this.canAct(st);
-      body = `<div class="cv-kick">${t('target')}</div><div class="cv-huge">${target ?? '—'} <small>${t('sec')}</small></div>`;
+      body = `<div class="tm-watch ${this.running !== null ? 'run' : ''}"></div><div class="cv-kick">${t('target')}</div><div class="cv-huge">${target ?? '—'} <small>${t('sec')}</small></div>`;
       if (st.phase === 'act' && this.alive(st)) {
         if (!mine || this.sent) body += `<div class="cv-note">${t('stopped')} · ${t('waitOthers')}</div>`;
         else if (this.running === null) body += `<button class="btn primary cv-big hit" data-go>${t('start')}</button><div class="cv-note">Space</div>`;

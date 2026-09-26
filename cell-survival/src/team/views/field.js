@@ -1,5 +1,6 @@
 // Испытания на 3D-поле: «Последняя клетка», «Взрывное поле», «Уникальное число», «Двери».
 import * as THREE from 'three';
+import { ASSETS, ART_V } from '../../paths.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { t } from '../../i18n.js';
 import { GameWorld } from '../../scene/GameWorld.js';
@@ -352,6 +353,11 @@ export class UniqueFieldView extends FieldView {
 }
 
 // ---------- 2. Двери ----------
+let doorTexture = null; // полотно двери — картинка ChatGPT, одна на все двери
+function doorTex() {
+  if (!doorTexture) { doorTexture = new THREE.TextureLoader().load(`${ASSETS}ui/door.jpg${ART_V}`); doorTexture.colorSpace = THREE.SRGBColorSpace; doorTexture.anisotropy = 8; }
+  return doorTexture;
+}
 // материалы монстра создаются при входе в испытание — их шейдеры собираются заранее (prewarmAvatars)
 function monsterMats() {
   return {
@@ -411,7 +417,7 @@ export class DoorsView extends BaseView {
       const inner = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 2.05), new THREE.MeshBasicMaterial({ color: '#050304' }));
       inner.position.set(0, 1.03, -0.06); d.add(inner);
       const hinge = new THREE.Group(); hinge.position.set(-0.5, 0, 0.02); d.add(hinge);
-      const leafM = new THREE.MeshStandardMaterial({ color: '#2a2218', metalness: 0.6, roughness: 0.45, emissive: new THREE.Color('#d9b25f'), emissiveIntensity: 0 });
+      const leafM = new THREE.MeshStandardMaterial({ map: doorTex(), metalness: 0.55, roughness: 0.45, emissive: new THREE.Color('#d9b25f'), emissiveIntensity: 0 });
       const leaf = new THREE.Mesh(new RoundedBoxGeometry(1.0, 2.04, 0.08, 3, 0.02), leafM);
       leaf.position.set(0.5, 1.03, 0); leaf.castShadow = true; hinge.add(leaf);
       const plate = new THREE.Mesh(new THREE.CircleGeometry(0.17, 32), new THREE.MeshBasicMaterial({ map: doorNumberTexture(i + 1) }));

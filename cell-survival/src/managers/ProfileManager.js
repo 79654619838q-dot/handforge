@@ -2,7 +2,7 @@ import { h } from './UIManager.js';
 import { t, getLang } from '../i18n.js';
 import { CATALOG, LABELS, BACKGROUNDS, PEOPLE, randomProfile } from './AvatarManager.js';
 import { HEROES, emblemCanvas } from './heroes.js';
-import { ASSETS } from '../paths.js';
+import { ASSETS, ART_V } from '../paths.js';
 
 const lbl = (v) => (getLang() === 'ru' ? LABELS.ru[v] : null) || (v[0].toUpperCase() + v.slice(1));
 
@@ -67,8 +67,10 @@ export class ProfileManager {
       }
       if (tab === 'hero') {
         const lang = getLang() === 'ru' ? 'ru' : 'en';
+        // арт героя (нарисован в ChatGPT) во всю карточку, эмблема — маленький знак в углу
         body.innerHTML = `<div class="heroes">${HEROES.map((hr) => `<div class="hero-card ${draft.hero === hr.id ? 'on' : ''}" data-hero="${hr.id}" style="--hc:${hr.glow}">
-          <img src="${heroIcon.get(hr.id)}" alt=""><b>${hr[lang]}</b><span>${hr.tag[lang]}</span></div>`).join('')}</div>
+          <img class="art" src="${ASSETS}heroes/${hr.id}.jpg${ART_V}" alt="" loading="lazy"><img class="emb" src="${heroIcon.get(hr.id)}" alt="">
+          <div class="cap"><b>${hr[lang]}</b><span>${hr.tag[lang]}</span></div></div>`).join('')}</div>
           <button class="chip ${!draft.hero || draft.hero === 'none' ? 'on' : ''}" data-hero="none" style="margin-top:12px">${t('noHero')}</button>`;
         return;
       }

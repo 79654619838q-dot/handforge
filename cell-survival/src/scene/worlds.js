@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { softDot, smokeTexture, gradientTexture, surfaceTextures } from './textures.js';
 import { buildAvatar, BACKGROUNDS, ensurePerson } from '../managers/AvatarManager.js';
-import { ASSETS } from '../paths.js';
+import { ASSETS, ART_V } from '../paths.js';
 
 function embers(count, color, spread, size = 0.08) {
   const geo = new THREE.BufferGeometry();
@@ -32,10 +32,10 @@ export class MenuWorld {
     this.camera.position.set(0, 1.2, 8);
     this.bloom = 0.9;
     this.scene.background = gradientTexture([[0, '#050409'], [0.55, '#140c1f'], [0.8, '#2a1606'], [1, '#050302']]);
-    new THREE.TextureLoader().load(`${ASSETS}menu/background.jpg`, (tx) => {
+    new THREE.TextureLoader().load(`${ASSETS}menu/background.jpg${ART_V}`, (tx) => {
       tx.colorSpace = THREE.SRGBColorSpace;
       tx.userData.cover = true;
-      tx.userData.focusX = 0.75; // на узком экране сохраняем кролика справа
+      tx.userData.focusX = 0.55; // на узком экране — героев в центре
       this.scene.background = tx;
       this.scene.fog.density = 0.015;
       this.forge.intensity = 0; this.floor.visible = false;
@@ -102,6 +102,11 @@ export class ProfileWorld {
     this.camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 100);
     this.bloom = 0.25;
     this.scene.fog = new THREE.Fog('#050409', 8, 22);
+    // фон — зал героев (ChatGPT): постамент слева, справа тёмное место под панель
+    new THREE.TextureLoader().load(`${ASSETS}ui/profile_bg.jpg${ART_V}`, (tx) => {
+      tx.colorSpace = THREE.SRGBColorSpace; tx.userData.cover = true; tx.userData.focusX = 0.3;
+      this.scene.background = tx; this.hallBg = true; this.scene.fog = null;
+    }, undefined, () => {});
     // студийная схема для реалистичного лица: тёплый боковой ключ, холодная мягкая заливка, контровые
     this.scene.add(new THREE.HemisphereLight('#ffffff', '#1a1208', 0.12));
     const key = new THREE.SpotLight('#ffe6c8', 12, 20, 0.45, 0.6, 1.2); key.position.set(3.2, 3.4, 1.6); key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.target.position.set(0, 1.3, 0); this.scene.add(key, key.target);
@@ -140,8 +145,8 @@ export class ProfileWorld {
     this.avatar = buildAvatar(p);
     this.holder.add(this.avatar);
     const bg = BACKGROUNDS[p.background] || BACKGROUNDS.forge;
-    this.scene.background = gradientTexture([[0, bg[1]], [0.55, bg[0]], [1, bg[1]]]);
-    this.scene.fog.color.set(bg[1]);
+    if (!this.hallBg) this.scene.background = gradientTexture([[0, bg[1]], [0.55, bg[0]], [1, bg[1]]]);
+    this.scene.fog?.color.set(bg[1]);
     this.rimA.color.set(bg[2]);
     this.ringMat.color.set(bg[2]);
   }

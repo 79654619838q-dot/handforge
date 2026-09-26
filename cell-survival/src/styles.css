@@ -238,12 +238,25 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px;
   #menu .mascot { opacity: .45; }
 }
 
-/* Герои в профиле */
+/* Герои в профиле: арт ChatGPT во всю карточку */
 .heroes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.hero-card { position: relative; padding: 10px 8px 9px; border: 1px solid rgba(255,255,255,.08); border-radius: 6px; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--hc) 22%, transparent), rgba(8,6,12,.85) 70%); cursor: pointer; text-align: center; transition: transform .15s, border-color .15s, box-shadow .15s; }
+.hero-card { position: relative; aspect-ratio: 4 / 5; border: 1px solid rgba(255,255,255,.08); border-radius: 6px; overflow: hidden; cursor: pointer; background: #0a0810; transition: transform .15s, border-color .15s, box-shadow .15s; }
+.hero-card .art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .35s, filter .2s; filter: saturate(.9) brightness(.85); }
+.hero-card:hover .art { transform: scale(1.06); filter: none; }
 .hero-card:hover { transform: translateY(-2px); border-color: var(--hc); }
-.hero-card.on { border-color: var(--hc); box-shadow: 0 0 18px color-mix(in srgb, var(--hc) 55%, transparent), inset 0 0 12px color-mix(in srgb, var(--hc) 25%, transparent); }
-.hero-card img { width: 54px; height: 54px; display: block; margin: 0 auto 4px; filter: drop-shadow(0 0 6px var(--hc)); }
-.hero-card b { display: block; font-family: var(--font-title); font-size: 15px; color: #fff; letter-spacing: .04em; }
-.hero-card span { display: block; font-size: 11px; line-height: 1.25; color: var(--ink-dim); margin-top: 2px; }
-@media (max-width: 760px) { .heroes { grid-template-columns: repeat(2, 1fr); } .hero-card img { width: 44px; height: 44px; } }
+.hero-card.on { border-color: var(--hc); box-shadow: 0 0 18px color-mix(in srgb, var(--hc) 60%, transparent), inset 0 0 14px color-mix(in srgb, var(--hc) 30%, transparent); }
+.hero-card.on .art { filter: none; }
+.hero-card .emb { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; filter: drop-shadow(0 0 5px var(--hc)); }
+.hero-card .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 7px 7px; text-align: center; background: linear-gradient(transparent, rgba(5,4,9,.92) 55%); }
+.hero-card b { display: block; font-family: var(--font-title); font-size: 15px; color: #fff; letter-spacing: .05em; text-shadow: 0 0 10px var(--hc); }
+.hero-card span { display: block; font-size: 10.5px; line-height: 1.2; color: var(--ink-dim); margin-top: 2px; }
+@media (max-width: 760px) { .heroes { grid-template-columns: repeat(3, 1fr); gap: 6px; } .hero-card b { font-size: 12px; } .hero-card span { display: none; } }
+
+/* ===== Картинки ChatGPT (26.09) ===== */
+/* экран итогов: фон победы / выбывания */
+#result.won { background: linear-gradient(90deg, rgba(3,2,6,.2), rgba(3,2,6,.78) 60%), var(--img-victory) center/cover no-repeat; }
+#result.lost { background: linear-gradient(90deg, rgba(3,2,6,.2), rgba(3,2,6,.8) 60%), var(--img-defeat) center/cover no-repeat; }
+/* баннеры: череп над «Вы выбыли», звезда над «Вы прошли» */
+.banner.red .band::before, .banner.green .band::before { content: ''; display: block; width: 84px; height: 84px; margin: 0 auto 6px; background: var(--img-icon-skull) center/contain no-repeat; filter: drop-shadow(0 0 16px rgba(255,59,59,.6)); animation: pop .5s var(--ease) both; }
+.banner.green .band::before { background-image: var(--img-icon-star); filter: drop-shadow(0 0 16px rgba(217,178,95,.6)); }
+@media (max-width: 760px) { .banner.red .band::before, .banner.green .band::before { width: 56px; height: 56px; } }

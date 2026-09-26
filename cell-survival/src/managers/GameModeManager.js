@@ -3,7 +3,7 @@ import { t } from '../i18n.js';
 import { layout } from './GridManager.js';
 import { CHALLENGE_IDS, CHALLENGE_META } from '../../shared/match.js';
 import { getLang } from '../i18n.js';
-import { ASSETS } from '../paths.js';
+import { ASSETS, ART_V } from '../paths.js';
 
 // Список размеров поля. Расширяется добавлением числа — раскладка считается сама.
 export const CELL_COUNTS = [16, 25, 36, 50, 64, 100];
@@ -16,11 +16,11 @@ export class GameModeManager {
     s.id = 'modes';
     s.innerHTML = `
       <div class="topbar"><h1 class="title">${t('chooseMode')}</h1><div class="spacer"></div><button class="btn ghost" data-back>${t('back')}</button></div>
-      <div class="mode-card" data-m="single" style="background-image:url(${ASSETS}modes/single.jpg), radial-gradient(ellipse at 50% 30%, #3a2a0e, #0b0910 70%)">
+      <div class="mode-card" data-m="single" style="background-image:url(${ASSETS}modes/single.jpg${ART_V}), radial-gradient(ellipse at 50% 30%, #3a2a0e, #0b0910 70%)">
         <div class="glyph">I</div>
         <div class="kicker">Solo</div><h2 class="title">${t('single')}</h2><p>${t('singleDesc')}</p>
       </div>
-      <div class="mode-card" data-m="team" style="background-image:url(${ASSETS}modes/team.jpg), radial-gradient(ellipse at 50% 30%, #2a1450, #0b0910 70%)">
+      <div class="mode-card" data-m="team" style="background-image:url(${ASSETS}modes/team.jpg${ART_V}), radial-gradient(ellipse at 50% 30%, #2a1450, #0b0910 70%)">
         <div class="glyph">II</div>
         <div class="kicker">Squad</div><h2 class="title">${t('team')}</h2><p>${t('teamDesc')}</p>
       </div>`;

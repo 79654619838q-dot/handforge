@@ -215,14 +215,14 @@
 .bm-tile.hot { border-color: #ff3b2a; box-shadow: 0 0 30px rgba(255,59,42,.55); }
 .bm-tile.hot.blink { box-shadow: 0 0 50px rgba(255,59,42,.95); }
 .bm-tile.me b { color: var(--gold-hi); }
-.bm-bomb { position: absolute; top: 4px; right: 6px; font-size: 30px; animation: beat .8s infinite; }
+.bm-bomb { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; background: var(--img-bomb) center/contain no-repeat; animation: beat .8s infinite; filter: drop-shadow(0 0 10px rgba(255,140,40,.7)); }
 .cv-kick.danger { color: #ff5a4a; }
 /* Очко */
 .pc-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; min-height: 96px; }
-.pc { width: 64px; height: 92px; background: #f4efe4; color: #111; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,.5); animation: pop .35s var(--ease) both; }
+.pc { width: 64px; height: 92px; background: var(--img-card-face) center/100% 100%, #f4efe4; color: #111; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,.5); animation: pop .35s var(--ease) both; }
 .pc b { font-size: 26px; font-family: var(--font-title); } .pc i { font-style: normal; font-size: 24px; }
 .pc.red { color: #b8243c; }
-.pc.back { background: repeating-linear-gradient(45deg, #3a1d5c 0 6px, #1a0d2c 6px 12px); border: 2px solid var(--gold); }
+.pc.back { background: var(--img-card-back) center/100% 100%, #3a0d14; }
 .pc-others { display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: center; margin-top: 14px; color: var(--ink-dim); font-size: 14px; }
 /* Рулетка */
 .rl-card { min-width: min(420px, 92vw); }
@@ -286,16 +286,26 @@
   .hud-right { top: 6px; right: 6px; width: 90px; padding: 5px; } .hud-right .pname { font-size: 11px; }
 }
 
-/* Рулетка: патроны на столе */
-.rl-shells { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 8px 0 14px; }
-.rl-shell { position: relative; width: 46px; height: 118px; border: 0; background: none; cursor: pointer; padding: 0; transition: transform .2s; }
-.rl-shell .tip { position: absolute; top: 0; left: 8px; width: 30px; height: 34px; border-radius: 15px 15px 3px 3px; background: linear-gradient(90deg, #6a4a22, #c9a060, #6a4a22); }
-.rl-shell .case { position: absolute; top: 32px; left: 5px; width: 36px; height: 80px; border-radius: 3px; background: linear-gradient(90deg, #7a5a1c, #e6c06a 45%, #8a6a2c); box-shadow: 0 6px 14px rgba(0,0,0,.5); }
-.rl-shell:not([disabled]):hover { transform: translateY(-8px); }
+/* Рулетка: латунные патроны (картинки ChatGPT); закрытые выглядят одинаково — холостой рисунок */
+.rl-shells { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 8px 0 18px; }
+.rl-shell { position: relative; width: 40px; height: 120px; border: 0; padding: 0; cursor: pointer; background: var(--img-bullet-blank) center bottom/contain no-repeat; filter: drop-shadow(0 8px 12px rgba(0,0,0,.6)); transition: transform .2s, filter .2s; }
+.rl-shell .tip, .rl-shell .case { display: none; }
+.rl-shell:not([disabled]):hover { transform: translateY(-8px); filter: drop-shadow(0 0 14px rgba(217,178,95,.7)); }
 .rl-shell[disabled] { cursor: default; }
-.rl-shell.blank { opacity: .35; transform: translateY(10px) rotate(-12deg); }
-.rl-shell.blank .tip { background: #444; }
-.rl-shell.shot .case, .rl-shell.live .case { background: linear-gradient(90deg, #6b0f1a, #ff3b2a 45%, #6b0f1a); box-shadow: 0 0 22px rgba(255,59,42,.7); }
-.rl-shell small { position: absolute; bottom: -18px; left: -10px; right: -10px; font-size: 11px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; }
-@media (max-width: 760px) { .rl-shell { width: 38px; height: 96px; } .rl-shell .tip { width: 24px; left: 7px; height: 28px; } .rl-shell .case { width: 30px; top: 26px; height: 66px; left: 4px; } }
-@media (max-height: 500px) and (orientation: landscape) { .rl-shell { width: 34px; height: 78px; } .rl-shell .tip { width: 22px; left: 6px; height: 22px; } .rl-shell .case { width: 28px; top: 20px; height: 56px; left: 3px; } }
+.rl-shell.blank { opacity: .35; transform: translateY(10px) rotate(-14deg); }
+.rl-shell.shot, .rl-shell.live { background-image: var(--img-bullet-live); filter: drop-shadow(0 0 18px rgba(255,59,42,.8)); }
+.rl-shell small { position: absolute; bottom: -18px; left: -14px; right: -14px; font-size: 11px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-align: center; }
+@media (max-width: 760px) { .rl-shell { width: 32px; height: 96px; } .rl-shells { gap: 8px; } }
+@media (max-height: 500px) and (orientation: landscape) { .rl-shell { width: 28px; height: 78px; } }
+
+/* Секундомер «Останови время» */
+.tm-watch { width: 150px; height: 150px; margin: 0 auto 6px; background: var(--img-stopwatch) center/contain no-repeat; filter: drop-shadow(0 10px 24px rgba(0,0,0,.6)) drop-shadow(0 0 18px rgba(217,178,95,.25)); }
+.tm-watch.run { animation: beat 1s infinite; }
+@media (max-width: 760px) { .tm-watch { width: 96px; height: 96px; } }
+@media (max-height: 500px) and (orientation: landscape) { .tm-watch { display: none; } }
+/* Финал матча: фон — пьедестал в золотом свете; корона над победителем */
+.ov-final { background: linear-gradient(rgba(3,2,6,.55), rgba(3,2,6,.75)), var(--img-victory) center/cover no-repeat; }
+.ov-final .kicker::before, .ov-end .kicker::before { content: ''; display: block; width: 64px; height: 64px; margin: 0 auto 8px; background: var(--img-icon-crown) center/contain no-repeat; filter: drop-shadow(0 0 14px rgba(217,178,95,.7)); }
+/* Рамка панелей испытаний и заставок */
+.m-card.panel, .cv-card.panel { border: 16px solid transparent; border-image: var(--img-panel-frame) 70 fill / 16px / 0 stretch; background: none; }
+.m-card.panel::before, .m-card.panel::after, .cv-card.panel::before, .cv-card.panel::after { display: none; }

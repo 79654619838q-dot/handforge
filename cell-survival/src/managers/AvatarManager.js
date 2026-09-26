@@ -5,7 +5,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { ASSETS } from '../paths.js';
+import { ASSETS, ART_V } from '../paths.js';
 import { HEROES, heroOf, applyHero } from './heroes.js';
 
 // ---------- Реалистичные люди (Microsoft Rocketbox, MIT) ----------
@@ -952,7 +952,7 @@ function portraitComposer(w, h) {
 // под свой свет (профиль 25.09: портреты давали треть всех шейдеров и секунды зависаний).
 export function portraitSrc(profile, w = 160, h = 200, full = false) {
   const hero = heroOf(profile);
-  if (hero) return `${ASSETS}heroes/${hero.id}${full ? '_full' : ''}.jpg`;
+  if (hero) return `${ASSETS}heroes/${hero.id}${full ? '_full' : ''}.jpg${ART_V}`;
   const key = 'cs.portrait.' + w + 'x' + h + (full ? 'f' : '') + JSON.stringify(profile || {});
   try { const v = localStorage.getItem(key); if (v) return v; } catch { /* нет хранилища */ }
   const url = renderPortrait(profile, w, h, full);
