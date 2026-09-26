@@ -309,3 +309,10 @@
 /* Рамка панелей испытаний и заставок */
 .m-card.panel, .cv-card.panel { border: 16px solid transparent; border-image: var(--img-panel-frame) 70 fill / 16px / 0 stretch; background: none; }
 .m-card.panel::before, .m-card.panel::after, .cv-card.panel::before, .cv-card.panel::after { display: none; }
+
+/* Рулетка: у каждого свой барабан — патроны «перезаряжаются» перед ходом, внизу — кто уже стрелял */
+.rl-shells.reload .rl-shell { animation: pop .45s var(--ease) both; }
+.rl-shells.reload .rl-shell:nth-child(2) { animation-delay: .05s; } .rl-shells.reload .rl-shell:nth-child(3) { animation-delay: .1s; }
+.rl-shells.reload .rl-shell:nth-child(4) { animation-delay: .15s; } .rl-shells.reload .rl-shell:nth-child(5) { animation-delay: .2s; } .rl-shells.reload .rl-shell:nth-child(6) { animation-delay: .25s; }
+.rl-hist { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; margin-top: 4px; min-height: 20px; font-size: 13px; }
+.rl-hist .ok { color: #7ee2a0; } .rl-hist .dead { color: #ff5a4a; font-weight: 600; }

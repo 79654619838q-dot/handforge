@@ -450,47 +450,52 @@ class Cards extends Base {
 
 // 11. Русская рулетка: барабан на 6, в раунде N — N патронов (максимум 5). Ходят по кругу, каждый крутит и жмёт.
 class Roulette extends Base {
-  // Каждый живой игрок по очереди тянет патрон; раунд кончается, когда вытянули все (оператор 25.09:
-  // «каждый должен пройти уровень»). Выбывают все, кому достался боевой. Боевых всегда меньше, чем игроков.
+  // Каждый игрок по очереди берёт СВОЙ полный барабан из 6 гнёзд (оператор 26.09: «каждый выбирает с целого
+  // барабана, а не все с одного»): после каждого выбора барабан заряжается и перемешивается заново.
+  // Раунд — когда выбрали все живые. Выбывают все, кому достался боевой; достался всем — раунд переигрывается.
   realtime = true;
   begin() {
-    const n = this.alive.length;
-    this.total = Math.max(6, n + 1);                   // патронов хватает на всех
-    this.live = Math.max(1, Math.min(this.round + 1, n - 1, 5)); // 1-й раунд — один боевой, дальше +1
-    const idx = shuffle(Array.from({ length: this.total }, (_, k) => k));
-    this.liveSet = new Set(idx.slice(0, this.live));   // где боевые — знает только сервер
-    this.taken = [];                                   // вытянутые патроны: { i, pid, live }
+    this.total = 6;
+    this.live = Math.min(5, this.round + 1);           // 1-й раунд — один боевой, каждый раунд +1 (round ещё не увеличен)
+    this.load();
+    this.taken = [];                                   // выборы игроков: { i, pid, live }
     this.order = shuffle(this.alive);
     this.turn = 0;
     this.endNow = false;
     this.turnAt = this.m.now();
     return super.begin();
   }
+  // новый полный барабан: где боевые — знает только сервер
+  load() { this.liveSet = new Set(shuffle(Array.from({ length: this.total }, (_, k) => k)).slice(0, this.live)); }
   data() { return { total: this.total, live: this.live, order: this.order }; }
   actMs() { return 300000; }
   complete() { return false; }
   get current() { return this.order[this.turn]; }
-  free() { const t = new Set(this.taken.map((x) => x.i)); return Array.from({ length: this.total }, (_, k) => k).filter((k) => !t.has(k)); }
+  free() { return Array.from({ length: this.total }, (_, k) => k); } // барабан всегда полный
   act(pid, a) {
     const i = Number(a?.pick);
-    if (this.endNow || pid !== this.current || !this.free().includes(i)) return false;
-    this.taken.push({ i, pid, live: this.liveSet.has(i) });
+    if (this.endNow || pid !== this.current || !(i >= 0 && i < this.total)) return false;
+    this.taken.push({ i, pid, live: this.liveSet.has(i), liveAt: [...this.liveSet] });
+    this.load();                                       // следующему — новый полный барабан
     this.movedAt[pid] = this.m.now();
     this.turn += 1; this.turnAt = this.m.now();
-    if (this.turn >= this.order.length) this.endNow = true; // вытянули все
+    if (this.turn >= this.order.length) this.endNow = true;
     return true;
   }
-  turnTimeoutMs() { return 15000; } // не выбрал за 15 с — патрон выбирается случайно
-  onTimeout() { if (!this.endNow) this.act(this.current, { pick: pick(this.free()) }); }
-  visibleMoves() { return { turn: this.current, turnAt: this.turnAt, taken: this.taken, live: this.live, total: this.total }; }
+  turnTimeoutMs() { return 15000; } // не выбрал за 15 с — гнездо выбирается случайно
+  onTimeout() { if (!this.endNow) this.act(this.current, { pick: rnd(this.total) }); }
+  // чужие выборы видны сразу (кто выжил, кто нет), но где боевые в следующем барабане — никто не знает
+  visibleMoves() { return { turn: this.current, turnAt: this.turnAt, taken: this.taken.map(({ i, pid, live }) => ({ i, pid, live })), live: this.live, total: this.total }; }
   botPlan() {
     const p = this.m.player(this.current);
     if (this.endNow || !p?.isBot) return [];
-    return [{ id: this.current, ms: 1200 + rnd(1200), move: () => ({ pick: pick(this.free()) }) }];
+    return [{ id: this.current, ms: 1200 + rnd(1200), move: () => ({ pick: rnd(this.total) }) }];
   }
   resolve() {
-    const eliminated = this.taken.filter((x) => x.live).map((x) => x.pid);
-    return { eliminated, replay: false, reveal: { losers: eliminated, taken: this.taken, live: [...this.liveSet] } };
+    let eliminated = this.taken.filter((x) => x.live).map((x) => x.pid);
+    const replay = eliminated.length === this.alive.length; // боевой достался всем — переигровка
+    if (replay) eliminated = [];
+    return { eliminated, replay, reveal: { losers: eliminated, taken: this.taken } };
   }
   revealMs() { return 5500; }
 }

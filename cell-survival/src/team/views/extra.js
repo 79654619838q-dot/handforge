@@ -187,25 +187,24 @@ export class CardsView extends FlatView {
 // На столе патроны: среди них боевые (в первом раунде один), остальные холостые. В свой ход выбираете патрон.
 export class RouletteView extends FlatView {
   holdSec = 0; // итог показывается своей анимацией
+  // У каждого свой полный барабан: 6 гнёзд, боевых — сколько сказано; ниже — кто уже стрелял и чем кончилось.
   render(st) {
     this.st = st;
     const v = st.visible || {};
     const total = v.total ?? st.data?.total ?? 6, live = v.live ?? st.data?.live ?? 1;
     const my = st.phase === 'act' && v.turn === this.myId && this.canAct(st);
-    const taken = new Map((v.taken || st.reveal?.taken || []).map((x) => [x.i, x]));
-    const liveRev = new Set(st.reveal?.live || []);
-    const order = st.data?.order || [];
-    const shells = Array.from({ length: total }, (_, i) => {
-      const tk = taken.get(i);
-      const cls = tk ? (tk.live ? 'shot' : 'blank') : st.phase === 'reveal' && liveRev.has(i) ? 'live' : '';
-      return `<button class="rl-shell hit ${cls}" data-i="${i}" ${my && !tk ? '' : 'disabled'}><span class="tip"></span><span class="case"></span>${tk ? `<small>${esc(this.name(st, tk.pid))}</small>` : ''}</button>`;
-    }).join('');
+    const taken = v.taken || st.reveal?.taken || [];
+    const last = taken[taken.length - 1];
+    const fresh = st.phase === 'act' && (!last || last.pid !== this.lastShown);
+    const shells = Array.from({ length: total }, (_, i) => `<button class="rl-shell hit" data-i="${i}" ${my ? '' : 'disabled'}></button>`).join('');
+    const hist = taken.map((x) => `<span class="${x.live ? 'dead' : 'ok'}">${esc(this.name(st, x.pid))} ${x.live ? '💀' : '✓'}</span>`).join('');
     this.el.innerHTML = `<div class="cv-card panel hit rl-card">
       <div class="cv-kick">${t('liveRounds')}: ${live} · ${t('blankRounds')}: ${total - live}</div>
-      <div class="rl-shells">${shells}</div>
-      <div class="rl-order">${order.filter((id) => st.alive?.includes(id)).map((id) => `<span class="${id === v.turn ? 'on' : ''}">${esc(this.name(st, id))}</span>`).join('')}</div>
+      <div class="rl-shells ${fresh ? 'reload' : ''}">${shells}</div>
+      <div class="rl-hist">${hist}</div>
       <div class="cv-note">${st.phase === 'act' ? (my ? t('pickShell') : v.turn ? `${t('turnOf')}: ${esc(this.name(st, v.turn))}` : '') : ''}</div>
       ${st.phase === 'reveal' ? this.outNames(st) : ''}</div>`;
+    if (last) this.lastShown = last.pid;
     this.el.querySelectorAll('.rl-shell:not([disabled])').forEach((b) => b.onclick = async () => {
       this.audio.select();
       if (!(await confirmBox(this.root, t('pickShellQ')))) return;
