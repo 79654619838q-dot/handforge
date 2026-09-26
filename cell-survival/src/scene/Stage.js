@@ -171,6 +171,18 @@ export class Stage {
     if (sa > ia) { b.repeat.set(1, ia / sa); b.offset.set(0, (1 - ia / sa) / 2); }
     else { b.repeat.set(sa / ia, 1); b.offset.set((1 - sa / ia) * (b.userData.focusX ?? 0.5), 0); }
   }
+  // Экран без 3D (world.cssOnly — главное меню): картинка показывается слоем страницы в полном качестве и цвете,
+  // холст скрыт и не рисуется. (Прозрачный холст поверх картинки в игре ронял частоту до 1–2 кадров.)
+  cssBackdrop() {
+    const url = this.world?.cssOnly ? this.world.cssUrl : '';
+    if (url === this.bgUrl) return !!url;
+    this.bgUrl = url;
+    const st = this.container.style;
+    st.backgroundImage = url ? `url("${url}")` : ''; st.backgroundSize = 'cover'; st.backgroundPosition = `${(this.world?.cssFocusX ?? 0.5) * 100}% 50%`; st.backgroundRepeat = 'no-repeat';
+    this.renderer.domElement.style.visibility = url ? 'hidden' : '';
+    return !!url;
+  }
+
 
   // Автокачество: раз в 2 с смотрим частоту кадров. Меньше 45 — выключаем объёмное затенение,
   // потом снижаем разрешение (до 60%), затем выключаем свечение. Больше 57 долго — возвращаем по шагу. Настройки игрока не трогаем.
@@ -196,7 +208,6 @@ export class Stage {
   }
 
   frame() {
-    this.fitBackground();
     const raw = this.clock.getDelta();
     this.autoTune(raw);
     const dt = Math.min(raw, 0.05);
@@ -205,6 +216,8 @@ export class Stage {
     if (!this.world) return;
     updateAvatars(dt, this.world.scene);
     this.world.update?.(dt, t);
+    if (this.cssBackdrop()) return; // меню: только картинка, 3D не рисуется
+    this.fitBackground();
     this.composer.render(dt);
   }
 }

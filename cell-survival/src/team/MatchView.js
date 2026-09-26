@@ -86,6 +86,7 @@ export class MatchView {
     const theme = THEME_IDS.includes(pref) ? pref : THEME_IDS[Math.floor(Math.random() * THEME_IDS.length)];
     this.view = new View({ game: this.game, stage: this.game.stage, root: this.stageEl, audio: this.game.audio, act: (a) => this.session.act(a), myId: this.myId, theme, hint: (s) => this.setHint(s), mv: this });
     this.view.enter(st);
+    this.game.audio.playMusic(st.cid); // у каждого испытания своя музыка (Music.js, TRACKS)
   }
 
   onPhase(st, me) {

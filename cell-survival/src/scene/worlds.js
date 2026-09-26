@@ -32,6 +32,8 @@ export class MenuWorld {
     this.camera.position.set(0, 1.2, 8);
     this.bloom = 0.9;
     this.scene.background = gradientTexture([[0, '#050409'], [0.55, '#140c1f'], [0.8, '#2a1606'], [1, '#050302']]);
+    // главное меню — только нарисованная картинка слоем страницы (Stage.cssBackdrop): чётко и в полном цвете
+    this.cssOnly = true; this.cssUrl = `${ASSETS}menu/background.jpg${ART_V}`; this.cssFocusX = 0.55;
     new THREE.TextureLoader().load(`${ASSETS}menu/background.jpg${ART_V}`, (tx) => {
       tx.colorSpace = THREE.SRGBColorSpace;
       tx.userData.cover = true;

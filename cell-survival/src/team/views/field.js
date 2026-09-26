@@ -406,7 +406,7 @@ export class DoorsView extends BaseView {
     for (let i = 0; i < n; i++) {
       const row = Math.floor(i / perRow), col = i % perRow;
       const inRow = row === 0 ? Math.min(perRow, n) : n - perRow;
-      const x = (col - (inRow - 1) / 2) * gap, z = -row * 2.6;
+      const x = (col - (inRow - 1) / 2) * gap, z = -row * 3.8; // второй ряд дальше (оператор 26.09)
       const d = new THREE.Group(); d.position.set(x, 0, z);
       const post = new THREE.BoxGeometry(0.12, 2.15, 0.2);
       const put = (m, x, y) => { m.position.set(x, y, 0); m.castShadow = true; d.add(m); };
@@ -437,8 +437,8 @@ export class DoorsView extends BaseView {
     // отъезд так, чтобы ряд дверей влез по ширине экрана (важно для телефона в портрете)
     const aspect = innerWidth / innerHeight, halfTan = Math.tan((this.world.camera.fov / 2) * Math.PI / 180);
     const z = Math.max(width * 0.72 + 3.8 + rows, (width * 1.1) / (2 * halfTan * aspect) + rows);
-    this.world.camBase.set(0, 3.2 + rows * 1.2 + (z - 8) * 0.25, z);
-    this.world.camLook.set(0, 1.0, -(rows - 1) * 1.3);
+    this.world.camBase.set(0, 3.2 + rows * 1.5 + (z - 8) * 0.25, z);
+    this.world.camLook.set(0, 1.0, -(rows - 1) * 1.9);
     this.round = st.round;
   }
   async onDoor(d) {

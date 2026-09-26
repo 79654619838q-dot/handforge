@@ -78,7 +78,17 @@ export function addArmor(heroId, person) {
   const B = (n) => person.getObjectByName(n);
   const wp = (o) => o.getWorldPosition(new THREE.Vector3());
   person.updateMatrixWorld(true);
-  const meshes = []; person.traverse((o) => { if (o.isSkinnedMesh) meshes.push(o); });
+  // Лучи — по неподвижной копии тела (вершины со скелетом считаются один раз): луч по «живой» модели
+  // пересчитывает скелет на каждый треугольник — десятки лучей на героя давали секунды рывков в начале испытания.
+  const meshes = [];
+  person.traverse((o) => {
+    if (!o.isSkinnedMesh) return;
+    const g = o.geometry, n = g.attributes.position.count, arr = new Float32Array(n * 3), v = new THREE.Vector3();
+    for (let i = 0; i < n; i++) { o.getVertexPosition(i, v); v.applyMatrix4(o.matrixWorld); arr[i * 3] = v.x; arr[i * 3 + 1] = v.y; arr[i * 3 + 2] = v.z; }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(arr, 3)); if (g.index) sg.setIndex(g.index);
+    const m = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); m.updateMatrixWorld(true);
+    meshes.push(m);
+  });
   const up = new THREE.Vector3(0, 1, 0);
   const la = B('Bip01_L_UpperArm'), ra = B('Bip01_R_UpperArm');
   const fwd = new THREE.Vector3().crossVectors(wp(ra).sub(wp(la)).setY(0), up).normalize();
@@ -204,5 +214,6 @@ export function addArmor(heroId, person) {
     const gem = new THREE.Mesh(new THREE.SphereGeometry(0.012, 10, 8), M.glow); gem.position.copy(fwd.clone().multiplyScalar(r + 0.012)); g.add(gem);
     attach(pelvis, g);
   }
+  meshes.forEach((m) => m.geometry.dispose());
   return { chestFront };
 }

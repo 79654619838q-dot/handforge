@@ -16,7 +16,7 @@ export class MenuManager {
     s.innerHTML = `
       <div class="brand stagger">
         <div class="kicker">Hand Forge presents</div>
-        <h1 class="title">Cell<br>Survival</h1>
+        <h1 class="title era">ЭРА</h1>
         <div class="label sub">${t('tagline')}</div>
       </div>
       <nav class="stagger">

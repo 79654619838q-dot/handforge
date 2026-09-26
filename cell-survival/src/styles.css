@@ -260,3 +260,6 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px;
 .banner.red .band::before, .banner.green .band::before { content: ''; display: block; width: 84px; height: 84px; margin: 0 auto 6px; background: var(--img-icon-skull) center/contain no-repeat; filter: drop-shadow(0 0 16px rgba(255,59,59,.6)); animation: pop .5s var(--ease) both; }
 .banner.green .band::before { background-image: var(--img-icon-star); filter: drop-shadow(0 0 16px rgba(217,178,95,.6)); }
 @media (max-width: 760px) { .banner.red .band::before, .banner.green .band::before { width: 56px; height: 56px; } }
+
+/* название игры «ЭРА» (26.09) */
+#menu .brand .title.era { font-size: clamp(72px, 11vw, 168px); letter-spacing: .18em; line-height: 1; filter: drop-shadow(0 0 28px rgba(217,178,95,.45)); }
