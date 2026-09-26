@@ -45,8 +45,27 @@ h1{font:600 26px/1.1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing
 .ghost{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:14px}
 .ghost.warn{border-color:var(--loss);color:var(--loss)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
-.example{background:var(--chip);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted)}
-.example[hidden]{display:none}
+#live{display:flex;flex-direction:column;gap:14px}
+.start{display:flex;flex-direction:column;gap:10px}
+.start input{padding:14px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:500 18px/1.2 "IBM Plex Sans",system-ui,sans-serif;width:100%}
+.start input.big-in{font:600 30px/1 "Barlow Condensed","Arial Narrow",sans-serif}
+.start .b-start{margin-top:6px}
+.b-start{padding:18px 10px;border-radius:12px;background:var(--felt);color:var(--felt-ink);font:700 26px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.05em;text-transform:uppercase}
+.b-start.small{padding:12px 16px;font-size:20px}
+.b-end{padding:9px 14px;border-radius:8px;background:var(--loss);color:#fff;font-weight:600;font-size:14px}
+h1{overflow-wrap:anywhere}
+.stacknow{font-size:34px;font-weight:600;line-height:1}
+.money{display:flex;gap:6px 16px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--muted)}
+.money b{color:var(--ink);font-weight:600}
+.buys{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.b-buy{padding:12px 6px;border-radius:10px;border:2px solid var(--felt);color:var(--felt);background:transparent;font:700 20px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.05em;text-transform:uppercase}
+.b-buy.on{background:var(--felt);color:var(--felt-ink)}
+.buyform{display:flex;flex-direction:column;gap:8px;background:var(--chip);border-radius:10px;padding:12px}
+.buyform input{flex:1;min-width:0;font:600 30px/1 "Barlow Condensed","Arial Narrow",sans-serif;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+.buyacts{display:flex;gap:8px;align-items:center}
+.pill.b{background:var(--chip);color:var(--felt)}
+.hand.buy .res{font-size:20px}
+.sess .nm{font-weight:600;overflow-wrap:anywhere}
 .total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .total .big{font-size:56px;font-weight:700;line-height:1}
 .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
@@ -126,84 +145,108 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
 <div class="wrap">
   <header>
     <div>
-      <h1>Покерная сессия</h1>
+      <h1 id="title">Покерная сессия</h1>
       <div class="sub" id="sessInfo"></div>
     </div>
     <div class="hbtns">
-      <button class="ghost" id="btnHist">Прошлые сессии</button>
-      <button class="ghost" id="btnEnd">Завершить</button>
+      <button class="b-end" id="btnEnd" hidden>Закончить сессию</button>
     </div>
   </header>
 
+  <section class="panel start" id="startScr">
+    <label class="lbl" for="sessName">Название сессии</label>
+    <input id="sessName" autocomplete="off" maxlength="60" placeholder="Например: Турнир в клубе">
+    <label class="lbl" for="stack0">Стартовый стек</label>
+    <input id="stack0" class="num big-in" inputmode="decimal" autocomplete="off" placeholder="Например: 10 000">
+    <button class="b-start" id="btnStart">Начать сессию</button>
+    <div class="msg" id="startMsg"></div>
+  </section>
+
   <div class="confirm" id="confirmEnd" hidden>
-    <span>Завершить сессию и сохранить в историю?</span>
-    <button class="ghost warn" id="endYes">Да, завершить</button>
+    <span id="confirmTxt"></span>
+    <button class="ghost warn" id="endYes">Да, закончить</button>
     <button class="ghost" id="endNo">Отмена</button>
   </div>
 
-  <div class="example" id="exampleNote" hidden>Сейчас показан пример. Первая введённая раздача уберёт его и начнёт вашу сессию.</div>
-
-  <section class="panel">
-    <div class="total">
-      <div>
-        <div class="lbl">Итог сессии</div>
-        <div class="big num" id="total">0</div>
+  <div id="live" hidden>
+    <section class="panel">
+      <div class="total">
+        <div>
+          <div class="lbl">Итог сессии</div>
+          <div class="big num" id="total">0</div>
+        </div>
+        <div style="text-align:right">
+          <div class="lbl">Стек сейчас</div>
+          <div class="num stacknow" id="stackNow">0</div>
+        </div>
       </div>
-      <div style="text-align:right">
-        <div class="lbl">Раздач</div>
-        <div class="num" style="font-size:34px;font-weight:600;line-height:1" id="hands">0</div>
+      <div class="money" id="money"></div>
+      <div class="stats">
+        <div class="stat"><span class="lbl">Раздач</span><b id="hands">0</b></div>
+        <div class="stat"><span class="lbl">Выиграл</span><b class="pos" id="sWin">0</b></div>
+        <div class="stat"><span class="lbl">Проиграл</span><b class="neg" id="sLoss">0</b></div>
+        <div class="stat"><span class="lbl">Пас</span><b class="zero" id="sFold">0</b></div>
       </div>
-    </div>
-    <div class="stats">
-      <div class="stat"><span class="lbl">Выиграл</span><b class="pos" id="sWin">0</b></div>
-      <div class="stat"><span class="lbl">Проиграл</span><b class="neg" id="sLoss">0</b></div>
-      <div class="stat"><span class="lbl">Пас</span><b class="zero" id="sFold">0</b></div>
-      <div class="stat"><span class="lbl">Играл</span><b id="sPlay">0%</b></div>
-    </div>
-    <div class="extra">
-      <span>Лучшая: <b id="xBest">—</b></span>
-      <span>Худшая: <b id="xWorst">—</b></span>
-      <span>Время: <b id="xTime">—</b></span>
-    </div>
-    <svg class="chart" id="chart" viewBox="0 0 500 110" preserveAspectRatio="none" aria-label="График баланса по раздачам"></svg>
-  </section>
-
-  <section class="panel entry">
-    <div class="lbl" id="nextLbl">Раздача №1</div>
-    <div class="myhand">
-      <div class="slots">
-        <button type="button" class="slot" id="slot0" data-slot="0"></button>
-        <button type="button" class="slot" id="slot1" data-slot="1"></button>
+      <div class="extra">
+        <span>Играл: <b id="sPlay">0%</b></span>
+        <span>Лучшая: <b id="xBest">—</b></span>
+        <span>Худшая: <b id="xWorst">—</b></span>
+        <span>Время: <b id="xTime">—</b></span>
       </div>
-      <button type="button" class="ghost" id="btnCardsClr">Сбросить карты</button>
-    </div>
-    <div class="deck" id="deck" hidden></div>
-    <div class="amt">
-      <input id="amount" class="num" inputmode="decimal" autocomplete="off" placeholder="Сумма">
-      <button class="clear" id="btnClr">Стереть</button>
-    </div>
-    <div class="chips" id="chips"></div>
-    <input id="note" class="note" autocomplete="off" placeholder="Заметка (необязательно): AK против QQ, блеф на ривере…">
-    <div class="acts">
-      <button class="b-fold" id="bFold">Пас</button>
-      <button class="b-loss" id="bLoss">− Минус</button>
-      <button class="b-win" id="bWin">+ Плюс</button>
-    </div>
-    <div class="row2">
-      <div class="msg" id="msg"></div>
-      <div style="display:flex;gap:8px">
-        <button class="ghost" id="btnUndo">Отменить последнюю</button>
-        <button class="ghost" id="btnCopy">Копировать отчёт</button>
+      <svg class="chart" id="chart" viewBox="0 0 500 110" preserveAspectRatio="none" aria-label="График итога по раздачам"></svg>
+    </section>
+
+    <section class="panel entry">
+      <div class="lbl" id="nextLbl">Раздача №1</div>
+      <div class="myhand">
+        <div class="slots">
+          <button type="button" class="slot" id="slot0" data-slot="0"></button>
+          <button type="button" class="slot" id="slot1" data-slot="1"></button>
+        </div>
+        <button type="button" class="ghost" id="btnCardsClr">Сбросить карты</button>
       </div>
-    </div>
-  </section>
+      <div class="deck" id="deck" hidden></div>
+      <div class="amt">
+        <input id="amount" class="num" inputmode="decimal" autocomplete="off" placeholder="Сумма">
+        <button class="clear" id="btnClr">Стереть</button>
+      </div>
+      <div class="chips" id="chips"></div>
+      <input id="note" class="note" autocomplete="off" placeholder="Заметка (необязательно): AK против QQ, блеф на ривере…">
+      <div class="acts">
+        <button class="b-fold" id="bFold">Пас</button>
+        <button class="b-loss" id="bLoss">− Минус</button>
+        <button class="b-win" id="bWin">+ Плюс</button>
+      </div>
+      <div class="buys">
+        <button class="b-buy" id="bRebuy">Ребай</button>
+        <button class="b-buy" id="bAddon">Аддон</button>
+      </div>
+      <div class="buyform" id="buyForm" hidden>
+        <label class="lbl" for="buyAmt" id="buyLbl">Сумма ребая</label>
+        <div class="amt">
+          <input id="buyAmt" class="num" inputmode="decimal" autocomplete="off" placeholder="Сумма">
+        </div>
+        <div class="buyacts">
+          <button class="b-start small" id="buyOk">Добавить</button>
+          <button class="ghost" id="buyNo">Отмена</button>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="msg" id="msg"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="ghost" id="btnUndo">Отменить последнее</button>
+          <button class="ghost" id="btnCopy">Копировать отчёт</button>
+        </div>
+      </div>
+    </section>
 
-  <section class="panel">
-    <h2>Раздачи</h2>
-    <div class="list" id="list"></div>
-  </section>
+    <section class="panel">
+      <h2>Раздачи</h2>
+      <div class="list" id="list"></div>
+    </section>
+  </div>
 
-  <section class="panel" id="histPanel" hidden>
+  <section class="panel" id="histPanel">
     <h2>Прошлые сессии</h2>
     <div class="sub" id="histTotal" style="margin-bottom:8px"></div>
     <div id="hist"></div>
@@ -216,36 +259,58 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
   var fmt = new Intl.NumberFormat('ru-RU');
   function $(id){ return document.getElementById(id); }
   function signed(v){ return v > 0 ? '+' + fmt.format(v) : v < 0 ? '−' + fmt.format(-v) : '0'; }
+  function money(v){ return v < 0 ? '−' + fmt.format(-v) : fmt.format(v); }
   function cls(v){ return v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero'; }
   function now(){ return Date.now(); }
+  function esc(t){ return String(t).replace(/[&<>"]/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]; }); }
+  var BUYNAME = { rebuy: 'Ребай', addon: 'Аддон' };
 
-  function example(){
-    var r = [0,0,1500,0,-800,0,0,-2400,0,4200,0,0,-600,0,0,2750,0,-1200,0,0];
-    var t0 = now() - 55*60000;
-    return { id: 'ex', start: t0, example: true,
-      hands: r.map(function(v,i){ return { r: v, cards: i===9 ? ["Ah","Ks"] : i===7 ? ["Jc","Jd"] : [], note: i===9 ? 'AK, выиграл против QQ' : '', t: t0 + i*160000 }; }) };
-  }
-  function fresh(){ return { id: String(now()), start: now(), hands: [] }; }
+  function fresh(name, stack0){ return { id: String(now()), name: name, stack0: stack0, start: now(), hands: [], buys: [] }; }
 
   var state;
   try { state = JSON.parse(localStorage.getItem(KEY)); } catch(e) { state = null; }
-  if (!state || !state.current) state = { current: example(), history: [] };
+  if (!state || typeof state !== 'object') state = { current: null, history: [] };
+  if (!Array.isArray(state.history)) state.history = [];
+  if (!state.current || state.current.example) state.current = null;   // пример из прежней версии не нужен
+  [state.current].concat(state.history).forEach(function(c){ if (c){ c.buys = c.buys || []; c.stack0 = c.stack0 || 0; } });
   function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} }
 
   function sum(hs){ return hs.reduce(function(a,h){ return a + h.r; }, 0); }
+  function buySum(c, kind){ return c.buys.reduce(function(a,b){ return a + (!kind || b.kind === kind ? b.amt : 0); }, 0); }
+  function buyCount(c, kind){ return c.buys.filter(function(b){ return b.kind === kind; }).length; }
+  function invested(c){ return c.stack0 + buySum(c); }
+  function stackNow(c){ return invested(c) + sum(c.hands); }
+  function nHands(n){ var m10 = n % 10, m100 = n % 100; return n + ' ' + (m10 === 1 && m100 !== 11 ? 'раздача' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'раздачи' : 'раздач'); }
+  function sessName(c){ return c.name || ('Сессия ' + dt(c.start)); }
   function dur(ms){
     var m = Math.max(0, Math.round(ms/60000)), h = Math.floor(m/60);
     return h ? h + ' ч ' + (m%60) + ' мин' : m + ' мин';
   }
   function dt(t){ return new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
 
-  function readAmount(){
-    var s = $('amount').value.replace(/\s/g,'').replace(',', '.').replace(/[^\d.]/g,'');
+  function readNum(el){
+    var s = el.value.replace(/\s/g,'').replace(',', '.').replace(/[^\d.]/g,'');
     var v = parseFloat(s);
     return isFinite(v) ? Math.round(v*100)/100 : NaN;
   }
+  function readAmount(){ return readNum($('amount')); }
 
   function flash(t){ $('msg').textContent = t; }
+
+  // все события сессии по времени: раздачи и докупки
+  function events(c){
+    var ev = [], n = 0;
+    c.hands.forEach(function(h, i){ ev.push({ type: 'hand', i: i, t: h.t, h: h }); });
+    c.buys.forEach(function(b, i){ ev.push({ type: 'buy', i: i, t: b.t, b: b }); });
+    ev.sort(function(a, b){ return a.t - b.t || (a.type === 'buy' ? -1 : 1); });
+    var st = c.stack0, res = 0;
+    ev.forEach(function(e){
+      if (e.type === 'hand'){ e.no = ++n; res += e.h.r; st += e.h.r; }
+      else { st += e.b.amt; }
+      e.stack = st; e.res = res;
+    });
+    return ev;
+  }
 
   // --- карты руки ---
   var RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
@@ -309,13 +374,13 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
   };
 
   function add(sign){
+    if (!state.current) return;
     var v = 0;
     if (sign !== 0){
       v = readAmount();
       if (!(v > 0)){ flash('Введите сумму, потом нажмите плюс или минус.'); $('amount').focus(); return; }
       v = sign * v;
     }
-    if (state.current.example){ state.current = fresh(); }
     state.current.hands.push({ r: v, cards: pickedList(), note: $('note').value.trim(), t: now() });
     var ct = cardsTxt(pickedList());
     $('amount').value = ''; $('note').value = '';
@@ -324,6 +389,38 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
     var n = state.current.hands.length;
     flash('Раздача №' + n + (ct ? ' (' + ct + ')' : '') + ': ' + (v === 0 ? 'пас' : signed(v)));
   }
+
+  // --- ребай и аддон ---
+  var buyKind = null;
+  function openBuy(kind){
+    var c = state.current; if (!c) return;
+    if (buyKind === kind){ closeBuy(); return; }
+    buyKind = kind;
+    var last = c.buys.filter(function(b){ return b.kind === kind; }).pop();
+    var def = last ? last.amt : (kind === 'rebuy' ? c.stack0 : 0);
+    $('buyLbl').textContent = kind === 'rebuy' ? 'Сумма ребая' : 'Сумма аддона';
+    $('buyOk').textContent = kind === 'rebuy' ? 'Добавить ребай' : 'Добавить аддон';
+    $('buyAmt').value = def > 0 ? fmt.format(def) : '';
+    $('buyForm').hidden = false;
+    $('bRebuy').classList.toggle('on', kind === 'rebuy'); $('bAddon').classList.toggle('on', kind === 'addon');
+    $('buyAmt').focus();
+  }
+  function closeBuy(){
+    buyKind = null; $('buyForm').hidden = true;
+    $('bRebuy').classList.remove('on'); $('bAddon').classList.remove('on');
+  }
+  $('bRebuy').onclick = function(){ openBuy('rebuy'); };
+  $('bAddon').onclick = function(){ openBuy('addon'); };
+  $('buyNo').onclick = closeBuy;
+  $('buyOk').onclick = function(){
+    var v = readNum($('buyAmt'));
+    if (!(v > 0)){ flash('Введите сумму ' + (buyKind === 'rebuy' ? 'ребая' : 'аддона') + '.'); $('buyAmt').focus(); return; }
+    var kind = buyKind;
+    state.current.buys.push({ kind: kind, amt: v, t: now() });
+    closeBuy(); save(); render();
+    flash(BUYNAME[kind] + ' ' + fmt.format(v) + ' добавлен. Стек: ' + money(stackNow(state.current)) + '.');
+  };
+  $('buyAmt').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); $('buyOk').click(); } });
 
   function drawChart(hs){
     var svg = $('chart'), W = 500, H = 110, pad = 8;
@@ -343,51 +440,74 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
       '<path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>' : '');
   }
 
-  var armed = null;
-  function renderList(hs){
-    var el = $('list');
-    if (!hs.length){ el.innerHTML = '<div class="empty">Раздач пока нет. Введите первую выше.</div>'; return; }
-    var bal = [], b = 0;
-    hs.forEach(function(h){ b += h.r; bal.push(b); });
+  var armed = null;   // 'h3' или 'b1' — строка, ждущая подтверждения удаления
+  function renderList(c){
+    var el = $('list'), ev = events(c);
+    if (!ev.length){ el.innerHTML = '<div class="empty">Раздач пока нет. Введите первую выше.</div>'; return; }
     var html = '';
-    for (var i = hs.length - 1; i >= 0; i--){
-      var h = hs[i];
+    for (var k = ev.length - 1; k >= 0; k--){
+      var e = ev[k], key = (e.type === 'hand' ? 'h' : 'b') + e.i, on = armed === key;
+      var del = '<button class="del' + (on ? ' armed' : '') + '" data-k="' + key + '" aria-label="Удалить">' + (on ? 'Удалить?' : '×') + '</button>';
+      if (e.type === 'buy'){
+        html += '<div class="hand buy"><span class="n num">' + (e.b.kind === 'rebuy' ? 'RB' : 'AD') + '</span>' +
+          '<div><span class="pill b">' + BUYNAME[e.b.kind].toLowerCase() + '</span> <span class="res num">' + fmt.format(e.b.amt) + '</span></div>' +
+          '<span class="bal num">стек ' + money(e.stack) + '</span>' + del + '</div>';
+        continue;
+      }
+      var h = e.h;
       var pill = h.r > 0 ? '<span class="pill w">плюс</span>' : h.r < 0 ? '<span class="pill l">минус</span>' : '<span class="pill f">пас</span>';
-      html += '<div class="hand">' +
-        '<span class="n num">№' + (i+1) + '</span>' +
-        '<div><div>' + (h.cards && h.cards.length ? h.cards.map(function(c){ return cardHtml(c, true); }).join(' ') + ' ' : '') + (h.r === 0 ? pill : '<span class="res num ' + cls(h.r) + '">' + signed(h.r) + '</span> ' + pill) + '</div>' +
+      html += '<div class="hand" data-note="' + e.i + '">' +
+        '<span class="n num">№' + e.no + '</span>' +
+        '<div><div>' + (h.cards && h.cards.length ? h.cards.map(function(x){ return cardHtml(x, true); }).join(' ') + ' ' : '') + (h.r === 0 ? pill : '<span class="res num ' + cls(h.r) + '">' + signed(h.r) + '</span> ' + pill) + '</div>' +
           (h.note ? '<div class="nt"></div>' : '') + '</div>' +
-        '<span class="bal num">итог ' + signed(bal[i]) + '</span>' +
-        '<button class="del' + (armed === i ? ' armed' : '') + '" data-i="' + i + '" aria-label="Удалить раздачу ' + (i+1) + '">' + (armed === i ? 'Удалить?' : '×') + '</button>' +
+        '<span class="bal num">' + (c.stack0 || c.buys.length ? 'стек ' + money(e.stack) : 'итог ' + signed(e.res)) + '</span>' + del +
       '</div>';
     }
     el.innerHTML = html;
     // заметки вставляем как текст
-    var notes = el.querySelectorAll('.hand'), k = 0;
-    for (var j = hs.length - 1; j >= 0; j--, k++){
-      if (hs[j].note){ notes[k].querySelector('.nt').textContent = hs[j].note; }
-    }
+    el.querySelectorAll('.hand[data-note]').forEach(function(row){
+      var h = c.hands[+row.dataset.note];
+      if (h.note) row.querySelector('.nt').textContent = h.note;
+    });
   }
 
   function renderHist(){
     var h = state.history;
-    var tot = sum(h.map(function(s){ return { r: sum(s.hands) }; }));
+    var tot = h.reduce(function(a, s){ return a + sum(s.hands); }, 0);
     $('histTotal').innerHTML = h.length ? 'Всего сессий: ' + h.length + ' · общий итог: <b class="num ' + cls(tot) + '" style="font-size:18px">' + signed(tot) + '</b>' : '';
-    if (!h.length){ $('hist').innerHTML = '<div class="empty">Завершённых сессий пока нет.</div>'; return; }
+    if (!h.length){ $('hist').innerHTML = '<div class="empty">Сохранённых сессий пока нет.</div>'; return; }
     $('hist').innerHTML = h.slice().reverse().map(function(s){
       var t = sum(s.hands);
-      return '<div class="sess"><div><div>' + dt(s.start) + '</div><div class="sub">' + s.hands.length + ' раздач · ' + dur((s.end||s.start) - s.start) + '</div></div>' +
+      var buys = [];
+      if (s.stack0) buys.push('старт ' + fmt.format(s.stack0));
+      if (buyCount(s, 'rebuy')) buys.push('ребаев ' + buyCount(s, 'rebuy'));
+      if (buyCount(s, 'addon')) buys.push('аддон ' + fmt.format(buySum(s, 'addon')));
+      return '<div class="sess"><div><div class="nm">' + esc(sessName(s)) + '</div>' +
+        '<div class="sub">' + dt(s.start) + ' · ' + nHands(s.hands.length) + ' · ' + dur((s.end||s.start) - s.start) + '</div>' +
+        (buys.length ? '<div class="sub">' + buys.join(' · ') + (s.stack0 || s.buys.length ? ' · в конце ' + money(stackNow(s)) : '') + '</div>' : '') + '</div>' +
         '<span class="res num ' + cls(t) + '">' + signed(t) + '</span>' +
         '<button class="del" data-sid="' + s.id + '" aria-label="Удалить сессию">×</button></div>';
     }).join('');
   }
 
   function render(){
-    var c = state.current, hs = c.hands;
-    var t = sum(hs);
+    var c = state.current;
+    $('startScr').hidden = !!c; $('live').hidden = !c; $('btnEnd').hidden = !c;
+    if (!c) $('confirmEnd').hidden = true;
+    $('title').textContent = c ? sessName(c) : 'Покерная сессия';
+    renderHist();
+    if (!c){ $('sessInfo').textContent = state.history.length ? 'Сохранено сессий: ' + state.history.length : 'Введите название и стек, затем начните сессию'; return; }
+    var hs = c.hands, t = sum(hs);
     var wins = hs.filter(function(h){ return h.r > 0; }), losses = hs.filter(function(h){ return h.r < 0; });
     var folds = hs.length - wins.length - losses.length;
     $('total').textContent = signed(t); $('total').className = 'big num ' + cls(t);
+    $('stackNow').textContent = money(stackNow(c));
+    var m = ['Старт <b>' + fmt.format(c.stack0) + '</b>'];
+    var rb = buyCount(c, 'rebuy'), ad = buyCount(c, 'addon');
+    if (rb) m.push('Ребаи <b>' + rb + ' × = ' + fmt.format(buySum(c, 'rebuy')) + '</b>');
+    if (ad) m.push('Аддон <b>' + fmt.format(buySum(c, 'addon')) + '</b>');
+    if (rb || ad) m.push('Вложено <b>' + fmt.format(invested(c)) + '</b>');
+    $('money').innerHTML = m.map(function(x){ return '<span>' + x + '</span>'; }).join('');
     $('hands').textContent = hs.length;
     $('sWin').textContent = wins.length; $('sLoss').textContent = losses.length; $('sFold').textContent = folds;
     $('sPlay').textContent = hs.length ? Math.round((wins.length + losses.length) * 100 / hs.length) + '%' : '0%';
@@ -395,12 +515,10 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
     var worst = losses.length ? Math.min.apply(null, losses.map(function(h){ return h.r; })) : null;
     $('xBest').textContent = best === null ? '—' : signed(best); $('xBest').className = best === null ? '' : 'pos';
     $('xWorst').textContent = worst === null ? '—' : signed(worst); $('xWorst').className = worst === null ? '' : 'neg';
-    var last = hs.length ? hs[hs.length-1].t : c.start;
-    $('xTime').textContent = hs.length ? dur(Math.max(last, now()) - c.start) : '—';
-    $('sessInfo').textContent = (c.example ? 'Пример · ' : 'Начата ') + dt(c.start);
-    $('exampleNote').hidden = !c.example;
-    $('nextLbl').textContent = 'Раздача №' + (c.example ? 1 : hs.length + 1);
-    drawChart(hs); renderList(hs); renderHist();
+    $('xTime').textContent = dur(now() - c.start);
+    $('sessInfo').textContent = 'Начата ' + dt(c.start);
+    $('nextLbl').textContent = 'Раздача №' + (hs.length + 1);
+    drawChart(hs); renderList(c);
   }
 
   // кнопки быстрых сумм добавляют к полю
@@ -416,36 +534,55 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
   $('bLoss').onclick = function(){ add(-1); };
   $('btnClr').onclick = function(){ $('amount').value = ''; $('amount').focus(); };
   $('btnUndo').onclick = function(){
-    var c = state.current;
-    if (c.example || !c.hands.length){ flash('Отменять нечего.'); return; }
-    var h = c.hands.pop(); save(); render();
-    flash('Отменена раздача №' + (c.hands.length + 1) + ' (' + (h.r === 0 ? 'пас' : signed(h.r)) + ')');
+    var c = state.current, ev = c ? events(c) : [];
+    if (!ev.length){ flash('Отменять нечего.'); return; }
+    var e = ev[ev.length - 1];
+    if (e.type === 'hand'){ c.hands.splice(e.i, 1); flash('Отменена раздача №' + e.no + ' (' + (e.h.r === 0 ? 'пас' : signed(e.h.r)) + ')'); }
+    else { c.buys.splice(e.i, 1); flash('Отменён ' + BUYNAME[e.b.kind].toLowerCase() + ' ' + fmt.format(e.b.amt)); }
+    save(); render();
   };
   $('list').onclick = function(e){
     var b = e.target.closest('.del'); if (!b) return;
-    var i = +b.dataset.i;
-    if (armed !== i){ armed = i; render(); return; }
+    var key = b.dataset.k;
+    if (armed !== key){ armed = key; render(); return; }
     armed = null;
-    if (state.current.example){ state.current = fresh(); }
-    else { state.current.hands.splice(i, 1); }
-    save(); render(); flash('Раздача удалена, номера пересчитаны.');
+    var i = +key.slice(1);
+    if (key[0] === 'h'){ state.current.hands.splice(i, 1); flash('Раздача удалена, номера пересчитаны.'); }
+    else { state.current.buys.splice(i, 1); flash('Докупка удалена.'); }
+    save(); render();
   };
   document.addEventListener('click', function(e){
     if (armed !== null && !e.target.closest('#list .del')){ armed = null; render(); }
   }, true);
 
+  // --- начало и конец сессии ---
+  $('btnStart').onclick = function(){
+    var name = $('sessName').value.trim();
+    var st = readNum($('stack0'));
+    if ($('stack0').value.trim() && !(st >= 0)){ $('startMsg').textContent = 'Стартовый стек — это число, например 10 000.'; $('stack0').focus(); return; }
+    state.current = fresh(name, st > 0 ? st : 0);
+    $('sessName').value = ''; $('stack0').value = ''; $('startMsg').textContent = '';
+    resetPicker(); closeBuy(); $('amount').value = ''; $('note').value = ''; flash('');
+    save(); renderPicked(); render(); window.scrollTo(0, 0);
+  };
+  $('sessName').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); $('stack0').focus(); } });
+  $('stack0').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); $('btnStart').click(); } });
   $('btnEnd').onclick = function(){
-    if (state.current.example || !state.current.hands.length){ flash('В сессии ещё нет раздач.'); return; }
-    $('confirmEnd').hidden = false;
+    var c = state.current; if (!c) return;
+    var any = c.hands.length || c.buys.length;
+    $('confirmTxt').textContent = any
+      ? 'Закончить «' + sessName(c) + '»? Итог ' + signed(sum(c.hands)) + ' за ' + nHands(c.hands.length) + ' сохранится в прошлые сессии.'
+      : 'В сессии нет раздач. Закончить без сохранения?';
+    $('confirmEnd').hidden = false; window.scrollTo(0, 0);
   };
   $('endNo').onclick = function(){ $('confirmEnd').hidden = true; };
   $('endYes').onclick = function(){
-    var c = state.current; c.end = c.hands[c.hands.length-1].t;
-    state.history.push(c); state.current = fresh();
-    $('confirmEnd').hidden = true; $('histPanel').hidden = false;
-    save(); render(); flash('Сессия сохранена. Началась новая.');
+    var c = state.current, saved = !!(c.hands.length || c.buys.length);
+    if (saved){ c.end = now(); state.history.push(c); }
+    state.current = null;
+    closeBuy(); save(); render();
+    $('startMsg').textContent = saved ? 'Сессия «' + sessName(c) + '» сохранена: ' + signed(sum(c.hands)) + '.' : 'Сессия без раздач не сохранена.';
   };
-  $('btnHist').onclick = function(){ $('histPanel').hidden = !$('histPanel').hidden; if (!$('histPanel').hidden) $('histPanel').scrollIntoView({behavior:'smooth'}); };
   var sArmed = null;
   $('hist').onclick = function(e){
     var b = e.target.closest('.del'); if (!b) return;
@@ -457,9 +594,15 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
   };
 
   $('btnCopy').onclick = function(){
-    var c = state.current, hs = c.hands, b = 0;
-    var lines = ['Покерная сессия ' + dt(c.start), 'Раздач: ' + hs.length + ', итог: ' + signed(sum(hs)), ''];
-    hs.forEach(function(h,i){ b += h.r; lines.push('№' + (i+1) + '  ' + (h.cards && h.cards.length ? cardsTxt(h.cards) + '  ' : '') + (h.r === 0 ? 'пас' : signed(h.r)) + '  (итог ' + signed(b) + ')' + (h.note ? '  ' + h.note : '')); });
+    var c = state.current; if (!c) return;
+    var lines = [sessName(c) + ' — ' + dt(c.start),
+      'Старт ' + fmt.format(c.stack0) + (c.buys.length ? ', докупки ' + fmt.format(buySum(c)) : '') + ', стек сейчас ' + money(stackNow(c)),
+      'Раздач: ' + c.hands.length + ', итог: ' + signed(sum(c.hands)), ''];
+    events(c).forEach(function(e){
+      if (e.type === 'buy'){ lines.push(BUYNAME[e.b.kind] + '  ' + fmt.format(e.b.amt) + '  (стек ' + money(e.stack) + ')'); return; }
+      var h = e.h;
+      lines.push('№' + e.no + '  ' + (h.cards && h.cards.length ? cardsTxt(h.cards) + '  ' : '') + (h.r === 0 ? 'пас' : signed(h.r)) + '  (итог ' + signed(e.res) + ', стек ' + money(e.stack) + ')' + (h.note ? '  ' + h.note : ''));
+    });
     var txt = lines.join('\n');
     try {
       navigator.clipboard.writeText(txt).then(function(){ flash('Отчёт скопирован.'); }, function(){ flash('Не удалось скопировать: браузер запретил доступ к буферу.'); });
@@ -471,9 +614,8 @@ h2{font:600 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.
   });
 
   renderPicked(); render();
-  setInterval(function(){ if (!state.current.example && state.current.hands.length) $('xTime').textContent = dur(now() - state.current.start); }, 30000);
+  setInterval(function(){ if (state.current) $('xTime').textContent = dur(now() - state.current.start); }, 30000);
 })();
 </script>
-
 </body>
 </html>
