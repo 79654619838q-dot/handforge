@@ -111,7 +111,8 @@ function toPBR(m) {
 
 export function ensurePerson(profile) {
   // человек готов, когда загружены и модель, и движения (иначе первые аватары вышли бы без анимации)
-  return profile?.person ? Promise.all([loadPerson(profile.person).catch(() => null), animsReady]).then(([f]) => f) : Promise.resolve(null);
+  if (heroOf(profile)) return figureTexture(heroOf(profile).id).ready; // герой — картинка, модель не нужна
+  return profile?.person ? Promise.all([loadPerson(profile.person).catch(() => null), animsReady()]).then(([f]) => f) : Promise.resolve(null);
 }
 
 // ---------- Живые движения (Microsoft Rocketbox Animations, MIT) ----------
@@ -119,7 +120,8 @@ export function ensurePerson(profile) {
 // Все анимированные люди обновляются из Stage.frame (updateAvatars), даже созданные сценами вне PlayerManager.
 let animLib = null;
 // ?noanim в адресе — без живых движений (для замера скорости)
-export const animsReady = (/noanim/.test(location.search) ? Promise.reject() : fetch(`${ASSETS}avatar/anims.json`)).then((r) => r.json()).then((raw) => {
+let animsP = null; // движения грузятся только когда нужен человек-модель (у героев-фигурок не нужны)
+export const animsReady = () => animsP ||= (/noanim/.test(location.search) ? Promise.reject() : fetch(`${ASSETS}avatar/anims.json`)).then((r) => r.json()).then((raw) => {
   animLib = {};
   for (const [name, c] of Object.entries(raw)) {
     const tracks = c.k.map((tr) => {
@@ -615,7 +617,65 @@ function shell(r, phiStart, phiLen, thetaStart, thetaLen) {
 }
 const FRONT = Math.PI / 2;
 
+// ---------- Герои — нарисованные фигурки (арты ChatGPT, assets/figures/<id>.webp) ----------
+// На поле фигурка маленькая: плоская картинка, всегда повёрнутая к камере, + тень под ногами.
+// Вместо модели со скелетом (сотни тысяч вершин, пересчёт костей каждый кадр) — 2 треугольника и одна текстура.
+const figTex = new Map();
+function figureTexture(id) {
+  if (!figTex.has(id)) {
+    let done; const ready = new Promise((r) => { done = r; });
+    const tx = new THREE.TextureLoader().load(`${ASSETS}figures/${id}.webp${ART_V}`, (t) => done(t), undefined, () => done(null));
+    tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4;
+    figTex.set(id, { tx, ready });
+  }
+  return figTex.get(id);
+}
+export function preloadFigures(ids) { return Promise.all(ids.map((id) => figureTexture(id).ready)); }
+let blobTex = null;
+function shadowBlob() {
+  if (!blobTex) {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(0,0,0,.65)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    blobTex = new THREE.CanvasTexture(c);
+  }
+  return blobTex;
+}
+const _q2 = new THREE.Quaternion(), _x = new THREE.Vector3(1, 0, 0), _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _v = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function buildFigure(hero) {
+  const root = new THREE.Group();
+  root.name = 'avatar';
+  const H = 1.85;
+  const { tx } = figureTexture(hero.id);
+  const mat = new THREE.MeshBasicMaterial({ map: tx, transparent: true, alphaTest: 0.08, toneMapped: false, side: THREE.DoubleSide });
+  const card = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  card.geometry.translate(0, 0.5, 0);
+  const fit = () => { const im = tx.image; const a = im && im.width ? im.width / im.height : 0.45; card.scale.set(H * a, H, 1); };
+  fit(); figureTexture(hero.id).ready.then(fit);
+  // всегда лицом к камере (поворот только вокруг вертикали — фигурка не заваливается) + лёгкое «дыхание»
+  const phase = Math.random() * 6;
+  card.onBeforeRender = (r, s, cam) => {
+    card.parent.getWorldQuaternion(_pq).invert();
+    cam.getWorldPosition(_v); card.getWorldPosition(card.userData.w ||= new THREE.Vector3());
+    const dx = _v.x - card.userData.w.x, dz = _v.z - card.userData.w.z, dy = _v.y - card.userData.w.y;
+    const yaw = Math.atan2(dx, dz);
+    // камера смотрит сверху — фигурка откидывается к ней на 75% угла (иначе видна сплюснутой), ноги остаются на клетке
+    const pitch = -Math.atan2(dy, Math.hypot(dx, dz)) * 0.75;
+    card.quaternion.copy(_pq).multiply(_q.setFromAxisAngle(_up, yaw)).multiply(_q2.setFromAxisAngle(_x, pitch));
+    const b = 1 + Math.sin(performance.now() / 900 + phase) * 0.012;
+    fit(); card.scale.y *= b;
+  };
+  root.add(card);
+  const blob = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: shadowBlob(), transparent: true, depthWrite: false }));
+  blob.rotation.x = -Math.PI / 2; blob.position.y = 0.005; root.add(blob);
+  root.userData.height = H; root.userData.figure = true;
+  root.userData.update = () => {};
+  root.userData.mood = () => {};
+  return root;
+}
+
 export function buildAvatar(p) {
+  { const hero = heroOf(p); if (hero) return buildFigure(hero); }
   const job = p.person && personCache.get(p.person);
   if (job?.resolved) return buildPerson(p, job.resolved);
   if (p.person && !job?.failed) { // ещё грузится: пустое место, чтобы не мелькал манекен
