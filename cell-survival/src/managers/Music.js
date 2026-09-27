@@ -137,7 +137,6 @@ export class Music {
         if (beat % 4 === 2) this.hat(t, 0.03);
         const n = melNote(12); if (n !== null && !intro) { this.brass(n, t, spb * 3.5, 0.045); this.bell(n + 12, t, 1.2, 0.02); }
         if (tr.fanfare && beat === 0 && bar % 2 === 0) this.brass(chord[2] + 24, t, spb * 6, 0.03);
-        if (build && beat >= 8) this.drum(t, 0.25 + (beat - 8) * 0.05, 60);
         return;
       }
       case 'synthwave': { // «Последняя клетка»: ретро-синтвейв — ровная бочка, хлопок, пульс баса восьмыми, яркий лид
@@ -147,7 +146,6 @@ export class Music {
         if (beat % 2 === 1) this.hat(t, 0.035);
         if (beat % 2 === 0) this.bass(chord[0] - 24 + (beat % 4 === 2 ? 12 : 0), t, spb * 1.6, 0.17);
         const n = melNote(12); if (n !== null && !intro) this.lead(n, t, spb * 1.8, 0.04);
-        if (build) this.riser(t, spb, beat / 16);
         return;
       }
       case 'horror': { // «Двери»: мрачное техно — глухая бочка, тревожные колокола, низкий гул
@@ -156,18 +154,16 @@ export class Music {
         if (beat % 4 === 2) this.hat(t, 0.05);
         if (beat === 12) this.clap(t, 0.12);
         const n = melNote(24); if (n !== null) this.bell(n + (R() < 0.3 ? 1 : 0), t, 1.8, 0.04);
-        if (build && beat % 2 === 0) this.drum(t, 0.3, 70);
         return;
       }
       case 'dnb': { // «Взрывное поле»: драм-н-бейс — ломаный быстрый ритм, раскаты малого, медь
         const K = [0, 10], SN = [4, 12];
         if (K.includes(beat)) this.drum(t, 0.7, 50);
         if (SN.includes(beat)) this.clap(t, 0.22);
-        if (beat % 2 === 1 || (build && beat >= 8)) this.hat(t, build ? 0.06 : 0.035);
+        if (beat % 2 === 1) this.hat(t, 0.035);
         if (beat === 0) { this.pad(chord, t, barLen, 0.03); this.bass(chord[0] - 24, t, barLen * 0.9, 0.2); }
         if (beat === 8) this.bass(chord[1] - 24, t, barLen * 0.4, 0.16);
         const n = melNote(12); if (n !== null && bar % 4 >= 2) this.brass(n, t, spb * 2, 0.04);
-        if (build && beat >= 8) this.clap(t, 0.05 + (beat - 8) * 0.02);
         return;
       }
       case 'trance': { // «Запомни число»: транс — каскад арпеджио шестнадцатыми, колокольная мелодия
@@ -178,7 +174,6 @@ export class Music {
         const arp = [0, 1, 2, 3, 2, 1, 2, 3]; const a = arp[beat % 8];
         if (!intro) this.pluck(chord[a % chord.length] + 12 + (a >= chord.length ? 12 : 0), t, spb * 0.9, 0.028);
         const n = melNote(24); if (n !== null && bar % 4 >= 2) this.bell(n, t, 0.9, 0.045);
-        if (build) this.riser(t, spb, beat / 16);
         return;
       }
       case 'chill': { // «Центр»: будущий бас — медленно, половинный ритм, мягкие щипки, широкие аккорды
@@ -225,7 +220,6 @@ export class Music {
         if (beat % 2 === 0) this.hat(t, 0.035);
         if (bar % 2 === 1 && beat % 4 === 0) this.wobble(chord[0] - 24, t, spb * 4, 0.16, beat % 8 === 0 ? 4 : 8);
         const n = melNote(24); if (n !== null && bar % 2 === 0) this.bell(n, t, 1.4, 0.04);
-        if (build) this.riser(t, spb, beat / 16);
         return;
       }
       case 'horror': // «Двери»: низкий гул, стук сердца, расстроенные колокольчики
@@ -367,8 +361,9 @@ export class Music {
   }
   // хоровая подложка: расстроенные пилы через мягкий фильтр
   pad(chord, t, dur, vol) {
-    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(500, t); f.frequency.linearRampToValueAtTime(1100, t + dur * 0.5); f.frequency.linearRampToValueAtTime(600, t + dur);
-    const g = this.ctx.createGain(); this.env(g, t, dur * 0.3, dur * 0.4, dur * 0.4, vol);
+    // ровная подложка (оператор 28.09: нарастающий звук в каждом такте раздражал) — без разгорания и без качания фильтра
+    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 800;
+    const g = this.ctx.createGain(); this.env(g, t, 0.04, dur * 0.8, dur * 0.2, vol);
     f.connect(g).connect(this.bus);
     for (const n of chord) for (const d of [-8, 8]) this.osc('sawtooth', hz(n), t, dur, d).connect(f);
   }
