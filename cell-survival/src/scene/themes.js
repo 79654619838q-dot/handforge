@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { makeCellTextures, surfaceTextures, gradientTexture, softDot, makeNoise, smokeTexture, memoTextures } from './textures.js';
-import { ASSETS } from '../paths.js';
+import { ASSETS, ART_V } from '../paths.js';
 
 // Пять утверждённых тем (п.35 ТЗ). Каждая строит окружение вокруг поля
 // и отдаёт материалы клеток и цвета эффектов. Менять состав тем — только с разрешения.
@@ -402,7 +402,7 @@ export function buildEnvironment(themeId, scene, onBackdrop) {
   scene.fog = ctx.fog;
   // Нарисованный задник темы (ASSETS.md): картинка становится окружением, процедурные декорации
   // прячутся, остаются свет и частицы. Клетки стоят на нарисованной площадке и бросают на неё тень.
-  new THREE.TextureLoader().load(`${ASSETS}${themeId}/backdrop.jpg`, (tx) => {
+  new THREE.TextureLoader().load(`${ASSETS}${themeId}/backdrop.jpg${ART_V}`, (tx) => {
     tx.colorSpace = THREE.SRGBColorSpace;
     tx.userData.cover = true;
     if (scene.background?.isTexture) scene.background.dispose();
