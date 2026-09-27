@@ -429,7 +429,7 @@ export function cellMaterials(themeId) {
   const th = THEMES[themeId];
   const conf = {
     desert: { rough: 0.85, metal: 0, side: '#4a311a' },
-    space: { rough: 0.35, metal: 0.8, side: '#15191f' },
+    space: { rough: 0.5, metal: 0.3, side: '#2a313b' }, // полный металл в тёмном космосе отражал черноту — клетки были чёрными
     bunker: { rough: 0.9, metal: 0.1, side: '#252422' },
     jungle: { rough: 0.8, metal: 0, side: '#22271e' },
     iceberg: { rough: 0.2, metal: 0.1, side: '#1c2e3e' },
@@ -450,16 +450,16 @@ export function cellMaterials(themeId) {
 // У каждого варианта клетки свой участок фото, чтобы соседние клетки не были одинаковыми.
 const photoCache = new Map();
 const photoMemo = new Map(); // тема:вариант → составленная фактура (считается один раз)
-const PHOTO_MIX = { iceberg: 0.35, desert: 0.55 }; // лёд должен остаться синим — фото только прожилками
+const PHOTO_TINT = { desert: '#e8b27a', space: '#aab8cc', bunker: '#b8ada0', jungle: '#a8c48e', iceberg: '#b8e2ff' }; // окраска фото-фактуры под мир
 function loadPhoto(url) {
   if (!photoCache.has(url)) photoCache.set(url, new THREE.ImageLoader().loadAsync(url).catch(() => null));
   return photoCache.get(url);
 }
 function addPhotoDetail(themeId, tops, side, conf) {
-  return Promise.all([loadPhoto(`${ASSETS}cells/${themeId}_diff.jpg`), loadPhoto(`${ASSETS}cells/${themeId}_rough.jpg`)]).then(([diff, rough]) => {
+  return Promise.all([loadPhoto(`${ASSETS}cells/${themeId}_diff.jpg${ART_V}`), loadPhoto(`${ASSETS}cells/${themeId}_rough.jpg${ART_V}`)]).then(([diff, rough]) => {
     if (!diff) return;
-    const S = 512;
-    const piece = (img, v, g) => { const o = (v * 0.37) % 1; g.drawImage(img, -o * S, -((v * 0.61) % 1) * S, S * 2, S * 2); };
+    const S = 1024; // плитка клетки в полном разрешении фото (было 512 — на большом экране мыло)
+    const piece = (img, v, g) => { const k = 1.3, o = (v * 0.37) % 1; g.drawImage(img, -o * S * (k - 1), -((v * 0.61) % 1) * S * (k - 1), S * k, S * k); };
     tops.forEach((m, v) => {
       const base = m.map?.image;
       if (!base) return;
@@ -467,10 +467,13 @@ function addPhotoDetail(themeId, tops, side, conf) {
       if (done) { m.map.dispose(); m.map = done.map.clone(); if (done.rough) { m.roughnessMap = done.rough.clone(); m.roughness = Math.min(1, conf.rough * 1.3); } m.needsUpdate = true; return; }
       const c = document.createElement('canvas'); c.width = c.height = S;
       const g = c.getContext('2d');
-      g.drawImage(base, 0, 0, S, S);
-      g.globalCompositeOperation = 'overlay'; g.globalAlpha = PHOTO_MIX[themeId] ?? 0.85;
+      // основа — фото-фактура в полную силу, окрашенная в цвет мира; гравировка и рамка темы — поверх
       piece(diff, v, g);
+      g.globalCompositeOperation = 'multiply'; g.fillStyle = PHOTO_TINT[themeId] || '#ffffff'; g.fillRect(0, 0, S, S);
+      g.globalCompositeOperation = 'overlay'; g.globalAlpha = 0.6; g.drawImage(base, 0, 0, S, S);
       g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+      // рамка клетки — тонкий светлый кант, чтобы клетки читались на фоне
+      g.strokeStyle = 'rgba(255,240,210,.22)'; g.lineWidth = S * 0.012; g.strokeRect(S * 0.03, S * 0.03, S * 0.94, S * 0.94);
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
       m.map.dispose(); m.map = t;
       if (rough) {

@@ -6,6 +6,7 @@ const KEY = 'cellsurvival.save.v1';
 const DEFAULTS = () => ({
   version: 1,
   qualityV2: true,
+  resV3: true,
   profile: null,
   settings: {
     music: 0.55,
@@ -33,6 +34,7 @@ export class SaveManager {
       const parsed = JSON.parse(raw);
       const d = DEFAULTS();
       // до 25.09 выбор был только «высокое/низкое»; «высокое» было по умолчанию — переводим на «Авто»
+      if (!parsed.resV3) { if (parsed.settings) parsed.settings.renderScale = 1; parsed.resV3 = true; } // 27.09: картинка была пиксельной
       if (!parsed.qualityV2) { if (parsed.settings?.quality === 'high') parsed.settings.quality = 'auto'; parsed.qualityV2 = true; }
       return { ...d, ...parsed, settings: { ...d.settings, ...parsed.settings }, best: { ...d.best, ...parsed.best }, stats: { ...d.stats, ...parsed.stats } };
     } catch {

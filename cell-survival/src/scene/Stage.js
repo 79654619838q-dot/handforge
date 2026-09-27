@@ -91,7 +91,11 @@ export class Stage {
       this.composer.passes.forEach((p) => p.dispose?.());
       this.composer.dispose();
     }
-    this.composer = new EffectComposer(this.renderer);
+    // Кадр рисуется в цель со встроенным сглаживанием краёв 4× (MSAA): без него постобработка
+    // давала «лесенку» на краях клеток и фигурок — игра выглядела пиксельной (оператор 27.09).
+    const q0 = this.quality;
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: q0 === 'low' ? 0 : 4 });
+    this.composer = new EffectComposer(this.renderer, rt);
     this.composer.addPass(new RenderPass(scene, camera));
     const q = this.quality;
     this.aoPass = null; this.bloomPass = null; this.aaPass = null;
@@ -121,15 +125,14 @@ export class Stage {
       u.uLift.value.set(...g.lift); u.uGain.value.set(...g.gain); u.uSat.value = g.sat; u.uContrast.value = g.contrast; u.uVignette.value = g.vignette;
       this.composer.addPass(this.gradePass);
       // после постобработки встроенное сглаживание не работает — сглаживаем сами
-      this.aaPass = q === 'ultra' ? new SMAAPass() : new ShaderPass(FXAAShader);
-      this.composer.addPass(this.aaPass);
+      this.aaPass = null; // сглаживание — MSAA в цели кадра (FXAA/SMAA мылили картинку)
     }
     this.resize();
   }
 
   // Размытие фона: focus — расстояние от камеры до игрока; null — выключить.
   setDof(focus) {
-    if (!this.dofPass) return;
+    if (!this.dofPass || this.dofOff) return;
     this.dofPass.enabled = focus != null;
     if (focus != null) this.dofPass.uniforms.focus.value = focus;
   }
@@ -194,15 +197,17 @@ export class Stage {
     this.fpsT = 0; this.fpsN = 0;
     this.fps = fps;
     const s = this.autoScale || 1;
-    if (fps < 45) {
-      if (this.aoPass?.enabled) this.aoPass.enabled = false; // самое дорогое — первым
-      else if (s > 0.61) { this.autoScale = Math.max(0.6, s - 0.15); this.resize(); }
+    if (fps < 40) {
+      // сначала выключаем дорогие эффекты; разрешение трогаем последним и не ниже 85% — иначе «пиксели»
+      if (this.aoPass?.enabled) this.aoPass.enabled = false;
+      else if (this.dofPass && !this.dofOff) this.dofOff = true;
       else if (this.bloomPass?.enabled) this.bloomPass.enabled = false;
+      else if (s > 0.86) { this.autoScale = Math.max(0.85, s - 0.15); this.resize(); }
       this.goodRuns = 0;
     } else if (fps > 57 && (this.goodRuns = (this.goodRuns || 0) + 1) >= 3) {
       this.goodRuns = 0;
-      if (this.bloomPass && !this.bloomPass.enabled) this.bloomPass.enabled = true;
-      else if (s < 1) { this.autoScale = Math.min(1, s + 0.1); this.resize(); }
+      if (s < 1) { this.autoScale = 1; this.resize(); }
+      else if (this.bloomPass && !this.bloomPass.enabled) this.bloomPass.enabled = true;
       else if (this.aoPass && !this.aoPass.enabled) this.aoPass.enabled = true;
     }
   }
