@@ -18,18 +18,24 @@ const BPM = { menu: 70, game: 96, final: 84 };
 
 // Свой трек у каждого испытания (оператор 26.09: «чтоб менялась под каждый режим»).
 // В «Останови время» и «Бомбе» нет ровной доли — по ней можно было бы считать секунды.
+// Энергичные треки (оператор 27.09: «музыку надо энергичной»): у каждого испытания свой темп, гармония и ведущий голос.
+// lead: saw — яркий синтезатор, pluck — щипок, bell — колокольчик, brass — медь.
+// «Останови время» и «Бомба» — без ровной доли (по ней можно было бы считать секунды), но плотные и нервные.
 const TRACKS = {
-  lastcell: { bpm: 96, prog: PROG.game, style: 'game' },
-  doors: { bpm: 58, prog: [[45, 48, 52], [46, 49, 53], [45, 48, 52], [44, 47, 51]], style: 'horror' },
-  time: { bpm: 60, prog: [[50, 53, 57, 60], [48, 52, 55, 59], [46, 50, 53, 57], [45, 48, 52, 55]], style: 'free' },
-  mines: { bpm: 112, prog: [[50, 53, 57], [50, 53, 57], [46, 50, 53], [48, 52, 55]], style: 'march' },
-  memory: { bpm: 84, prog: [[57, 60, 64], [55, 59, 62], [53, 57, 60], [52, 56, 59]], style: 'mystery' },
-  center: { bpm: 72, prog: [[52, 55, 59, 62], [48, 52, 55, 59], [50, 53, 57, 60], [47, 50, 54, 57]], style: 'focus' },
-  unique: { bpm: 92, prog: [[55, 58, 62], [56, 60, 63], [53, 56, 60], [55, 58, 62]], style: 'odd', steps: 14 },
-  shoot: { bpm: 100, prog: [[52, 55, 59], [52, 55, 59], [48, 52, 55], [47, 51, 54]], style: 'western' },
+  menu: { bpm: 126, prog: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], style: 'drive', lead: 'saw' },
+  lastcell: { bpm: 128, prog: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [52, 56, 59]], style: 'drive', lead: 'pluck' },
+  doors: { bpm: 132, prog: [[45, 48, 52], [46, 49, 53], [45, 48, 52], [44, 47, 51]], style: 'drive', lead: 'bell', dark: true },
+  mines: { bpm: 138, prog: [[50, 53, 57], [50, 53, 57], [46, 50, 53], [48, 52, 55]], style: 'drive', lead: 'brass' },
+  memory: { bpm: 124, prog: [[57, 60, 64], [55, 59, 62], [53, 57, 60], [52, 56, 59]], style: 'drive', lead: 'bell' },
+  center: { bpm: 122, prog: [[52, 55, 59, 62], [48, 52, 55, 59], [50, 53, 57, 60], [47, 50, 54, 57]], style: 'drive', lead: 'pluck' },
+  unique: { bpm: 130, prog: [[55, 58, 62], [56, 60, 63], [53, 56, 60], [55, 58, 62]], style: 'drive', lead: 'saw' },
+  shoot: { bpm: 134, prog: [[52, 55, 59], [52, 55, 59], [48, 52, 55], [47, 51, 54]], style: 'drive', lead: 'pluck', dark: true },
+  cards: { bpm: 126, prog: [[50, 53, 57, 60], [55, 59, 62, 65], [48, 52, 55, 59], [45, 49, 52, 55]], style: 'drive', lead: 'saw' },
+  roulette: { bpm: 136, prog: [[45, 48, 52], [45, 48, 51], [44, 48, 51], [45, 48, 52]], style: 'drive', lead: 'bell', dark: true },
+  final: { bpm: 132, prog: [[48, 52, 55], [53, 57, 60], [55, 59, 62], [48, 52, 55, 60]], style: 'drive', lead: 'brass' },
+  game: { bpm: 128, prog: PROG.game, style: 'drive', lead: 'pluck' },
+  time: { bpm: 0, prog: [[50, 53, 57, 60], [48, 52, 55, 59], [46, 50, 53, 57], [45, 48, 52, 55]], style: 'free' },
   bomb: { bpm: 0, prog: [[49, 52, 56], [50, 53, 57], [49, 52, 56], [48, 51, 55]], style: 'fuse' },
-  cards: { bpm: 88, prog: [[50, 53, 57, 60], [55, 59, 62, 65], [48, 52, 55, 59], [45, 49, 52, 55]], style: 'noir', swing: 0.33 },
-  roulette: { bpm: 64, prog: [[45, 48, 52], [45, 48, 51], [44, 48, 51], [45, 48, 52]], style: 'heartbeat' },
 };
 const trackOf = (name) => TRACKS[name] || { bpm: BPM[name], prog: PROG[name], style: name };
 
@@ -44,7 +50,10 @@ export class Music {
     this.revGain = ctx.createGain(); this.revGain.gain.value = 0.35;
     this.rev.connect(this.revGain).connect(out);
     this.bus = ctx.createGain(); this.bus.gain.value = 0;
-    this.bus.connect(out); this.bus.connect(this.rev);
+    // компрессор-ограничитель: энергичные треки плотные, но без перегруза и хрипа
+    this.comp = ctx.createDynamicsCompressor();
+    this.comp.threshold.value = -14; this.comp.knee.value = 8; this.comp.ratio.value = 6; this.comp.attack.value = 0.004; this.comp.release.value = 0.18;
+    this.bus.connect(this.comp).connect(out); this.bus.connect(this.rev);
     this.noiseBuf = this.noise(1);
   }
 
@@ -88,7 +97,7 @@ export class Music {
     const tr = trackOf(name);
     // без ровной доли: длина шага каждый раз чуть другая (0,6…1,4 от средней)
     const free = tr.bpm === 0 || tr.style === 'free';
-    const spbBase = 60 / (tr.bpm || 76) / 4;
+    const spbBase = 60 / (tr.bpm || 128) / 4;
     // после фейда трек снова набирает громкость
     if (this.bus.gain.value < 0.01 && this.ctx.currentTime > this.next) this.bus.gain.setTargetAtTime(1, this.ctx.currentTime, 0.6);
     while (this.next < this.ctx.currentTime + 0.25) {
@@ -108,6 +117,25 @@ export class Music {
     const barLen = spb * steps;
     const R = Math.random;
     switch (tr.style) {
+      case 'drive': { // бочка на каждую долю, хлопок на 2 и 4, шестнадцатые тарелки, бас между долями, арпеджио
+        const phrase = bar % 8, intro = bar < 2, build = phrase === 7;
+        if (beat === 0) { this.pad(tr.dark ? chord.map((n) => n - 12) : chord, t, barLen, 0.03); if (phrase === 0 && bar > 0) this.crash(t, 0.12); }
+        if (beat % 4 === 0 && !(build && beat >= 12)) this.drum(t, 0.6, 48);
+        if (!intro && (beat === 4 || beat === 12)) this.clap(t, 0.2);
+        if (!intro) this.hat(t, beat % 4 === 2 ? 0.075 : 0.03);
+        if (beat % 4 === 2) this.bass(chord[0] - 24, t, spb * 1.6, 0.2);                  // «качающий» бас между долями
+        if (beat % 4 === 3 && !intro) this.bass(chord[0] - 12, t, spb * 0.8, 0.12);
+        if (bar >= 1) {
+          const arp = [0, 1, 2, 1, 2, 3, 2, 1], n = chord[arp[beat % 8] % chord.length] + 12 + (arp[beat % 8] === 3 ? 12 : 0);
+          const v = beat % 4 === 0 ? 0.05 : 0.032;
+          if (tr.lead === 'saw') this.lead(n, t, spb * 0.9, v);
+          else if (tr.lead === 'bell') { if (beat % 2 === 0) this.bell(n + 12, t, 0.5, v); }
+          else if (tr.lead === 'brass') { if (beat % 4 === 0) this.brass(n, t, spb * 3, v * 1.2); else if (beat % 2 === 0) this.pluck(n, t, spb, v * 0.7); }
+          else this.pluck(n, t, spb * 1.2, v * 1.2);
+        }
+        if (build) { if (beat % 2 === 0) this.clap(t, 0.06 + beat * 0.012); this.riser(t, spb, beat / 16); }
+        return;
+      }
       case 'horror': // «Двери»: низкий гул, стук сердца, расстроенные колокольчики
         if (beat === 0) { this.pad(chord.map((n) => n - 12), t, barLen * 1.1, 0.05); this.bass(chord[0] - 24, t, barLen, 0.14); }
         if (beat === 0 || beat === 3) this.drum(t, beat ? 0.35 : 0.55, 42);
@@ -115,7 +143,10 @@ export class Music {
         return;
       case 'free': // «Время»: ни одной ровной доли — подложка и редкие колокольчики в случайные моменты
         if (beat === 0) this.pad(chord, t, barLen * 1.6, 0.045);
-        if (R() < 0.18) this.bell(chord[Math.floor(R() * chord.length)] + 12 + (R() < 0.3 ? 12 : 0), t, 2.5, 0.035);
+        if (R() < 0.45) this.bell(chord[Math.floor(R() * chord.length)] + 12 + (R() < 0.4 ? 12 : 0), t, 1.2, 0.06);
+        if (R() < 0.12) this.bass(chord[0] - 12, t, spb * 3, 0.14);
+        if (R() < 0.3) this.pluck(chord[Math.floor(R() * chord.length)] + 24, t, spb * 0.8, 0.03);
+        if (R() < 0.25) this.hat(t, 0.04);
         if (beat === 8 && R() < 0.5) this.bass(chord[0] - 12, t, barLen * 0.8, 0.1);
         return;
       case 'march': // «Взрывное поле»: военный марш — дробь, тяжёлые удары, остинато
@@ -148,8 +179,9 @@ export class Music {
         return;
       case 'fuse': // «Бомба»: нервный гул и случайные удары — ровного тиканья нет
         if (beat === 0) { this.pad(chord, t, barLen * 1.2, 0.04); this.bass(chord[0] - 24, t, barLen, 0.16); }
-        if (R() < 0.22) this.hat(t, 0.05 + R() * 0.04);
-        if (R() < 0.06) this.drum(t, 0.4, 50);
+        if (R() < 0.45) this.hat(t, 0.05 + R() * 0.05);
+        if (R() < 0.12) this.drum(t, 0.55, 50);
+        if (R() < 0.25) this.lead(chord[Math.floor(R() * chord.length)] + 12, t, spb * 0.6, 0.028);
         return;
       case 'noir': // «Очко»: джаз казино — шагающий бас, щётки, септаккорды
         if (beat === 0) this.pad(chord, t, barLen, 0.03);
@@ -187,6 +219,34 @@ export class Music {
   }
 
   // ---- инструменты ----
+  // яркий синтезатор: три расстроенные пилы через фильтр с «щелчком»
+  lead(n, t, dur, vol) {
+    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 6; f.frequency.setValueAtTime(3800, t); f.frequency.exponentialRampToValueAtTime(900, t + dur);
+    const g = this.ctx.createGain(); this.env(g, t, 0.004, dur * 0.3, dur * 0.7, vol);
+    f.connect(g).connect(this.bus);
+    for (const d of [-12, 0, 12]) this.osc('sawtooth', hz(n), t, dur, d).connect(f);
+  }
+  clap(t, vol) {
+    for (const k of [0, 0.011, 0.022]) {
+      const n = this.ctx.createBufferSource(); n.buffer = this.noiseBuf;
+      const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 0.9;
+      const g = this.ctx.createGain(); this.env(g, t + k, 0.001, 0, k === 0.022 ? 0.16 : 0.03, vol);
+      n.connect(f).connect(g).connect(this.bus); n.start(t + k, Math.random() * 0.5); n.stop(t + k + 0.2);
+    }
+  }
+  crash(t, vol) {
+    const n = this.ctx.createBufferSource(); n.buffer = this.noiseBuf;
+    const f = this.ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 5000;
+    const g = this.ctx.createGain(); this.env(g, t, 0.002, 0, 1.4, vol);
+    n.connect(f).connect(g).connect(this.bus); n.start(t); n.stop(t + 1.5);
+  }
+  // нарастающий шум перед новой фразой
+  riser(t, dur, k) {
+    const n = this.ctx.createBufferSource(); n.buffer = this.noiseBuf;
+    const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 800 + k * 6000; f.Q.value = 2;
+    const g = this.ctx.createGain(); this.env(g, t, 0.002, dur * 0.5, dur * 0.5, 0.02 + k * 0.05);
+    n.connect(f).connect(g).connect(this.bus); n.start(t, Math.random() * 0.5); n.stop(t + dur + 0.05);
+  }
   env(g, t, a, hold, r, peak) {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + a);
