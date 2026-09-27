@@ -263,3 +263,18 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px;
 
 /* название игры «ЭРА» (26.09) */
 #menu .brand .title.era { font-size: clamp(72px, 11vw, 168px); letter-spacing: .18em; line-height: 1; filter: drop-shadow(0 0 28px rgba(217,178,95,.45)); }
+
+/* Общий рейтинг */
+#rating { flex-direction: column; align-items: center; justify-content: center; padding-top: 70px; background: radial-gradient(ellipse at center, rgba(3,2,6,.55), rgba(3,2,6,.2) 70%); }
+.rt-panel { background: rgba(8,6,12,.82); width: min(760px, 94vw); max-height: calc(100vh - 150px); overflow-y: auto; scrollbar-width: thin; }
+.rt-body { margin-top: 12px; }
+.rt-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.rt-table th { text-align: left; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-dim); padding: 6px 8px; }
+.rt-table td { padding: 6px 8px; border-top: 1px solid rgba(255,255,255,.06); }
+.rt-table td.pl { font-family: var(--font-title); color: var(--gold-hi); width: 40px; }
+.rt-table tr:nth-child(2) td.pl, .rt-table tr:nth-child(3) td.pl, .rt-table tr:nth-child(4) td.pl { font-size: 20px; }
+.rt-table td.hr { width: 44px; } .rt-table td.hr img { width: 36px; height: 45px; object-fit: cover; border-radius: 3px; display: block; }
+.rt-table td.pt { font-family: var(--font-title); color: var(--gold-hi); font-size: 18px; }
+.rt-table tr.me td { background: rgba(217,178,95,.12); }
+.rt-table tr.gap td { text-align: center; color: var(--ink-dim); border: 0; }
+@media (max-width: 760px) { #rating { padding-top: 80px; } .rt-table { font-size: 13px; } .rt-table th:nth-child(6), .rt-table td:nth-child(6) { display: none; } }

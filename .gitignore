@@ -17,3 +17,5 @@ claude-skills/
 
 # исходники картинок одевалки (большие PNG из ChatGPT)
 dressup-art/
+
+hub/.cell-rating.json

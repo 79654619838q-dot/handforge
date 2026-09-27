@@ -1,8 +1,10 @@
+import { playerId } from '../net/session.js';
+import { esc } from '../team/MatchView.js';
 import { h } from './UIManager.js';
 import { t, setLang } from '../i18n.js';
 import { THEMES, THEME_IDS } from '../scene/themes.js';
 import { getLang } from '../i18n.js';
-import { ASSETS } from '../paths.js';
+import { ASSETS, ART_V } from '../paths.js';
 
 // Главное меню и настройки.
 export class MenuManager {
@@ -22,8 +24,9 @@ export class MenuManager {
       <nav class="stagger">
         <button class="btn primary" data-a="play"><span class="num">I</span>${t('play')}</button>
         <button class="btn" data-a="profile"><span class="num">II</span>${t('profile')}</button>
-        <button class="btn" data-a="settings"><span class="num">III</span>${t('settings')}</button>
-        <button class="btn" data-a="exit"><span class="num">IV</span>${t('exit')}</button>
+        <button class="btn" data-a="rating"><span class="num">III</span>${t('rating')}</button>
+        <button class="btn" data-a="settings"><span class="num">IV</span>${t('settings')}</button>
+        <button class="btn" data-a="exit"><span class="num">V</span>${t('exit')}</button>
       </nav>
       ${best !== null ? `<div class="best">${t('best')}<b>${best}%</b></div>` : ''}
       <div class="foot">v0.1 · ${save.profile ? save.profile.name : ''}</div>`;
@@ -32,6 +35,7 @@ export class MenuManager {
       if (a === 'play') this.game.goModes();
       if (a === 'profile') this.game.goProfile(false);
       if (a === 'settings') this.game.goSettings();
+      if (a === 'rating') this.game.goRating();
       if (a === 'exit') this.exit(s);
     };
     return s;
@@ -46,6 +50,23 @@ export class MenuManager {
       s.appendChild(n);
       setTimeout(() => n.remove(), 3000);
     }, 200);
+  }
+
+  // Общий рейтинг: очки за все игры (hub/cell-rating.js)
+  ratingScreen() {
+    const s = h('div', 'screen vignette');
+    s.id = 'rating';
+    s.innerHTML = `<div class="topbar"><h1 class="title">${t('rating')}</h1><div class="spacer"></div><button class="btn ghost" data-back>${t('back')}</button></div>
+      <div class="panel rt-panel"><div class="label">${t('ratingHint')}</div><div class="rt-body" data-b>${t('loading')}</div></div>`;
+    s.querySelector('[data-back]').onclick = () => this.game.goMenu();
+    const body = s.querySelector('[data-b]');
+    fetch(`${import.meta.env.BASE_URL}api/rating?me=${encodeURIComponent(playerId())}`).then((r) => r.json()).then((d) => {
+      const row = (r) => `<tr class="${r.me ? 'me' : ''}"><td class="pl">${r.place}</td><td class="hr">${r.hero ? `<img src="${ASSETS}heroes/${r.hero}.jpg${ART_V}" alt="">` : ''}</td><td class="nm">${esc(r.name)}</td><td class="pt">${r.points}</td><td>${r.wins}</td><td>${r.games}</td></tr>`;
+      const head = `<tr><th>#</th><th></th><th>${t('name')}</th><th>${t('pts')}</th><th>${t('wins')}</th><th>${t('games')}</th></tr>`;
+      const mine = d.me && !d.top.some((r) => r.me) ? `<tr class="gap"><td colspan="6">…</td></tr>` + row({ ...d.me, me: true }) : '';
+      body.innerHTML = d.top.length ? `<table class="rt-table">${head}${d.top.map(row).join('')}${mine}</table>` : `<div class="label">${t('ratingEmpty')}</div>`;
+    }).catch(() => { body.textContent = t('ratingError'); });
+    return s;
   }
 
   settingsScreen() {

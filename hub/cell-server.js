@@ -5,6 +5,7 @@
 import { Server } from "socket.io";
 import { Match, CHALLENGE_IDS } from "../cell-survival/shared/match.js";
 import { pickHeroBot } from "../cell-survival/shared/heroes.js";
+import { recordGame } from "./cell-rating.js";
 
 const ROOM_STATUS = { WAITING: "WAITING", READY: "READY", PLAYING: "PLAYING", FINISHED: "FINISHED" };
 const CELL_COUNTS = [16, 25, 36, 50, 64, 100];
@@ -68,8 +69,17 @@ export function attachCellServer(httpServer) {
       r.pushQueued = false;
       if (!r.match) return;
       for (const m of r.members.values()) if (!m.isBot && m.socketId) io.to(m.socketId).emit("game", r.match.getStateFor(m.id));
-      if (r.match.phase === "final" && r.status !== ROOM_STATUS.FINISHED) { r.status = ROOM_STATUS.FINISHED; pushRoom(r); }
+      if (r.match.phase === "final" && r.status !== ROOM_STATUS.FINISHED) { r.status = ROOM_STATUS.FINISHED; pushRoom(r); saveRating(r); }
     });
+  }
+
+  // итог командной игры — в общий рейтинг (боты не считаются); победитель — больше всех очков
+  function saveRating(r) {
+    const any = [...r.members.values()].find((m) => !m.isBot);
+    if (!any) return;
+    const players = r.match.getStateFor(any.id).players;
+    const top = Math.max(...players.map((p) => p.points));
+    for (const p of players) if (!p.isBot) recordGame({ id: p.id, name: p.name, hero: r.members.get(p.id)?.profile?.hero, points: p.points, won: p.points === top }).catch((e) => console.error("[cell-rating]", e.message));
   }
 
   function deleteRoom(r) {

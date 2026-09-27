@@ -1,3 +1,4 @@
+import { playerId } from '../net/session.js';
 import { h } from '../managers/UIManager.js';
 import { t, getLang } from '../i18n.js';
 import { CHALLENGE_META } from '../../shared/match.js';
@@ -225,6 +226,8 @@ export class MatchView {
     o.querySelector('[data-again]')?.addEventListener('click', () => this.onAgain?.());
     o.querySelector('[data-leave]').onclick = () => this.onExit();
     if (top?.id === this.myId) this.game.audio.victory();
+    // одиночная игра считается в браузере — итог в общий рейтинг отправляем сами (командную пишет сервер)
+    if (solo) { const me = st.players.find((p) => p.id === this.myId); if (me) fetch(`${import.meta.env.BASE_URL}api/rating`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: playerId(), name: me.name, hero: me.profile?.hero, points: me.points, won: top?.id === this.myId }) }).catch(() => {}); }
     this.onFinal?.(st, hist);
   }
 

@@ -9,6 +9,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { attachCellServer } from "./cell-server.js";
+import { attachRatingRoutes } from "./cell-rating.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8877;
@@ -76,6 +77,7 @@ app.use(
 // Cell Survival — статическая сборка Vite с base "/cell/": все её пути уже
 // начинаются с /cell/, поэтому раздаём папку как есть. Без хвостового "/"
 // редиректим — так же, как у Poker (см. выше про req.path).
+attachRatingRoutes(app); // общий рейтинг «ЭРА»: /cell/api/rating
 app.get("/cell", (req, res, next) => {
   if (req.path === "/cell") return res.redirect(301, "/cell/");
   next();

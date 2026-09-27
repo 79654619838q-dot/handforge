@@ -73,6 +73,7 @@ export class GameManager {
     this.ui.show(this.menu.menuScreen());
   }
 
+  goRating() { this._menuBackdrop(); this.ui.show(this.menu.ratingScreen()); }
   goSettings() { this._menuBackdrop(); this.ui.show(this.menu.settingsScreen()); }
 
   goProfile(firstRun) {
