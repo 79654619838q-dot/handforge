@@ -21,21 +21,24 @@ const BPM = { menu: 70, game: 96, final: 84 };
 // Энергичные треки (оператор 27.09: «музыку надо энергичной»): у каждого испытания свой темп, гармония и ведущий голос.
 // lead: saw — яркий синтезатор, pluck — щипок, bell — колокольчик, brass — медь.
 // «Останови время» и «Бомба» — без ровной доли (по ней можно было бы считать секунды), но плотные и нервные.
+// Свой жанр и своя мелодия у меню и у каждого испытания (оператор 28.09: «в меню одна, в каждом испытании своя»).
+// mel — мелодия на 2 такта: ступени аккорда по восьмым (0,1,2 — ноты аккорда, 3 — октава, null — пауза, +7 — выше на квинту).
+// «Останови время» и «Бомба» — без ровной доли (по ней можно было бы считать секунды).
 const TRACKS = {
-  menu: { bpm: 126, prog: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], style: 'drive', lead: 'saw' },
-  lastcell: { bpm: 128, prog: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [52, 56, 59]], style: 'drive', lead: 'pluck' },
-  doors: { bpm: 132, prog: [[45, 48, 52], [46, 49, 53], [45, 48, 52], [44, 47, 51]], style: 'drive', lead: 'bell', dark: true },
-  mines: { bpm: 138, prog: [[50, 53, 57], [50, 53, 57], [46, 50, 53], [48, 52, 55]], style: 'drive', lead: 'brass' },
-  memory: { bpm: 124, prog: [[57, 60, 64], [55, 59, 62], [53, 57, 60], [52, 56, 59]], style: 'drive', lead: 'bell' },
-  center: { bpm: 122, prog: [[52, 55, 59, 62], [48, 52, 55, 59], [50, 53, 57, 60], [47, 50, 54, 57]], style: 'drive', lead: 'pluck' },
-  unique: { bpm: 130, prog: [[55, 58, 62], [56, 60, 63], [53, 56, 60], [55, 58, 62]], style: 'drive', lead: 'saw' },
-  shoot: { bpm: 134, prog: [[52, 55, 59], [52, 55, 59], [48, 52, 55], [47, 51, 54]], style: 'drive', lead: 'pluck', dark: true },
-  cards: { bpm: 126, prog: [[50, 53, 57, 60], [55, 59, 62, 65], [48, 52, 55, 59], [45, 49, 52, 55]], style: 'drive', lead: 'saw' },
-  roulette: { bpm: 136, prog: [[45, 48, 52], [45, 48, 51], [44, 48, 51], [45, 48, 52]], style: 'drive', lead: 'bell', dark: true },
-  final: { bpm: 132, prog: [[48, 52, 55], [53, 57, 60], [55, 59, 62], [48, 52, 55, 60]], style: 'drive', lead: 'brass' },
-  game: { bpm: 128, prog: PROG.game, style: 'drive', lead: 'pluck' },
-  time: { bpm: 0, prog: [[50, 53, 57, 60], [48, 52, 55, 59], [46, 50, 53, 57], [45, 48, 52, 55]], style: 'free' },
-  bomb: { bpm: 0, prog: [[49, 52, 56], [50, 53, 57], [49, 52, 56], [48, 51, 55]], style: 'fuse' },
+  menu: { bpm: 100, style: 'anthem', prog: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], mel: [0, null, 2, 3, 2, null, 1, 0, 1, null, 2, null, 0, null, null, null] },
+  lastcell: { bpm: 118, style: 'synthwave', prog: [[57, 60, 64], [53, 57, 60], [50, 53, 57], [52, 56, 59]], mel: [3, 2, 0, 2, 3, null, 2, 1, 0, 1, 2, null, 1, 0, null, null] },
+  doors: { bpm: 128, style: 'horror', prog: [[45, 48, 52], [46, 49, 53], [45, 48, 52], [44, 47, 51]], mel: [0, null, null, 1, null, null, 0, null, 2, null, null, 1, null, null, null, null] },
+  mines: { bpm: 172, style: 'dnb', prog: [[50, 53, 57], [50, 53, 57], [46, 50, 53], [48, 52, 55]], mel: [0, 0, 2, null, 1, null, 0, null, 3, null, 2, null, 1, null, null, null] },
+  memory: { bpm: 138, style: 'trance', prog: [[57, 60, 64], [55, 59, 62], [53, 57, 60], [52, 56, 59]], mel: [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 3, 2, 1, 0] },
+  center: { bpm: 96, style: 'chill', prog: [[52, 55, 59, 62], [48, 52, 55, 59], [50, 53, 57, 60], [47, 50, 54, 57]], mel: [3, null, 2, null, 1, null, 2, 3, null, null, 1, null, 0, null, null, null] },
+  unique: { bpm: 132, style: 'odd', steps: 14, prog: [[55, 58, 62], [56, 60, 63], [53, 56, 60], [55, 58, 62]], mel: [0, 2, 1, 3, 2, null, 1, 0, 2, 1, 3, null, null, null] },
+  shoot: { bpm: 112, style: 'western', prog: [[52, 55, 59], [52, 55, 59], [48, 52, 55], [47, 51, 54]], mel: [0, null, 3, null, 2, 1, 0, null, 1, null, 2, null, 0, null, null, null] },
+  cards: { bpm: 124, style: 'swing', swing: 0.33, prog: [[50, 53, 57, 60], [55, 59, 62, 65], [48, 52, 55, 59], [45, 49, 52, 55]], mel: [3, 2, 1, 0, 1, null, 2, 3, 2, null, 0, null, 1, 2, null, null] },
+  roulette: { bpm: 140, style: 'dubstep', prog: [[45, 48, 52], [45, 48, 51], [44, 48, 51], [45, 48, 52]], mel: [0, null, null, null, 2, null, 1, null, 0, null, null, null, 3, null, 2, null] },
+  final: { bpm: 120, style: 'anthem', fanfare: true, prog: [[48, 52, 55], [53, 57, 60], [55, 59, 62], [48, 52, 55, 60]], mel: [0, 0, 1, 2, 3, null, 2, null, 1, 1, 2, 3, 3, null, null, null] },
+  game: { bpm: 118, style: 'synthwave', prog: PROG.game, mel: [0, 2, 3, 2, 1, null, 0, null, 2, null, 1, null, 0, null, null, null] },
+  time: { bpm: 0, style: 'free', prog: [[50, 53, 57, 60], [48, 52, 55, 59], [46, 50, 53, 57], [45, 48, 52, 55]] },
+  bomb: { bpm: 0, style: 'fuse', prog: [[49, 52, 56], [50, 53, 57], [49, 52, 56], [48, 51, 55]] },
 };
 const trackOf = (name) => TRACKS[name] || { bpm: BPM[name], prog: PROG[name], style: name };
 
@@ -116,24 +119,113 @@ export class Music {
     const chord = prog[bar % prog.length];
     const barLen = spb * steps;
     const R = Math.random;
+    switch (tr.style === 'free' || tr.style === 'fuse' ? tr.style : '') {
+      // мелодия трека: восьмые, ступени аккорда
+      default: break;
+    }
+    const melNote = (oct = 12) => {
+      const m = tr.mel; if (!m || beat % 2) return null;
+      const d = m[((bar % 2) * 8 + beat / 2) % m.length];
+      return d === null || d === undefined ? null : chord[d % chord.length] + oct + (d >= chord.length ? 12 : 0);
+    };
+    const phrase = bar % 8, build = phrase === 7, intro = bar < 1;
     switch (tr.style) {
-      case 'drive': { // бочка на каждую долю, хлопок на 2 и 4, шестнадцатые тарелки, бас между долями, арпеджио
-        const phrase = bar % 8, intro = bar < 2, build = phrase === 7;
-        if (beat === 0) { this.pad(tr.dark ? chord.map((n) => n - 12) : chord, t, barLen, 0.03); if (phrase === 0 && bar > 0) this.crash(t, 0.12); }
-        if (beat % 4 === 0 && !(build && beat >= 12)) this.drum(t, 0.6, 48);
-        if (!intro && (beat === 4 || beat === 12)) this.clap(t, 0.2);
-        if (!intro) this.hat(t, beat % 4 === 2 ? 0.075 : 0.03);
-        if (beat % 4 === 2) this.bass(chord[0] - 24, t, spb * 1.6, 0.2);                  // «качающий» бас между долями
-        if (beat % 4 === 3 && !intro) this.bass(chord[0] - 12, t, spb * 0.8, 0.12);
-        if (bar >= 1) {
-          const arp = [0, 1, 2, 1, 2, 3, 2, 1], n = chord[arp[beat % 8] % chord.length] + 12 + (arp[beat % 8] === 3 ? 12 : 0);
-          const v = beat % 4 === 0 ? 0.05 : 0.032;
-          if (tr.lead === 'saw') this.lead(n, t, spb * 0.9, v);
-          else if (tr.lead === 'bell') { if (beat % 2 === 0) this.bell(n + 12, t, 0.5, v); }
-          else if (tr.lead === 'brass') { if (beat % 4 === 0) this.brass(n, t, spb * 3, v * 1.2); else if (beat % 2 === 0) this.pluck(n, t, spb, v * 0.7); }
-          else this.pluck(n, t, spb * 1.2, v * 1.2);
-        }
-        if (build) { if (beat % 2 === 0) this.clap(t, 0.06 + beat * 0.012); this.riser(t, spb, beat / 16); }
+      case 'anthem': { // меню и финал: торжественно — медленные мощные удары, хор, медь, мелодия колоколом
+        if (beat === 0) { this.pad(chord, t, barLen * 1.05, 0.06); this.bass(chord[0] - 12, t, barLen, 0.18); if (phrase === 0) this.crash(t, 0.1); }
+        if (beat === 0 || beat === 10) this.drum(t, 0.7, 42);
+        if (beat === 8) this.clap(t, 0.16);
+        if (beat % 4 === 2) this.hat(t, 0.03);
+        const n = melNote(12); if (n !== null && !intro) { this.brass(n, t, spb * 3.5, 0.045); this.bell(n + 12, t, 1.2, 0.02); }
+        if (tr.fanfare && beat === 0 && bar % 2 === 0) this.brass(chord[2] + 24, t, spb * 6, 0.03);
+        if (build && beat >= 8) this.drum(t, 0.25 + (beat - 8) * 0.05, 60);
+        return;
+      }
+      case 'synthwave': { // «Последняя клетка»: ретро-синтвейв — ровная бочка, хлопок, пульс баса восьмыми, яркий лид
+        if (beat === 0) this.pad(chord, t, barLen, 0.035);
+        if (beat % 4 === 0) this.drum(t, 0.6, 50);
+        if (beat === 4 || beat === 12) this.clap(t, 0.18);
+        if (beat % 2 === 1) this.hat(t, 0.035);
+        if (beat % 2 === 0) this.bass(chord[0] - 24 + (beat % 4 === 2 ? 12 : 0), t, spb * 1.6, 0.17);
+        const n = melNote(12); if (n !== null && !intro) this.lead(n, t, spb * 1.8, 0.04);
+        if (build) this.riser(t, spb, beat / 16);
+        return;
+      }
+      case 'horror': { // «Двери»: мрачное техно — глухая бочка, тревожные колокола, низкий гул
+        if (beat === 0) { this.pad(chord.map((n) => n - 12), t, barLen * 1.1, 0.05); this.bass(chord[0] - 24, t, barLen, 0.14); }
+        if (beat % 4 === 0) this.drum(t, 0.65, 40);
+        if (beat % 4 === 2) this.hat(t, 0.05);
+        if (beat === 12) this.clap(t, 0.12);
+        const n = melNote(24); if (n !== null) this.bell(n + (R() < 0.3 ? 1 : 0), t, 1.8, 0.04);
+        if (build && beat % 2 === 0) this.drum(t, 0.3, 70);
+        return;
+      }
+      case 'dnb': { // «Взрывное поле»: драм-н-бейс — ломаный быстрый ритм, раскаты малого, медь
+        const K = [0, 10], SN = [4, 12];
+        if (K.includes(beat)) this.drum(t, 0.7, 50);
+        if (SN.includes(beat)) this.clap(t, 0.22);
+        if (beat % 2 === 1 || (build && beat >= 8)) this.hat(t, build ? 0.06 : 0.035);
+        if (beat === 0) { this.pad(chord, t, barLen, 0.03); this.bass(chord[0] - 24, t, barLen * 0.9, 0.2); }
+        if (beat === 8) this.bass(chord[1] - 24, t, barLen * 0.4, 0.16);
+        const n = melNote(12); if (n !== null && bar % 4 >= 2) this.brass(n, t, spb * 2, 0.04);
+        if (build && beat >= 8) this.clap(t, 0.05 + (beat - 8) * 0.02);
+        return;
+      }
+      case 'trance': { // «Запомни число»: транс — каскад арпеджио шестнадцатыми, колокольная мелодия
+        if (beat === 0) this.pad(chord, t, barLen, 0.04);
+        if (beat % 4 === 0) this.drum(t, 0.6, 48);
+        if (beat % 4 === 2) { this.hat(t, 0.07); this.bass(chord[0] - 24, t, spb * 1.5, 0.18); }
+        if (beat === 4 || beat === 12) this.clap(t, 0.12);
+        const arp = [0, 1, 2, 3, 2, 1, 2, 3]; const a = arp[beat % 8];
+        if (!intro) this.pluck(chord[a % chord.length] + 12 + (a >= chord.length ? 12 : 0), t, spb * 0.9, 0.028);
+        const n = melNote(24); if (n !== null && bar % 4 >= 2) this.bell(n, t, 0.9, 0.045);
+        if (build) this.riser(t, spb, beat / 16);
+        return;
+      }
+      case 'chill': { // «Центр»: будущий бас — медленно, половинный ритм, мягкие щипки, широкие аккорды
+        if (beat === 0) { this.pad(chord, t, barLen * 1.1, 0.055); this.bass(chord[0] - 24, t, barLen * 0.7, 0.2); }
+        if (beat === 0) this.drum(t, 0.6, 46);
+        if (beat === 8) this.clap(t, 0.2);
+        if (beat % 4 === 2) this.hat(t, 0.03);
+        if (beat === 6 || beat === 14) this.pad(chord.map((n) => n + 12), t, spb * 1.5, 0.03);
+        const n = melNote(12); if (n !== null) this.pluck(n, t, spb * 3, 0.045);
+        return;
+      }
+      case 'odd': { // «Уникальное число»: размер 7/8 — ритм сбивается, резкий синтезатор
+        if (beat === 0) this.pad(chord, t, barLen, 0.035);
+        if (beat === 0 || beat === 6 || beat === 10) this.drum(t, beat ? 0.4 : 0.65, 55);
+        if (beat === 4 || beat === 12) this.clap(t, 0.15);
+        if (beat % 2 === 1) this.hat(t, 0.04);
+        if (beat % 2 === 0) this.bass(chord[(beat / 2) % 3] - 24, t, spb * 1.4, 0.15);
+        const n = melNote(12); if (n !== null && !intro) this.lead(n, t, spb * 1.4, 0.038);
+        return;
+      }
+      case 'western': { // «Стрельба»: вестерн — скачущий ритм, звонкая гитара с эхом, свист
+        if (beat === 0) { this.pad(chord, t, barLen, 0.04); this.bass(chord[0] - 12, t, spb * 3, 0.22); }
+        if (beat === 8) this.bass(chord[2] - 24, t, spb * 3, 0.2);
+        if (beat === 4 || beat === 12) this.clap(t, 0.14);
+        if ([0, 3, 4, 7, 8, 11, 12, 15].includes(beat)) this.hat(t, beat % 4 === 0 ? 0.06 : 0.035); // галоп
+        if (beat === 0 || beat === 8) this.drum(t, 0.65, 52);
+        const n = melNote(12);
+        if (n !== null) { if (bar % 4 < 2) { this.pluck(n, t, spb * 2, 0.07); this.pluck(n, t + spb * 3, spb * 2, 0.02); } else this.whistle(n + 12, t, spb * 2, 0.04); }
+        return;
+      }
+      case 'swing': { // «Очко»: электросвинг — шагающий бас, медные акценты, хлопки на 2 и 4
+        if (beat === 0) this.pad(chord, t, barLen, 0.03);
+        if (beat % 4 === 0) { this.drum(t, 0.5, 50); this.bass(chord[(beat / 4) % chord.length] - 12, t, spb * 3.5, 0.17); }
+        if (beat === 4 || beat === 12) this.clap(t, 0.18);
+        if (beat % 2 === 0) this.hat(t, beat % 4 === 2 ? 0.06 : 0.03);
+        if (beat === 6 || beat === 14) this.brass(chord[3 % chord.length] + 12, t, spb * 1.2, 0.04);
+        const n = melNote(24); if (n !== null && !intro) this.pluck(n, t, spb * 1.5, 0.04);
+        return;
+      }
+      case 'dubstep': { // «Рулетка»: дабстеп — тяжёлый половинный ритм, «рычащий» бас, редкие колокола
+        if (beat === 0) this.pad(chord.map((n) => n - 12), t, barLen, 0.04);
+        if (beat === 0 || beat === 3) this.drum(t, 0.7, 42);
+        if (beat === 8) this.clap(t, 0.25);
+        if (beat % 2 === 0) this.hat(t, 0.035);
+        if (bar % 2 === 1 && beat % 4 === 0) this.wobble(chord[0] - 24, t, spb * 4, 0.16, beat % 8 === 0 ? 4 : 8);
+        const n = melNote(24); if (n !== null && bar % 2 === 0) this.bell(n, t, 1.4, 0.04);
+        if (build) this.riser(t, spb, beat / 16);
         return;
       }
       case 'horror': // «Двери»: низкий гул, стук сердца, расстроенные колокольчики
@@ -219,6 +311,20 @@ export class Music {
   }
 
   // ---- инструменты ----
+  // свист: чистый тон с вибрато (вестерн)
+  whistle(n, t, dur, vol) {
+    const o = this.osc('sine', hz(n), t, dur), lfo = this.osc('sine', 6, t, dur), lg = this.ctx.createGain();
+    lg.gain.value = hz(n) * 0.012; lfo.connect(lg).connect(o.frequency);
+    const g = this.ctx.createGain(); this.env(g, t, 0.05, dur * 0.5, dur * 0.5, vol); o.connect(g).connect(this.bus);
+  }
+  // «рычащий» бас: фильтр качается с частотой rate
+  wobble(n, t, dur, vol, rate) {
+    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 9; f.frequency.value = 400;
+    const lfo = this.osc('sine', rate, t, dur), lg = this.ctx.createGain(); lg.gain.value = 900; lfo.connect(lg).connect(f.frequency);
+    const g = this.ctx.createGain(); this.env(g, t, 0.01, dur * 0.8, dur * 0.2, vol);
+    f.connect(g).connect(this.bus);
+    for (const d of [-7, 7]) this.osc('sawtooth', hz(n), t, dur, d).connect(f);
+  }
   // яркий синтезатор: три расстроенные пилы через фильтр с «щелчком»
   lead(n, t, dur, vol) {
     const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 6; f.frequency.setValueAtTime(3800, t); f.frequency.exponentialRampToValueAtTime(900, t + dur);
