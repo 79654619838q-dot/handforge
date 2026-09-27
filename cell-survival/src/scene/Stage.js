@@ -44,10 +44,20 @@ export class Stage {
 
   // Уровни: ultra — компьютер (объём в углах, SMAA, всё включено); high — телефон (свечение, FXAA);
   // low — слабые устройства. «auto» выбирает сам по устройству.
+  // «Авто»: «Максимум» (постобработка) — только на отдельной видеокарте. Встроенная (Intel UHD/Iris, AMD Radeon
+  // Graphics, телефоны) — «Высокое»: кадр сразу на экран. Замер 28.09 на ноутбуке оператора (Chrome рисует на
+  // Intel UHD): «Максимум» 7 к/с, прямой вывод — 60+.
   static resolveQuality(q) {
     if (q !== 'auto') return q;
     const phone = Math.min(innerWidth, innerHeight) < 600 || matchMedia('(pointer: coarse)').matches;
-    return phone ? 'high' : 'ultra';
+    return phone || Stage.integratedGpu() ? 'high' : 'ultra';
+  }
+  static integratedGpu() {
+    if (Stage._igpu !== undefined) return Stage._igpu;
+    let name = '';
+    try { const gl = document.createElement('canvas').getContext('webgl2'); const e = gl?.getExtension('WEBGL_debug_renderer_info'); name = e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : ''; gl?.getExtension('WEBGL_lose_context')?.loseContext(); } catch { /* нет данных */ }
+    Stage.gpuName = name;
+    return (Stage._igpu = !name || /intel|uhd|iris|radeon\(tm\) graphics|radeon graphics|vega|mali|adreno|powervr|apple|swiftshader|llvmpipe|microsoft basic/i.test(name));
   }
 
   applySettings(s) {
@@ -90,7 +100,13 @@ export class Stage {
     if (this.composer) {
       this.composer.passes.forEach((p) => p.dispose?.());
       this.composer.dispose();
+      this.composer = null;
     }
+    this.bloomPass = this.aoPass = this.dofPass = this.gradePass = null;
+    // «Высокое» и «Низкое» — без постобработки: кадр сразу на экран, сглаживание — встроенное в холст,
+    // тон и цвет — сам рендерер, затемнение краёв — слоем страницы (#vignette). На встроенной видеокарте это 60+ к/с.
+    this.setVignette(this.world.grade);
+    if (this.quality !== 'ultra') { this.resize(); return; }
     // Кадр рисуется в цель со встроенным сглаживанием краёв 4× (MSAA): без него постобработка
     // давала «лесенку» на краях клеток и фигурок — игра выглядела пиксельной (оператор 27.09).
     const q0 = this.quality;
@@ -135,6 +151,13 @@ export class Stage {
     if (!this.dofPass || this.dofOff) return;
     this.dofPass.enabled = focus != null;
     if (focus != null) this.dofPass.uniforms.focus.value = focus;
+  }
+
+  // затемнение краёв и лёгкая сочность — слоем страницы поверх холста (почти бесплатно, в отличие от прохода по кадру)
+  setVignette(g) {
+    if (!this.vig) { this.vig = document.createElement('div'); this.vig.id = 'vignette'; this.vig.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:1'; this.container.after(this.vig); }
+    const v = this.quality === 'ultra' ? 0 : (g?.vignette ?? 0.4);
+    this.vig.style.background = v ? `radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0,0,0,${Math.min(0.75, v * 1.3)}) 100%)` : 'none';
   }
 
   resize() {
@@ -198,8 +221,11 @@ export class Stage {
     this.fps = fps;
     const s = this.autoScale || 1;
     if (fps < 40) {
+      // «Максимум» не тянет — сразу на прямой вывод (постобработка самая дорогая)
+      if (this.quality === 'ultra' && (this.slowRuns = (this.slowRuns || 0) + 1) >= 2) { this.quality = 'high'; this.slowRuns = 0; this._buildComposer(); return; }
       // сначала выключаем дорогие эффекты; разрешение трогаем последним и не ниже 85% — иначе «пиксели»
       if (this.aoPass?.enabled) this.aoPass.enabled = false;
+      else if (!this.composer && this.renderer.shadowMap.enabled) { this.renderer.shadowMap.enabled = false; this.world?.scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); }); }
       else if (this.dofPass && !this.dofOff) this.dofOff = true;
       else if (this.bloomPass?.enabled) this.bloomPass.enabled = false;
       else if (s > 0.86) { this.autoScale = Math.max(0.85, s - 0.15); this.resize(); }
@@ -223,6 +249,6 @@ export class Stage {
     this.world.update?.(dt, t);
     if (this.cssBackdrop()) return; // меню: только картинка, 3D не рисуется
     this.fitBackground();
-    this.composer.render(dt);
+    if (this.composer) this.composer.render(dt); else this.renderer.render(this.world.scene, this.world.camera);
   }
 }

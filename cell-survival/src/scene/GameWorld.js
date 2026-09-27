@@ -14,7 +14,7 @@ export class GameWorld {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 400);
     this.scene.add(this.camera); // к камере пристёгнут слой «жизни» мира (ambience.js)
-    if (Stage.current?.quality !== 'low') this.ambience = new Ambience(themeId, this.camera);
+    if (Stage.current?.quality !== 'low') this.ambience = new Ambience(themeId, this.camera, Stage.current?.quality === 'ultra');
     this.env = buildEnvironment(themeId, this.scene, () => {
       // под нарисованный задник камера смотрит круче — как ракурс площадки на картинке
       this.hasBackdrop = true;

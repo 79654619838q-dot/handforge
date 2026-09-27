@@ -97,13 +97,13 @@ function dotTex() {
 }
 
 export class Ambience {
-  constructor(themeId, camera) {
+  constructor(themeId, camera, heavy = true) {
     this.camera = camera;
     this.group = new THREE.Group();
     camera.add(this.group);
     const D = 1.2; // расстояние слоя от камеры
     this.D = D;
-    const frag = LAYERS[themeId];
+    const frag = heavy ? LAYERS[themeId] : null; // полноэкранный слой — только на «Максимуме» (дорог для встроенной видеокарты)
     if (frag) {
       this.u = { uT: { value: 0 }, uAspect: { value: 1 } };
       this.plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
