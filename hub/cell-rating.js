@@ -66,7 +66,7 @@ export async function topList(limit = 50, me = "") {
     const i = all.findIndex((r) => r.id === me);
     if (i >= 0) mine = { ...all[i], place: i + 1 };
   }
-  return { top: rows.map((r, i) => ({ place: i + 1, name: r.name, hero: r.hero, points: r.points, wins: r.wins, games: r.games, me: r.id === me })), me: mine && { place: mine.place, name: mine.name, hero: mine.hero, points: mine.points, wins: mine.wins, games: mine.games } };
+  return { store: p ? 'db' : 'file', top: rows.map((r, i) => ({ place: i + 1, name: r.name, hero: r.hero, points: r.points, wins: r.wins, games: r.games, me: r.id === me })), me: mine && { place: mine.place, name: mine.name, hero: mine.hero, points: mine.points, wins: mine.wins, games: mine.games } };
 }
 
 // Одиночные игры считаются в браузере — итог присылает клиент. Не чаще раза в 20 с с одного игрока.

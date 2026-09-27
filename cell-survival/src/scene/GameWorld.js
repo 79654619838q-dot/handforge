@@ -4,6 +4,8 @@ import { GridManager } from '../managers/GridManager.js';
 import { PlayerManager } from '../managers/PlayerManager.js';
 import { Effects } from './effects.js';
 import { tween, ease } from './tween.js';
+import { Ambience } from './ambience.js';
+import { Stage } from './Stage.js';
 
 // Сцена игрового поля: окружение темы + сетка + игроки + эффекты + камера.
 export class GameWorld {
@@ -11,6 +13,8 @@ export class GameWorld {
     this.themeId = themeId;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 400);
+    this.scene.add(this.camera); // к камере пристёгнут слой «жизни» мира (ambience.js)
+    if (Stage.current?.quality !== 'low') this.ambience = new Ambience(themeId, this.camera);
     this.env = buildEnvironment(themeId, this.scene, () => {
       // под нарисованный задник камера смотрит круче — как ракурс площадки на картинке
       this.hasBackdrop = true;
@@ -73,6 +77,7 @@ export class GameWorld {
 
   update(dt, t) {
     this.env.update(dt, t);
+    this.ambience?.update(dt, t);
     this.grid.update(dt, t);
     this.players.update(dt, t);
     this.effects.update(dt);
@@ -100,6 +105,7 @@ export class GameWorld {
   }
 
   dispose() {
+    this.ambience?.dispose();
     window.removeEventListener('pointermove', this.onPointerMove);
     this.effects.clear();
     this.grid.dispose();
