@@ -194,8 +194,8 @@ class Mines extends Base {
     else this.cells = this.cells.filter((c) => !bombs.has(c));
     return { eliminated, replay, reveal: { moves: { ...this.moves }, bombs: [...bombs], cellsLeft: this.cells.length } };
   }
-  // кончились клетки — оставшиеся проходят дальше вместе
-  over() { return this.alive.length <= 1 || this.cells.length <= 1; }
+  // клеток осталось не больше, чем игроков (например, двое на двух клетках) — все оставшиеся побеждают (оператор 27.09)
+  over() { return this.alive.length <= 1 || this.cells.length <= Math.max(1, this.alive.length); }
   revealMs() { return 6500; }
 }
 
