@@ -121,7 +121,7 @@ function duck(on) {
 // Все фразы заранее записаны нейронным голосом (tools/build_voice.py → assets/voice/*.mp3,
 // список — assets/voice/index.json). Чего нет в записях — говорит встроенный голос браузера.
 let voiceIndex = {};
-fetch('assets/voice/index.json').then((r) => (r.ok ? r.json() : {})).then((j) => { voiceIndex = j; }).catch(() => {});
+const indexReady = fetch('assets/voice/index.json').then((r) => (r.ok ? r.json() : {})).then((j) => { voiceIndex = j; }).catch(() => {});
 const buffers = new Map();
 let current = null;
 function loadVoice(file) {
@@ -184,6 +184,9 @@ export function say(parts, { rate = 0.9, pitch = 1.1 } = {}) {
   const list = (Array.isArray(parts) ? parts : [parts]).filter((p) => p || p === 0);
   duck(true);
   return list.reduce((p, part) => p.then(() => {
+    if (!isMine()) return;
+    return Promise.race([indexReady, new Promise((r) => setTimeout(r, 3000))]);
+  }).then(() => {
     if (!isMine()) return;
     if (typeof part === 'number') return new Promise((r) => setTimeout(r, part));
     const file = voiceIndex[part.trim()];
