@@ -3,11 +3,12 @@ import { ITEMS, SECTIONS, PRAISE, TRY_AGAIN, ALPHABET } from './data.js';
 import { h, pick, shuffle, sayL, letterWord } from './games.js';
 import { LEVELS, TASKS_PER_LEVEL, starsFor } from './levels.js';
 import { say, hush, sfx, startAudio, setMusic, isMusicOn } from './audio.js';
+import { account, signIn, signOut, pull, schedulePush } from './account.js';
 
 const app = document.getElementById('app');
 const store = {
   get(k, d) { try { const v = localStorage.getItem('school.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('school.' + k, JSON.stringify(v)); } catch {} },
+  set(k, v) { try { localStorage.setItem('school.' + k, JSON.stringify(v)); } catch {} schedulePush(); },
 };
 // Прогресс: по разделу — массив звёзд за уровни (0 — не пройден).
 const prog = (id) => { const p = store.get('prog.' + id, []); return LEVELS[id].map((_, i) => p[i] || 0); };
@@ -18,7 +19,7 @@ const sectionDone = (id) => prog(id).every((s) => s > 0);
 const owl = h('div', 'owl');
 const owlImg = h('img'); owlImg.alt = 'Умка'; owlImg.draggable = false;
 const bubble = h('div', 'bubble');
-owl.append(bubble, owlImg);
+owl.append(owlImg, bubble); // облачко поверх совёнка — крыло не закрывает текст
 let owlVoice = null;
 owlImg.onclick = () => { sfx.tap(); owlPose('hello'); if (owlVoice) say(owlVoice); };
 function owlPose(p) { owlImg.src = `assets/owl/${p}.webp`; owlImg.classList.remove('hop'); void owlImg.offsetWidth; owlImg.classList.add('hop'); }
@@ -86,11 +87,51 @@ function splash() {
   setBg('assets/bg/menu.jpg');
   const s = screen('splash');
   s.append(h('h1', 'logo', 'Школа <span>Умки</span>'));
-  s.append(h('p', 'sub', 'Считаем · Звуки · Слоги · Читаем'));
-  const go = h('button', 'play-btn', '▶ Играть');
-  go.onclick = () => { startAudio(); sfx.good(); menu(true); };
-  s.append(go);
+  s.append(h('p', 'sub', 'Считаем · Звуки · Слоги · Буквы · Слова'));
+  const a = account();
+  const go = h('button', 'play-btn', a ? `▶ Играть` : '▶ Играть');
+  if (a) {
+    go.onclick = () => { startAudio(); sfx.good(); menu(true); };
+    s.append(h('p', 'who', `👤 ${esc(a.nick)}`), go);
+  } else {
+    go.onclick = () => { startAudio(); sfx.good(); login(); };
+    s.append(go);
+  }
   owlSay('', null, 'hello');
+}
+
+// ---------- вход ----------
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function login(isNew = false) {
+  setBg('assets/bg/menu.jpg');
+  const s = screen('login');
+  const card = h('form', 'login-card');
+  card.append(h('h2', '', isNew ? 'Новый игрок' : 'Вход'));
+  const nick = h('input'); nick.placeholder = 'Имя'; nick.maxLength = 20; nick.autocomplete = 'username';
+  const pass = h('input'); pass.placeholder = 'Пароль'; pass.type = 'password'; pass.maxLength = 64; pass.autocomplete = isNew ? 'new-password' : 'current-password';
+  const eye = h('button', 'eye', '👁'); eye.type = 'button';
+  eye.onclick = () => { pass.type = pass.type === 'password' ? 'text' : 'password'; };
+  const passRow = h('div', 'pass-row'); passRow.append(pass, eye);
+  const err = h('p', 'login-err');
+  const ok = h('button', 'play-btn small', isNew ? 'Создать ▶' : 'Войти ▶'); ok.type = 'submit';
+  card.append(h('label', '', 'Как тебя зовут?'), nick, h('label', '', isNew ? 'Придумай пароль (от 4 знаков). Запиши его!' : 'Пароль'), passRow, err, ok);
+  const sw = h('button', 'link-btn', isNew ? 'Я уже играл(а) — войти' : 'Я здесь впервые — новый игрок'); sw.type = 'button';
+  sw.onclick = () => { sfx.tap(); login(!isNew); };
+  const guest = h('button', 'link-btn dim', 'Играть без входа (прохождение сохранится только на этом устройстве)'); guest.type = 'button';
+  guest.onclick = () => { sfx.tap(); menu(true); };
+  card.append(sw, guest);
+  card.onsubmit = async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    if (nick.value.trim().length < 2) { err.textContent = 'Имя — хотя бы 2 буквы.'; return; }
+    if (pass.value.length < 4) { err.textContent = 'Пароль — хотя бы 4 знака.'; return; }
+    ok.disabled = true;
+    try { await signIn(nick.value.trim(), pass.value, isNew); sfx.good(); menu(true); }
+    catch (ex) { sfx.bad(); err.textContent = ex.message; ok.disabled = false; }
+  };
+  s.append(card);
+  setTimeout(() => nick.focus(), 300);
+  owlSay(isNew ? 'Давай познакомимся!' : 'Привет! Входи!', isNew ? 'Давай познакомимся! Напиши своё имя и придумай пароль.' : 'Привет! Напиши своё имя и пароль.', 'hello');
 }
 
 // ---------- меню ----------
@@ -114,9 +155,18 @@ function menu(first = false) {
   s.append(grid);
   const album = h('button', 'album-btn', `📒 Мои наклейки <b>${store.get('stickers', []).length} / ${ITEMS.length}</b>`);
   album.onclick = () => { sfx.pop(); stickers(); };
-  s.append(album);
+  const a = account();
+  const who = h('button', 'album-btn who-btn', a ? `👤 ${esc(a.nick)} · выйти` : '👤 Войти');
+  who.onclick = () => {
+    sfx.tap();
+    if (!a) return login();
+    if (confirm(`Выйти из игрока «${a.nick}»? Прохождение сохранено, войдёшь — всё вернётся.`)) { signOut(); splash(); }
+  };
+  const row = h('div', 'menu-bottom'); row.append(album, who);
+  s.append(row);
   owlSay(first ? 'Привет! Я совёнок Умка. Во что поиграем?' : 'Во что поиграем?',
-    first ? 'Привет! Я совёнок Умка. Выбирай, во что будем играть!' : 'Во что поиграем?', 'hello');
+    first ? 'Привет! Я совёнок Умка. Выбирай, во что будем играть!' : 'Во что поиграем?', 'hello')
+    .then(() => setTimeout(() => { if (s.isConnected) bubble.classList.remove('show'); }, 1500)); // не закрывать кнопки внизу
 }
 
 // ---------- карта уровней ----------
@@ -174,7 +224,7 @@ function map(sec) {
   s.append(scroller);
   requestAnimationFrame(() => { scroller.scrollTop = Math.max(0, ys[Math.min(cur, n - 1)] - scroller.clientHeight / 2); });
   const total = p.reduce((a, b) => a + b, 0);
-  if (cur >= levels.length) owlSay('Ты прошёл все уровни! Можно переиграть любой.', 'Ты прошёл все уровни! Можно переиграть любой и собрать все звёзды.', 'cheer');
+  if (cur >= levels.length) owlSay('Все уровни пройдены! Можно переиграть любой.', 'Все уровни пройдены! Можно переиграть любой и собрать все звёзды.', 'cheer');
   else owlSay(`Уровень ${cur + 1}: ${levels[cur].title}`, [`Уровень ${cur + 1}.`, levels[cur].title], total ? 'cheer' : 'hello');
 }
 
@@ -297,7 +347,7 @@ function reward(sec, li, got, firstTime, cupNow) {
   let fresh = null;
   if (cupNow) {
     const cup = h('div', 'sticker new cup'); const im = h('img'); im.src = sec.cup; cup.append(im);
-    card.append(h('p', '', `Ты прошёл весь раздел «${sec.title}»!`), cup);
+    card.append(h('p', '', `Весь раздел «${sec.title}» пройден!`), cup);
   } else if (firstTime) {
     const owned = store.get('stickers', []);
     fresh = shuffle(ITEMS.filter((i) => !owned.includes(i.word)))[0];
@@ -368,5 +418,5 @@ setTimeout(() => ITEMS.forEach((it) => { const i = new Image(); i.src = it.img; 
 if (q.get('level')) {
   const [sid, n] = q.get('level').split('.');
   const sec = SECTIONS.find((x) => x.id === sid);
-  if (sec && LEVELS[sid][+n]) { startAudio(); play(sec, +n); } else splash();
-} else splash();
+  if (sec && LEVELS[sid][+n]) { startAudio(); play(sec, +n); } else pull().then(splash); // прохождение с сервера — до первого экрана
+} else pull().then(splash); // прохождение с сервера — до первого экрана

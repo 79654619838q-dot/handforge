@@ -83,6 +83,20 @@ LEVELS.abc = [
   L('Вся азбука', [G.findLetter, {}], [G.picToLetter, {}], [G.letterToPic, {}], [G.similarLetters, {}], [G.lowerCase, {}], [G.abcGap, {}], [G.abcTrain, {}]),
 ];
 
+LEVELS.build = [
+  L('3 буквы с подсказкой', [G.buildWord, { min: 3, max: 3, extra: 2, hint: true }]),
+  L('Слова из 3 букв', [G.buildWord, { min: 3, max: 3, extra: 3 }]),
+  L('4 буквы с подсказкой', [G.buildWord, { min: 4, max: 4, extra: 2, hint: true }]),
+  L('Слова из 4 букв', [G.buildWord, { min: 4, max: 4, extra: 2 }]),
+  L('5 букв с подсказкой', [G.buildWord, { min: 5, max: 5, extra: 1, hint: true }]),
+  L('Слова из 5 букв', [G.buildWord, { min: 5, max: 5, extra: 1 }]),
+  L('Длинные слова с подсказкой', [G.buildWord, { min: 6, max: 11, extra: 0, hint: true }]),
+  L('Длинные слова', [G.buildWord, { min: 6, max: 11, extra: 0 }]),
+  L('Слова с Ь и Й', [G.buildWord, { min: 3, max: 7, extra: 1, soft: true }]),
+  L('Послушай и собери', [G.buildWord, { min: 3, max: 5, extra: 2, ear: true }]),
+  L('Всё вместе', [G.buildWord, { min: 3, max: 4, extra: 3 }], [G.buildWord, { min: 5, max: 8, extra: 1 }], [G.buildWord, { min: 3, max: 6, extra: 2, ear: true }], [G.buildWord, { min: 3, max: 7, extra: 1, soft: true }]),
+];
+
 export const TASKS_PER_LEVEL = 8;
 // звёзды за уровень по числу ошибок
 export const starsFor = (mistakes) => (mistakes <= 1 ? 3 : mistakes <= 4 ? 2 : 1);

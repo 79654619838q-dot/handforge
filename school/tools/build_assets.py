@@ -70,9 +70,10 @@ for s in range(1, 12):
 grid(load('mascot'), 2, '', 'owl', ['hello', 'joy', 'think', 'cheer'], size=520)
 grid(load('cups'), 2, '', 'cups', ['math', 'sounds', 'syllables', 'words'], size=420)
 grid(load('cup_abc'), 1, '', 'cups', ['abc'], size=420)
+grid(load('cup_build'), 1, '', 'cups', ['build'], size=420)
 
 os.makedirs(os.path.join(OUT, 'bg'), exist_ok=True)
-for b in ['bg_menu', 'bg_math', 'bg_sounds', 'bg_syllables', 'bg_words', 'bg_reward', 'bg_abc']:
+for b in ['bg_menu', 'bg_math', 'bg_sounds', 'bg_syllables', 'bg_words', 'bg_reward', 'bg_abc', 'bg_build']:
     im = load(b)
     im.thumbnail((1920, 1920), Image.LANCZOS)
     im.save(os.path.join(OUT, 'bg', b[3:] + '.jpg'), quality=84, optimize=True, progressive=True)

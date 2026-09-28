@@ -4,7 +4,7 @@
 import {
   ITEMS, COUNTABLE, SOUND_SAY, NUM, numWord, plural, isVowel, byWord,
   STORY_THINGS, STORY_HEROES, countPhrase, YES_NO, RIDDLES, SYL_CONS, SYL_VOW,
-  ALPHABET, LETTER_SAY, letterWord, lettersWithPics,
+  ALPHABET, LETTER_SAY, letterWord, lettersWithPics, alike,
 } from './data.js';
 import { say, sfx } from './audio.js';
 
@@ -24,6 +24,15 @@ function numberOptions(ans, max = 10, n = 3) {
   return shuffle([...set]);
 }
 function others(pool, n, ok) { return shuffle(pool.filter(ok)).slice(0, n); }
+// неверные картинки: не похожие ни на верную, ни друг на друга
+function wrongPics(target, n, ok = () => true) {
+  const res = [];
+  for (const it of shuffle(ITEMS)) {
+    if (res.length >= n) break;
+    if (ok(it) && !alike(it, target) && !res.some((r) => alike(r, it))) res.push(it);
+  }
+  return res;
+}
 
 function answerButtons(options, isRight, api, label = (o) => o, speak = null) {
   const row = h('div', 'answers');
@@ -196,7 +205,7 @@ export const missing = ({ max = 10 }) => {
     build(stage, api) {
       const line = h('div', 'numline');
       for (let i = 0; i < len; i++) line.append(h('div', 'nl' + (i === hole ? ' q' : ''), i === hole ? '?' : String(s + i)));
-      const hear = hearBtn(Array.from({ length: len }, (_, i) => (i === hole ? 'и-и-и' : NUM[s + i])), { rate: 0.8 });
+      const hear = hearBtn(Array.from({ length: len }, (_, i) => (i === hole ? 900 : NUM[s + i])));
       stage.append(line, hear, answerButtons(numberOptions(ans, max), (o) => o === ans, api, String, (o) => NUM[o]));
     },
   };
@@ -268,7 +277,7 @@ export const firstSound = ({ vowels = false }) => {
 export const findSound = ({ at = 'first' }) => {
   const pool = at === 'first' ? withFirst : withLast;
   const target = pick(pool), L = target[at];
-  const wrong = others(pool, 2, (i) => i[at] !== L);
+  const wrong = wrongPics(target, 2, (i) => i[at] && i[at] !== L);
   const where = at === 'first' ? 'начинается на звук' : 'заканчивается на звук';
   return {
     text: `Найди: ${at === 'first' ? 'начинается' : 'заканчивается'} на «${L}»`, voice: [`Найди картинку, которая ${where}`, sayS(L)],
@@ -311,15 +320,20 @@ export const vowelCons = () => {
 };
 
 export const soundPlace = () => {
-  // берём звук, который встречается в слове один раз; на конце — только не оглушаемый
+  // берём согласный, который встречается в слове один раз и звучит так, как пишется:
+  // без оглушения (лодка → [т]), озвончения (сделать → [з]) и непроизносимых (солнце).
+  const VOICED = 'БВГДЖЗ', DEAF = 'ПФКТШСХЦЧЩ';
   const cands = [];
   for (const it of ITEMS) {
+    if (it.word === 'солнце') continue;
     const w = it.word.toUpperCase();
     [...w].forEach((ch, i) => {
       if (!SOUND_SAY[ch] || isVowel(ch) || w.indexOf(ch) !== w.lastIndexOf(ch)) return;
-      if (i === w.length - 1 && 'БВГДЖЗ'.includes(ch)) return;
-      if (w[i + 1] === 'Ь' && i + 1 === w.length - 1) return;
-      cands.push({ it, ch, pos: i === 0 ? 0 : i === w.length - 1 ? 2 : 1 });
+      const nx = w[i + 1] || '';
+      const end = i === w.length - 1 || (nx === 'Ь' && i + 1 === w.length - 1);
+      if (VOICED.includes(ch) && (end || DEAF.includes(nx))) return;
+      if (DEAF.includes(ch) && 'БГДЖЗ'.includes(nx) && nx) return;
+      cands.push({ it, ch, pos: i === 0 ? 0 : end ? 2 : 1 });
     });
   }
   const pos = rnd(0, 2);
@@ -468,7 +482,7 @@ export const findBySyl = () => {
   const n = rnd(1, 3);
   const target = pick(ITEMS.filter((i) => i.syl.length === n));
   const ns = shuffle([1, 2, 3, 4].filter((x) => x !== n)).slice(0, 2);
-  const wrong = ns.map((k) => pick(ITEMS.filter((i) => i.syl.length === k)));
+  const wrong = ns.map((k) => pick(ITEMS.filter((i) => i.syl.length === k && !alike(i, target))));
   return {
     text: `Найди слово: ${n} ${sylPlural(n)}`, voice: [`Найди слово, в котором ${numWord(n)} ${sylPlural(n)}.`, 'Похлопай каждое слово.'],
     build(stage, api) {
@@ -496,7 +510,7 @@ export const sylRead = () => {
 
 export const read = ({ maxLen = 99, minSyl = 1, maxSyl = 9 }) => {
   const item = pick(ITEMS.filter((i) => i.word.length <= maxLen && i.syl.length >= minSyl && i.syl.length <= maxSyl));
-  const wrong = others(ITEMS, 2, (i) => i !== item && i.word[0] !== item.word[0]);
+  const wrong = wrongPics(item, 2, (i) => i.word[0] !== item.word[0]);
   return {
     text: 'Прочитай слово и найди картинку', voice: ['Прочитай слово и найди картинку.'],
     build(stage, api) {
@@ -541,7 +555,7 @@ export const pickWord = () => {
   const item = pick(ITEMS.filter((i) => i.word.length <= 6));
   const w = item.word;
   const score = (o) => (o.word.length === w.length ? 2 : 0) + (o.word[0] === w[0] ? 2 : 0) + [...o.word].filter((ch) => w.includes(ch)).length / 2;
-  const similar = ITEMS.filter((o) => o !== item).sort((a, b) => score(b) - score(a)).slice(0, 5);
+  const similar = ITEMS.filter((o) => !alike(o, item)).sort((a, b) => score(b) - score(a)).slice(0, 5);
   const opts = shuffle([item, ...shuffle(similar).slice(0, 2)]);
   return {
     text: 'Какое слово подходит к картинке?', voice: ['Прочитай слова.', 'Какое подходит к картинке?'],
@@ -555,10 +569,10 @@ export const pickWord = () => {
 
 export const missLetter = () => {
   const words = new Set(ITEMS.map((i) => i.word));
-  const cands = ITEMS.filter((i) => i.word.length >= 3 && i.word.length <= 5 && /[аоуыи]/.test(i.word));
+  // пропускаем только ударную гласную: безударную «о» в «сова» ребёнок слышит как «а»
+  const cands = ITEMS.filter((i) => i.word.length >= 3 && i.word.length <= 6 && 'аоуыи'.includes(i.word[i.stress]));
   const item = pick(cands);
-  const idxs = [...item.word].map((ch, i) => ('аоуыи'.includes(ch) ? i : -1)).filter((i) => i >= 0);
-  const k = pick(idxs), ans = item.word[k].toUpperCase();
+  const k = item.stress, ans = item.word[k].toUpperCase();
   // не даём буквы, которые тоже образуют слово из нашего списка (к_т → кот и кит)
   const ok = 'АОУЫИ'.split('').filter((L) => L !== ans && !words.has(item.word.slice(0, k) + L.toLowerCase() + item.word.slice(k + 1)));
   return {
@@ -590,7 +604,7 @@ export const yesNo = () => {
 
 export const riddle = () => {
   const r = pick(RIDDLES);
-  const wrong = others(ITEMS, 2, (i) => !r.not.includes(i.word));
+  const wrong = wrongPics(r.item, 2, (i) => !r.not.includes(i.word));
   return {
     text: 'Прочитай загадку и найди ответ', voice: ['Прочитай загадку и найди ответ.'],
     build(stage, api) {
@@ -624,7 +638,7 @@ export const findLetter = ({ set = ALPHABET }) => {
 export const letterToPic = ({ set = ALPHABET }) => {
   const L = pick(lettersWithPics(set));
   const target = pick(ITEMS.filter((i) => i.letter === L));
-  const wrong = others(ITEMS, 2, (i) => i.letter !== L);
+  const wrong = wrongPics(target, 2, (i) => i.letter !== L);
   return {
     text: `Что начинается на букву «${L}»?`, voice: ['Найди картинку на букву', sayL(L)],
     build(stage, api) {
@@ -651,7 +665,7 @@ const LOOKALIKE = [['Ш', 'Щ', 'Ц'], ['Е', 'Ё', 'Э'], ['И', 'Й', 'Н'], [
 export const similarLetters = () => {
   const g = pick(LOOKALIKE), L = pick(g);
   return {
-    text: 'Буквы похожи! Найди нужную', voice: ['Буквы похожи. Будь внимателен!', 'Найди букву', sayL(L)],
+    text: 'Буквы похожи! Найди нужную', voice: ['Буквы похожи. Смотри внимательно!', 'Найди букву', sayL(L)],
     build(stage, api) {
       const row = answerButtons(shuffle(g), (o) => o === L, api, (o) => o, sayL);
       row.classList.add('letters');
@@ -713,6 +727,53 @@ export const abcTrain = () => {
         tiles.append(t);
       });
       stage.append(slots, tiles);
+    },
+  };
+};
+
+// ======================= СОБЕРИ СЛОВО =======================
+// Картинка + 5–6 букв: нажимать буквы по порядку. hint — бледные буквы в окошках,
+// ear — картинки не видно, слово только звучит; soft — слова с Ь и Й.
+export const buildWord = ({ min = 3, max = 3, extra = 2, hint = false, ear = false, soft = false }) => {
+  const pool = ITEMS.filter((i) => i.word.length >= min && i.word.length <= max && (soft ? /[ьй]/.test(i.word) : !/[ьъй]/.test(i.word)));
+  const item = pick(pool);
+  const ls = item.word.toUpperCase().split('');
+  // всего букв на выбор — не больше шести (длинные слова — без лишних)
+  const extras = shuffle('АОУИЫЭМСЛКТРНПВДБЗГШ'.split('').filter((l) => !ls.includes(l))).slice(0, Math.min(extra, Math.max(0, 6 - ls.length)));
+  const voice = ear ? ['Послушай слово:', item.word, 300, 'Собери его из букв.'] : ['Собери слово', item.word, 'Нажимай буквы по порядку.'];
+  return {
+    text: ear ? 'Послушай и собери слово!' : 'Собери слово из букв!', voice,
+    build(stage, api) {
+      const card = ear ? h('div', 'hero small') : hero(item, true, item.word);
+      let pic = null;
+      if (ear) {
+        pic = h('div', 'mystery', '?');
+        card.append(pic, hearBtn(item.word));
+      }
+      const slots = h('div', 'slots');
+      const cells = ls.map((L) => { const c = h('div', 'slot-letter' + (hint ? ' ghost' : '')); if (hint) c.dataset.hint = L; slots.append(c); return c; });
+      if (ls.length > 6) slots.classList.add('long');
+      let next = 0;
+      const tiles = h('div', 'tiles');
+      shuffle([...ls, ...extras]).forEach((L) => {
+        const t = h('button', 'tile letter', L);
+        t.onclick = async () => {
+          if (t.disabled || api.locked()) return;
+          if (L === ls[next]) {
+            t.disabled = true; t.classList.add('used');
+            cells[next].textContent = L; cells[next].classList.add('filled');
+            sfx.pop(); say(sayL(L));
+            next++;
+            if (next === ls.length) {
+              api.hold();
+              if (pic) { pic.replaceWith(img(item, 'pic hero-pic')); }
+              await wait(600); await say(item.word); api.right(slots);
+            }
+          } else api.wrong(t);
+        };
+        tiles.append(t);
+      });
+      stage.append(card, slots, tiles);
     },
   };
 };

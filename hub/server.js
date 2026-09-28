@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { attachCellServer } from "./cell-server.js";
 import { attachRatingRoutes } from "./cell-rating.js";
+import { attachSchoolAccounts } from "./school-accounts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8877;
@@ -109,6 +110,8 @@ app.use("/dressup", express.static(DRESSUP_DIR, {
 }));
 
 // «Школа Умки» — подготовка к школе для малышей, статическая, без сборки.
+// Вход по нику и паролю и хранение прохождения — /school/api (см. school-accounts.js).
+attachSchoolAccounts(app);
 app.get("/school", (req, res, next) => {
   if (req.path === "/school") return res.redirect(301, "/school/");
   next();

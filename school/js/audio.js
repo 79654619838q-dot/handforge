@@ -1,13 +1,15 @@
 // Все звуки синтезируются в браузере (Web Audio) — файлов нет, грузить нечего.
 // Голос ведущего — встроенный синтез речи браузера (русский голос).
 let ctx, master, musicGain, musicTimer = null;
+// ?mute=1 — полная тишина (для проверок): ни музыки, ни эффектов, ни голоса
+const MUTE = new URLSearchParams(location.search).has('mute');
 let musicOn = true;
 try { musicOn = localStorage.getItem('school.music') !== '0'; } catch {}
 
 function ac() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain(); master.gain.value = 0.8;
+    master = ctx.createGain(); master.gain.value = MUTE ? 0 : 0.8;
     const comp = ctx.createDynamicsCompressor();
     master.connect(comp).connect(ctx.destination);
     musicGain = ctx.createGain(); musicGain.gain.value = 0.05;
@@ -108,7 +110,7 @@ export function setMusic(on) {
   if (!on && musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
 }
 export const isMusicOn = () => musicOn;
-export function startAudio() { ac(); if (musicOn && !musicTimer) musicLoop(); }
+export function startAudio() { ac(); if (musicOn && !musicTimer && !MUTE) musicLoop(); }
 
 function duck(on) {
   if (!musicGain) return;
@@ -189,6 +191,7 @@ export function say(parts, { rate = 0.9, pitch = 1.1 } = {}) {
   }).then(() => {
     if (!isMine()) return;
     if (typeof part === 'number') return new Promise((r) => setTimeout(r, part));
+    if (MUTE) return new Promise((r) => setTimeout(r, 30));
     const file = voiceIndex[part.trim()];
     return file ? playFile(file, isMine).catch(() => speakTTS(part, rate, pitch, isMine)) : speakTTS(part, rate, pitch, isMine);
   }), Promise.resolve()).then(() => { if (isMine()) duck(false); });
