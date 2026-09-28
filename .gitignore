@@ -19,3 +19,6 @@ claude-skills/
 dressup-art/
 
 hub/.cell-rating.json
+
+# исходники картинок и список фраз «Школы Умки» (из ChatGPT, большие)
+school-art/

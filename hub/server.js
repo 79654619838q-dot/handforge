@@ -19,6 +19,7 @@ const QUEST_DIST = path.join(__dirname, "..", "web", "dist");
 const CELL_DIST = path.join(__dirname, "..", "cell-survival", "dist");
 const DRESSUP_DIR = path.join(__dirname, "..", "dressup");
 const JOURNAL_DIR = path.join(__dirname, "..", "journal");
+const SCHOOL_DIR = path.join(__dirname, "..", "school");
 
 const app = express();
 
@@ -107,6 +108,20 @@ app.use("/dressup", express.static(DRESSUP_DIR, {
   },
 }));
 
+// «Школа Умки» — подготовка к школе для малышей, статическая, без сборки.
+app.get("/school", (req, res, next) => {
+  if (req.path === "/school") return res.redirect(301, "/school/");
+  next();
+});
+app.get("/school/tools/*", (_req, res) => res.sendStatus(404));
+app.use("/school", express.static(SCHOOL_DIR, {
+  index: "index.html",
+  setHeaders: (res, file) => {
+    if (/\.(html|js|css)$/.test(file)) res.setHeader("Cache-Control", "no-cache");
+    else res.setHeader("Cache-Control", "public, max-age=604800");
+  },
+}));
+
 // Журнал покерной сессии — одна статическая страница, данные только в браузере игрока.
 app.get("/journal", (req, res, next) => {
   if (req.path === "/journal") return res.redirect(301, "/journal/");
@@ -131,6 +146,7 @@ const server = app.listen(PORT, () => {
   console.log(`  /cell    → ${CELL_DIST}`);
   console.log(`  /dressup → ${DRESSUP_DIR}`);
   console.log(`  /journal → ${JOURNAL_DIR}`);
+  console.log(`  /school  → ${SCHOOL_DIR}`);
   console.log(`  /api     → ${QUEST_API_TARGET}`);
 });
 
