@@ -28,7 +28,7 @@ def settings(text):
 
 
 async def one(text, sem, index):
-    name = hashlib.sha1(f'{VOICE}|{text}'.encode()).hexdigest()[:14] + '.mp3'
+    name = hashlib.sha1(f'{VOICE}|v2|{text}'.encode()).hexdigest()[:14] + '.mp3'  # v2 — после обрезки тишины
     index[text] = name
     path = os.path.join(OUT, name)
     if os.path.exists(path) and os.path.getsize(path) > 0:

@@ -120,7 +120,8 @@ app.get("/school/tools/*", (_req, res) => res.sendStatus(404));
 app.use("/school", express.static(SCHOOL_DIR, {
   index: "index.html",
   setHeaders: (res, file) => {
-    if (/\.(html|js|css)$/.test(file)) res.setHeader("Cache-Control", "no-cache");
+    if (/\.(html|js|css|json)$/.test(file)) res.setHeader("Cache-Control", "no-cache");
+    // список записей голоса меняется при каждом обновлении — старый в кэше = немой совёнок
     else res.setHeader("Cache-Control", "public, max-age=604800");
   },
 }));

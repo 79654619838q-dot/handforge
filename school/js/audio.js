@@ -123,7 +123,7 @@ function duck(on) {
 // Все фразы заранее записаны нейронным голосом (tools/build_voice.py → assets/voice/*.mp3,
 // список — assets/voice/index.json). Чего нет в записях — говорит встроенный голос браузера.
 let voiceIndex = {};
-const indexReady = fetch('assets/voice/index.json').then((r) => (r.ok ? r.json() : {})).then((j) => { voiceIndex = j; }).catch(() => {});
+const indexReady = fetch('assets/voice/index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).then((j) => { voiceIndex = j; }).catch(() => {});
 const buffers = new Map();
 let current = null;
 function loadVoice(file) {
