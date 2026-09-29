@@ -20,6 +20,26 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets', 'voice')
 PHRASES = os.path.join(os.path.dirname(ROOT), 'school-art', 'phrases.json')
 
+# Что синтезатор должен прочитать вместо надписи (ключ в index.json — прежний текст).
+# Проверено распознаванием речи (scratchpad asr.py, Vosk): без правки нейронный голос читает
+# отдельную «о» как [а] («найди букву а»), слоги «по/во/до/со/ко» — как предлоги [па], [са],
+# одиночную «ы» — нечётко (слышно «и»/«э»). С ударением / протяжно / подсказкой-словом — верно.
+import re
+ACUTE = '\u0301'
+def speakable(text):
+    # гласные о/у/э как отдельная буква или звук — протяжно («о-о»): только так голос не превращает
+    # их в [а]/[и] во всех фразах (ударение «о́» помогало не везде — «…на звук о́» всё равно [а])
+    t = text
+    bare = t.strip(' .,!?').lower()
+    if bare in ('о', 'у', 'э'): return f'{bare}-{bare}'
+    if bare == 'ы': return 'ы, как в слове мы'
+    if re.fullmatch(r'[пвдск]о', bare): return bare + 'о'
+    t = re.sub(r'(букв[ауы]|звук:?) ([оуэ])(?=[.,!?]|$)', lambda m: f'{m[1]} «{m[2]}-{m[2]}»', t)
+    t = re.sub(r'(букв[ауы]|звук:?) ы(?=[.!?]|$)', lambda m: f'{m[1]} ы, как в слове мы', t)
+    t = re.sub(r'(^|\. )([ОУЭ]) —', lambda m: f'{m[1]}{m[2]}-{m[2].lower()} —', t)
+    t = re.sub(r'(слог )([пвдск]о)(?=[.,!?]|$)', lambda m: f'{m[1]}{m[2]}о', t)
+    return t
+
 # Одиночные слоги и звуки синтезатор иногда читает как буквы или слишком быстро —
 # проговариваем их отдельно и медленнее.
 def settings(text):
@@ -28,7 +48,9 @@ def settings(text):
 
 
 async def one(text, sem, index):
-    name = hashlib.sha1(f'{VOICE}|v2|{text}'.encode()).hexdigest()[:14] + '.mp3'  # v2 — после обрезки тишины
+    spoken = speakable(text)
+    # в имени — то, что реально произнесено: поправили произношение — запишется заново
+    name = hashlib.sha1(f'{VOICE}|v2|{spoken}'.encode()).hexdigest()[:14] + '.mp3'  # v2 — после обрезки тишины
     index[text] = name
     path = os.path.join(OUT, name)
     if os.path.exists(path) and os.path.getsize(path) > 0:
@@ -37,7 +59,7 @@ async def one(text, sem, index):
     async with sem:
         for attempt in range(4):
             try:
-                await edge_tts.Communicate(text, VOICE, rate=rate, pitch=pitch).save(path)
+                await edge_tts.Communicate(spoken, VOICE, rate=rate, pitch=pitch).save(path)
                 await asyncio.to_thread(trim, path)
                 return 1
             except Exception as e:  # сеть/лимит — пробуем ещё
