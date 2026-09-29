@@ -1,6 +1,6 @@
 // «Школа Умки» — экраны: заставка → меню → карта уровней раздела → уровень (8 заданий) → награда; альбом.
 import { ITEMS, SECTIONS, PRAISE, TRY_AGAIN, ALPHABET } from './data.js';
-import { h, pick, shuffle, sayL, letterWord } from './games.js';
+import { h, pick, shuffle, sayL, letterWord, letterPhrase } from './games.js';
 import { LEVELS, TASKS_PER_LEVEL, starsFor } from './levels.js';
 import { say, hush, sfx, startAudio, setMusic, isMusicOn } from './audio.js';
 import { account, signIn, signOut, pull, schedulePush } from './account.js';
@@ -298,15 +298,13 @@ function play(sec, li, skipIntro = false) {
 function letterCard(L, big = false) {
   const it = letterWord(L);
   const c = h('button', 'letter-card' + (big ? ' big' : ''));
+  c.dataset.letter = L;
   c.append(h('b', '', `${L}<small>${L.toLowerCase()}</small>`));
   if (it) { const im = h('img'); im.src = it.img; im.alt = it.word; c.append(im); c.append(h('span', '', it.word)); }
   c.onclick = () => {
     sfx.pop();
     c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
-    if (L === 'Ъ') say(['твёрдый знак', 300, 'Он не звучит, а разделяет.']);
-    else if (L === 'Ь') say(['мягкий знак', 300, 'Он не звучит, а смягчает:', 'конь']);
-    else if (L === 'Ы') say(['ы', 300, 'На ы слова не начинаются. Ы есть в слове', 'сыр']);
-    else say(['Буква', sayL(L), 300, it ? it.word : '']);
+    say(letterPhrase(L, it));
   };
   return c;
 }
@@ -321,7 +319,19 @@ function intro(sec, li) {
   const go = h('button', 'play-btn small', 'Играть ▶');
   go.onclick = () => { sfx.good(); play(sec, li, true); };
   s.append(row, go);
-  owlSay('Знакомься с буквами! Нажимай на каждую.', ['Знакомься с новыми буквами!', 'Нажимай на каждую букву и слушай.', 'Потом нажми «Играть».'], 'hello');
+  // совёнок сам показывает и называет каждую букву; ребёнок может нажимать и сам
+  let auto = true;
+  row.addEventListener('pointerdown', () => { auto = false; });
+  owlSay('Знакомься с буквами! Слушай и смотри.', 'Знакомься с новыми буквами! Слушай и смотри.', 'hello').then(async () => {
+    for (const c of row.children) {
+      if (!auto || !s.isConnected) return;
+      c.classList.add('glow'); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
+      await say(letterPhrase(c.dataset.letter));
+      c.classList.remove('glow');
+      await new Promise((r) => setTimeout(r, 350));
+    }
+    if (auto && s.isConnected) owlSay('Нажми на букву, чтобы послушать ещё. Потом — «Играть».', 'Нажми на букву, чтобы послушать ещё раз. А потом нажми «Играть».', 'cheer');
+  });
 }
 function abcPoster(sec) {
   setBg(sec.bg);

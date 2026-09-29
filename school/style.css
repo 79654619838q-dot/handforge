@@ -382,3 +382,4 @@ img { -webkit-user-drag: none; }
   .read-box { flex-wrap: wrap; justify-content: center; }
   .read-word { font-size: min(clamp(56px, 12vmin, 110px), 11vw); padding: 4px 12px; letter-spacing: 0; }
 }
+.letter-card.glow { box-shadow: 0 7px 0 var(--c), 0 0 0 8px #fff, 0 0 40px var(--c); transform: scale(1.06); }

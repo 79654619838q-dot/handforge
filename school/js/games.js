@@ -14,7 +14,7 @@ export const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1;
 export function h(tag, cls = '', html = '') { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; }
 const img = (item, cls = 'pic') => { const i = h('img', cls); i.src = item.img; i.alt = item.word; i.draggable = false; return i; };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const sayS = (L) => SOUND_SAY[L] || L.toLowerCase();
+const sayS = (L) => SOUND_SAY[L.toUpperCase()] || L.toLowerCase();
 
 // ---------- общие детали ----------
 function numberOptions(ans, max = 10, n = 3) {
@@ -162,7 +162,7 @@ export const add = ({ max = 5, pics = true }) => {
   const sum = rnd(2, max), a = rnd(1, sum - 1), b = sum - a;
   const item = pick(COUNTABLE);
   return {
-    text: `${a} + ${b} = ?`, voice: [`${NUM[a]} плюс ${NUM[b]}.`, 'Сколько будет?'],
+    text: `${a} + ${b} = ?`, voice: [`${NUM[a]} плюс ${NUM[b]}. Сколько будет?`],
     build(stage, api) {
       if (pics) {
         const row = h('div', 'equation');
@@ -181,7 +181,7 @@ export const sub = ({ max = 5, pics = true }) => {
   const item = pick(COUNTABLE);
   return {
     text: `${n} − ${m} = ?`,
-    voice: pics ? [`Было ${NUM[n]}.`, 400, `Убрали ${NUM[m]}.`, 'Сколько осталось?'] : [`${NUM[n]} минус ${NUM[m]}.`, 'Сколько будет?'],
+    voice: pics ? [`Было ${NUM[n]}.`, 400, `Убрали ${NUM[m]}.`, 'Сколько осталось?'] : [`${NUM[n]} минус ${NUM[m]}. Сколько будет?`],
     build(stage, api) {
       const eq = h('div', 'formula' + (pics ? '' : ' big'), `<span>${n}</span><span class="op">−</span><span>${m}</span><span class="op">=</span><span class="q">?</span>`);
       const answers = answerButtons(numberOptions(rest, max), (o) => o === rest, api, String, (o) => NUM[o]);
@@ -246,7 +246,7 @@ export const signs = ({ max = 10 }) => {
   const ans = a > b ? '>' : a < b ? '<' : '=';
   const name = { '>': 'больше', '<': 'меньше', '=': 'равно' };
   return {
-    text: 'Какой знак поставить?', voice: ['Какой знак поставить?', 'Больше, меньше или равно?'],
+    text: 'Какой знак поставить?', voice: ['Какой знак поставить: больше, меньше или равно?'],
     build(stage, api) {
       const row = h('div', 'formula big', `<span>${a}</span><span class="q">?</span><span>${b}</span>`);
       const dots = h('div', 'dots-row');
@@ -265,7 +265,7 @@ export const firstSound = ({ vowels = false }) => {
   const item = pick(pool);
   const letters = [...new Set(pool.map((i) => i.first))].filter((l) => l !== item.first);
   return {
-    text: 'Какой первый звук в слове?', voice: ['Какой первый звук в слове', item.word + '?'],
+    text: 'Какой первый звук в слове?', voice: [`Какой первый звук в слове ${item.word}?`],
     build(stage, api) {
       const row = answerButtons(shuffle([item.first, ...shuffle(letters).slice(0, 2)]), (o) => o === item.first, api, (o) => o, sayS);
       row.classList.add('letters');
@@ -280,7 +280,7 @@ export const findSound = ({ at = 'first' }) => {
   const wrong = wrongPics(target, 2, (i) => i[at] && i[at] !== L);
   const where = at === 'first' ? 'начинается на звук' : 'заканчивается на звук';
   return {
-    text: `Найди: ${at === 'first' ? 'начинается' : 'заканчивается'} на «${L}»`, voice: [`Найди картинку, которая ${where}`, sayS(L)],
+    text: `Найди: ${at === 'first' ? 'начинается' : 'заканчивается'} на «${L}»`, voice: [`Найди картинку, которая ${where} ${sayS(L)}.`],
     build(stage, api) {
       const big = h('button', 'big-letter', L);
       big.onclick = () => { sfx.tap(); say(sayS(L)); };
@@ -293,7 +293,7 @@ export const lastSound = () => {
   const item = pick(withLast);
   const letters = [...new Set(withLast.map((i) => i.last))].filter((l) => l !== item.last);
   return {
-    text: 'Какой последний звук в слове?', voice: ['Какой последний звук в слове', item.word + '?'],
+    text: 'Какой последний звук в слове?', voice: [`Какой последний звук в слове ${item.word}?`],
     build(stage, api) {
       const row = answerButtons(shuffle([item.last, ...shuffle(letters).slice(0, 2)]), (o) => o === item.last, api, (o) => o, sayS);
       row.classList.add('letters');
@@ -306,7 +306,7 @@ export const vowelCons = () => {
   const L = Math.random() < 0.5 ? pick('АОУЫИЭ'.split('')) : pick('БВГДЖЗКЛМНПРСТФХШ'.split(''));
   const v = isVowel(L);
   return {
-    text: 'Гласный или согласный?', voice: ['Послушай звук:', sayS(L), 300, 'Он гласный или согласный?'],
+    text: 'Гласный или согласный?', voice: [`Послушай звук: ${sayS(L)}. Он гласный или согласный?`],
     build(stage, api) {
       const big = h('button', 'big-letter', L);
       big.onclick = () => { sfx.tap(); say(sayS(L)); };
@@ -340,7 +340,7 @@ export const soundPlace = () => {
   const { it, ch } = pick(cands.filter((c) => c.pos === pos));
   const names = ['в начале', 'в середине', 'в конце'];
   return {
-    text: `Где звук «${ch}» в слове?`, voice: ['Где звук', sayS(ch), 'в слове', it.word + '?', 'В начале, в середине или в конце?'],
+    text: `Где звук «${ch}» в слове?`, voice: [`Где звук ${sayS(ch)} в слове ${it.word}?`, 'В начале, в середине или в конце?'],
     build(stage, api) {
       const row = answerButtons([0, 1, 2], (o) => o === pos, api,
         (o) => `<span class="scheme">${[0, 1, 2].map((k) => `<i class="${k === o ? 'on' : ''}"></i>`).join('')}</span><small>${names[o]}</small>`,
@@ -354,7 +354,7 @@ export const soundPlace = () => {
 export const softHard = () => {
   const item = pick(ITEMS.filter((i) => i.soft !== null));
   return {
-    text: 'Первый звук твёрдый или мягкий?', voice: ['Первый звук в слове', item.word, '— твёрдый или мягкий?'],
+    text: 'Первый звук твёрдый или мягкий?', voice: [`Первый звук в слове ${item.word} — твёрдый или мягкий?`],
     build(stage, api) {
       const row = answerButtons([false, true], (o) => o === item.soft, api,
         (o) => o ? '<i class="mark soft"></i>мягкий' : '<i class="mark hard"></i>твёрдый',
@@ -370,7 +370,7 @@ export const countSounds = () => {
   const item = pick(ITEMS.filter((i) => i.sounds));
   const n = item.sounds;
   return {
-    text: 'Сколько звуков в слове?', voice: ['Сколько звуков в слове', item.word + '?', 'Произнеси медленно.'],
+    text: 'Сколько звуков в слове?', voice: [`Сколько звуков в слове ${item.word}?`, 'Произнеси его медленно.'],
     build(stage, api) {
       const slow = [...item.word].map(sayS).flatMap((s) => [s, 200]);
       stage.append(hero(item, false, [...slow, item.word]),
@@ -384,7 +384,7 @@ export const clap = ({ min = 1, max = 4 }) => {
   const item = pick(ITEMS.filter((i) => i.syl.length >= min && i.syl.length <= max));
   const n = item.syl.length;
   return {
-    text: 'Сколько слогов? Похлопай!', voice: ['Сколько слогов в слове', item.word + '?', 'Нажми на ладошки, похлопаем вместе!'],
+    text: 'Сколько слогов? Похлопай!', voice: [`Сколько слогов в слове ${item.word}?`, 'Нажми на ладошки, похлопаем вместе!'],
     build(stage, api) {
       const card = hero(item);
       const dots = h('div', 'syl-dots');
@@ -412,7 +412,7 @@ export const clap = ({ min = 1, max = 4 }) => {
 export const train = ({ min = 2, max = 3 }) => {
   const item = pick(ITEMS.filter((i) => i.syl.length >= min && i.syl.length <= max));
   return {
-    text: 'Собери слово из слогов!', voice: ['Собери слово', item.word, 'Посади слоги в вагончики по порядку.'],
+    text: 'Собери слово из слогов!', voice: [`Собери слово ${item.word}.`, 'Посади слоги в вагончики по порядку.'],
     build(stage, api) {
       const tr = h('div', 'train');
       tr.append(h('div', 'loco', '<div class="chimney"></div><div class="cab"></div><div class="wheel w1"></div><div class="wheel w2"></div>'));
@@ -453,7 +453,7 @@ export const firstSyl = () => {
   const s0 = item.syl[0];
   const opts = [s0, ...shuffle([...new Set(ITEMS.map((i) => i.syl[0]))].filter((s) => s !== s0 && s[0] !== s0[0])).slice(0, 2)];
   return {
-    text: 'С какого слога начинается слово?', voice: ['С какого слога начинается слово', item.word + '?'],
+    text: 'С какого слога начинается слово?', voice: [`С какого слога начинается слово ${item.word}?`],
     build(stage, api) {
       const row = answerButtons(shuffle(opts), (o) => o === s0, api, (o) => o.toUpperCase(), (o) => o);
       row.classList.add('syls');
@@ -467,7 +467,7 @@ export const missingSyl = ({ n = 3 }) => {
   const k = rnd(0, item.syl.length - 1), ans = item.syl[k];
   const pool = [...new Set(ITEMS.flatMap((i) => i.syl))].filter((s) => s !== ans && !item.syl.includes(s));
   return {
-    text: 'Какого слога не хватает?', voice: ['Какого слога не хватает в слове', item.word + '?'],
+    text: 'Какого слога не хватает?', voice: [`Какого слога не хватает в слове ${item.word}?`],
     build(stage, api) {
       const w = h('div', 'read-word');
       item.syl.forEach((s, i) => w.append(h('span', i === k ? 'gap' : `s${i % 2}`, i === k ? '?' : s.toUpperCase())));
@@ -499,11 +499,11 @@ export const sylRead = () => {
   const set = new Set([s]);
   while (set.size < 3) set.add(Math.random() < 0.5 ? c + pick(SYL_VOW) : pick(SYL_CONS) + v);
   return {
-    text: 'Найди слог, который я скажу', voice: ['Найди слог', s.toLowerCase()],
+    text: 'Найди слог, который я скажу', voice: [`Найди слог ${s.toLowerCase()}.`],
     build(stage, api) {
       const row = answerButtons(shuffle([...set]), (o) => o === s, api, (o) => o, (o) => o.toLowerCase());
       row.classList.add('syls');
-      stage.append(hearBtn(['Найди слог', s.toLowerCase()]), row);
+      stage.append(hearBtn([`Найди слог ${s.toLowerCase()}.`]), row);
     },
   };
 };
@@ -526,7 +526,7 @@ export const letters = ({ min = 3, max = 3 }) => {
   const ls = item.word.toUpperCase().split('');
   const extra = shuffle('АОУИЫМСЛКТРН'.split('').filter((l) => !ls.includes(l))).slice(0, 2);
   return {
-    text: 'Собери слово из букв!', voice: ['Собери слово', item.word, 'из букв.'],
+    text: 'Собери слово из букв!', voice: [`Собери слово ${item.word} из букв.`],
     build(stage, api) {
       const slots = h('div', 'slots');
       const cells = ls.map(() => { const s = h('div', 'slot-letter'); slots.append(s); return s; });
@@ -576,7 +576,7 @@ export const missLetter = () => {
   // не даём буквы, которые тоже образуют слово из нашего списка (к_т → кот и кит)
   const ok = 'АОУЫИ'.split('').filter((L) => L !== ans && !words.has(item.word.slice(0, k) + L.toLowerCase() + item.word.slice(k + 1)));
   return {
-    text: 'Какой буквы не хватает?', voice: ['Какой буквы не хватает в слове', item.word + '?'],
+    text: 'Какой буквы не хватает?', voice: [`Какой буквы не хватает в слове ${item.word}?`],
     build(stage, api) {
       const w = h('div', 'read-word');
       [...item.word.toUpperCase()].forEach((ch, i) => w.append(h('span', i === k ? 'gap' : 's0 plain', i === k ? '?' : ch)));
@@ -626,11 +626,11 @@ function letterOptions(L, set, n = 3) {
 export const findLetter = ({ set = ALPHABET }) => {
   const L = pick(set);
   return {
-    text: 'Найди букву', voice: ['Найди букву', sayL(L)],
+    text: 'Найди букву', voice: [`Найди букву ${sayL(L)}.`],
     build(stage, api) {
       const row = answerButtons(letterOptions(L, set), (o) => o === L, api, (o) => o, sayL);
       row.classList.add('letters');
-      stage.append(hearBtn(['Найди букву', sayL(L)]), row);
+      stage.append(hearBtn([`Найди букву ${sayL(L)}.`]), row);
     },
   };
 };
@@ -640,7 +640,7 @@ export const letterToPic = ({ set = ALPHABET }) => {
   const target = pick(ITEMS.filter((i) => i.letter === L));
   const wrong = wrongPics(target, 2, (i) => i.letter !== L);
   return {
-    text: `Что начинается на букву «${L}»?`, voice: ['Найди картинку на букву', sayL(L)],
+    text: `Что начинается на букву «${L}»?`, voice: [`Найди картинку на букву ${sayL(L)}.`],
     build(stage, api) {
       const big = h('button', 'big-letter abc', L);
       big.onclick = () => { sfx.tap(); say(sayL(L)); };
@@ -652,7 +652,7 @@ export const letterToPic = ({ set = ALPHABET }) => {
 export const picToLetter = ({ set = ALPHABET }) => {
   const item = pick(ITEMS.filter((i) => set.includes(i.letter)));
   return {
-    text: 'С какой буквы начинается слово?', voice: ['С какой буквы начинается слово', item.word + '?'],
+    text: 'С какой буквы начинается слово?', voice: [`С какой буквы начинается слово ${item.word}?`],
     build(stage, api) {
       const row = answerButtons(letterOptions(item.letter, set), (o) => o === item.letter, api, (o) => o, sayL);
       row.classList.add('letters');
@@ -665,11 +665,11 @@ const LOOKALIKE = [['Ш', 'Щ', 'Ц'], ['Е', 'Ё', 'Э'], ['И', 'Й', 'Н'], [
 export const similarLetters = () => {
   const g = pick(LOOKALIKE), L = pick(g);
   return {
-    text: 'Буквы похожи! Найди нужную', voice: ['Буквы похожи. Смотри внимательно!', 'Найди букву', sayL(L)],
+    text: 'Буквы похожи! Найди нужную', voice: ['Буквы похожи. Смотри внимательно!', `Найди букву ${sayL(L)}.`],
     build(stage, api) {
       const row = answerButtons(shuffle(g), (o) => o === L, api, (o) => o, sayL);
       row.classList.add('letters');
-      stage.append(hearBtn(['Найди букву', sayL(L)]), row);
+      stage.append(hearBtn([`Найди букву ${sayL(L)}.`]), row);
     },
   };
 };
@@ -678,7 +678,7 @@ export const lowerCase = () => {
   const L = pick(ALPHABET.filter((x) => !'ЪЬЫ'.includes(x)));
   const opts = letterOptions(L, ALPHABET).map((x) => x.toLowerCase());
   return {
-    text: 'Найди такую же маленькую букву', voice: ['Это большая буква', sayL(L), 300, 'Найди такую же, только маленькую.'],
+    text: 'Найди такую же маленькую букву', voice: [`Это большая буква ${sayL(L)}.`, 'Найди такую же, только маленькую.'],
     build(stage, api) {
       const big = h('button', 'big-letter abc', L);
       big.onclick = () => { sfx.tap(); say(sayL(L)); };
@@ -706,7 +706,7 @@ export const abcGap = () => {
 export const abcTrain = () => {
   const len = 4, s = rnd(0, ALPHABET.length - len), part = ALPHABET.slice(s, s + len);
   return {
-    text: 'Поставь буквы по алфавиту!', voice: ['Поставь буквы по порядку, как в азбуке.', 'Начни с буквы', sayL(part[0])],
+    text: 'Поставь буквы по алфавиту!', voice: ['Поставь буквы по порядку, как в азбуке.', `Начни с буквы ${sayL(part[0])}.`],
     build(stage, api) {
       const slots = h('div', 'slots');
       const cells = part.map(() => { const c = h('div', 'slot-letter'); slots.append(c); return c; });
@@ -740,7 +740,7 @@ export const buildWord = ({ min = 3, max = 3, extra = 2, hint = false, ear = fal
   const ls = item.word.toUpperCase().split('');
   // всего букв на выбор — не больше шести (длинные слова — без лишних)
   const extras = shuffle('АОУИЫЭМСЛКТРНПВДБЗГШ'.split('').filter((l) => !ls.includes(l))).slice(0, Math.min(extra, Math.max(0, 6 - ls.length)));
-  const voice = ear ? ['Послушай слово:', item.word, 300, 'Собери его из букв.'] : ['Собери слово', item.word, 'Нажимай буквы по порядку.'];
+  const voice = ear ? [`Послушай слово: ${item.word}.`, 'Собери его из букв.'] : [`Собери слово ${item.word}.`, 'Нажимай буквы по порядку.'];
   return {
     text: ear ? 'Послушай и собери слово!' : 'Собери слово из букв!', voice,
     build(stage, api) {
@@ -778,4 +778,12 @@ export const buildWord = ({ min = 3, max = 3, extra = 2, hint = false, ear = fal
   };
 };
 
+// что совёнок говорит про букву: одной фразой, с примером слова
+export function letterPhrase(L, it = letterWord(L)) {
+  if (L === 'Ъ') return 'Это твёрдый знак. Он не звучит, а разделяет звуки.';
+  if (L === 'Ь') return 'Это мягкий знак. Он не звучит, а смягчает, как в слове конь.';
+  if (L === 'Ы') return 'Это буква ы. На ы слова не начинаются, но она есть в слове сыр.';
+  const n = sayL(L);
+  return it ? `Это буква ${n}. ${n[0].toUpperCase() + n.slice(1)} — ${it.word}.` : `Это буква ${n}.`;
+}
 export { byWord, sayL, letterWord };

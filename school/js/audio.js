@@ -184,6 +184,7 @@ export function say(parts, { rate = 0.9, pitch = 1.1 } = {}) {
   const isMine = () => my === speakId;
   stopVoice();
   const list = (Array.isArray(parts) ? parts : [parts]).filter((p) => p || p === 0);
+  if (window.__sayLog) window.__sayLog.push(...list.filter((p) => typeof p === 'string')); // для проверок: что говорилось
   duck(true);
   return list.reduce((p, part) => p.then(() => {
     if (!isMine()) return;
@@ -193,7 +194,8 @@ export function say(parts, { rate = 0.9, pitch = 1.1 } = {}) {
     if (typeof part === 'number') return new Promise((r) => setTimeout(r, part));
     if (MUTE) return new Promise((r) => setTimeout(r, 30));
     const file = voiceIndex[part.trim()];
-    return file ? playFile(file, isMine).catch(() => speakTTS(part, rate, pitch, isMine)) : speakTTS(part, rate, pitch, isMine);
+    return (file ? playFile(file, isMine).catch(() => speakTTS(part, rate, pitch, isMine)) : speakTTS(part, rate, pitch, isMine))
+      .then(() => new Promise((r) => setTimeout(r, 140))); // короткий вдох между фразами
   }), Promise.resolve()).then(() => { if (isMine()) duck(false); });
 }
 function stopVoice() {
