@@ -48,11 +48,40 @@ async function createAccount(key, nick, salt, hash) {
   d[key] = { nick, salt, hash, progress: {} }; writeFile(d);
   return true;
 }
+// Прохождение только растёт: присланное объединяется с сохранённым (лучшее из двух). Раньше сервер
+// заменял его целиком, и устройство, которое не успело загрузить прохождение (сайт просыпался после
+// сна Render, у браузера не работало хранилище), затирало пройденные уровни своим неполным списком.
+function mergeProgress(a = {}, b = {}) {
+  const out = {};
+  for (const src of [a, b]) {
+    for (const [k, v] of Object.entries(src || {})) {
+      if (k === "stars") out.stars = Math.max(out.stars || 0, Math.max(0, Math.min(1e6, Math.round(+v || 0))));
+      else if (k === "stickers" && Array.isArray(v)) out.stickers = [...new Set([...(out.stickers || []), ...v.filter((x) => typeof x === "string").map((x) => x.slice(0, 30))])].slice(0, 500);
+      else if (/^prog\.[a-z]{1,20}$/.test(k) && Array.isArray(v)) {
+        const w = out[k] || [];
+        out[k] = Array.from({ length: Math.min(200, Math.max(w.length, v.length)) }, (_, i) => Math.max(w[i] || 0, Math.max(0, Math.min(3, Math.round(+v[i] || 0)))));
+      }
+    }
+  }
+  return out;
+}
 async function saveProgress(key, progress) {
   const p = await db();
-  if (p) { await p.query(`UPDATE school.accounts SET progress=$2, updated=now() WHERE nick_key=$1`, [key, progress]); return; }
+  if (p) {
+    const c = await p.connect();
+    try {
+      await c.query("BEGIN");
+      const cur = (await c.query(`SELECT progress FROM school.accounts WHERE nick_key=$1 FOR UPDATE`, [key])).rows[0];
+      const merged = cur ? mergeProgress(cur.progress, progress) : null;
+      if (cur) await c.query(`UPDATE school.accounts SET progress=$2, updated=now() WHERE nick_key=$1`, [key, merged]);
+      await c.query("COMMIT");
+      return merged;
+    } catch (e) { await c.query("ROLLBACK").catch(() => {}); throw e; } finally { c.release(); }
+  }
   const d = readFile();
-  if (d[key]) { d[key].progress = progress; writeFile(d); }
+  if (!d[key]) return null;
+  d[key].progress = mergeProgress(d[key].progress, progress); writeFile(d);
+  return d[key].progress;
 }
 
 // ---------- пароль и токен ----------
@@ -129,8 +158,9 @@ export function attachSchoolAccounts(app) {
     try {
       const progress = req.body?.progress;
       if (!progress || typeof progress !== "object" || Array.isArray(progress) || JSON.stringify(progress).length > MAX_PROGRESS) return res.status(400).json({ error: "Неверные данные." });
-      await saveProgress(req.key, progress);
-      res.json({ ok: true });
+      const merged = await saveProgress(req.key, progress);
+      if (!merged) return res.status(401).json({ error: "Нужно войти заново." });
+      res.json({ ok: true, progress: merged });
     } catch (e) { res.status(500).json({ error: "Ошибка сервера." }); }
   });
 

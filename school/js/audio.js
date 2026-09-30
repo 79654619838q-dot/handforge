@@ -1,3 +1,4 @@
+import { ls } from './storage.js';
 // Все звуки синтезируются в браузере (Web Audio) — файлов нет, грузить нечего.
 // Голос ведущего — встроенный синтез речи браузера (русский голос).
 let ctx, master, musicGain, musicTimer = null;
@@ -8,7 +9,7 @@ const MUTE = new URLSearchParams(location.search).has('mute');
 const CHECK = new URLSearchParams(location.search).has('check');
 const trace = (part, how, extra) => { if (CHECK) (window.__voiceTrace ||= []).push({ part, how, extra }); };
 let musicOn = true;
-try { musicOn = localStorage.getItem('school.music') !== '0'; } catch {}
+musicOn = ls.getItem('school.music') !== '0';
 
 function ac() {
   if (!ctx) {
@@ -109,7 +110,7 @@ function musicLoop() {
 }
 export function setMusic(on) {
   musicOn = on;
-  try { localStorage.setItem('school.music', on ? '1' : '0'); } catch {}
+  ls.setItem('school.music', on ? '1' : '0');
   if (on && !musicTimer) musicLoop();
   if (!on && musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
 }

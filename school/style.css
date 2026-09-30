@@ -228,7 +228,7 @@ img { -webkit-user-drag: none; }
   .round-btn, .spacer { width: 46px; height: 46px; font-size: 22px; }
   .stars-total { font-size: 17px; padding: 8px 12px; }
   .topbar .title { padding: 4px 12px; font-size: 18px; }
-  .topbar .stars-total { display: none; }
+  .topbar .stars-total { font-size: 15px; padding: 6px 10px; } /* звёзды видны всегда, на узком экране компактнее */
   .topbar { gap: 6px; }
   .screen { padding-bottom: calc(var(--owl) + 20px); }
 }
@@ -390,3 +390,8 @@ img { -webkit-user-drag: none; }
 .tile.found { background: var(--good); color: #fff; border-color: var(--good); box-shadow: 0 7px 0 #238a3b; animation: yay 0.5s; }
 .big-letter.small { font-size: clamp(56px, 10vmin, 90px); }
 .link-btn.on-bg { background: rgba(255,255,255,0.9); border-radius: 999px; padding: 8px 18px; text-decoration: none; box-shadow: var(--shadow); }
+
+/* предупреждения о сохранении */
+.warn { margin: 6px auto 0; max-width: 560px; background: #fff7d6; border: 3px solid #ffc93c; color: #6b4a00; border-radius: 18px; padding: 8px 14px; font-size: clamp(14px, 2.4vmin, 18px); text-align: center; box-shadow: var(--shadow); }
+.warn.small { font-size: clamp(12px, 2vmin, 15px); padding: 6px 12px; align-self: flex-end; max-width: 420px; }
+.login-note { margin: 4px 0 0; font-size: 14px; color: #5a5280; text-align: center; }

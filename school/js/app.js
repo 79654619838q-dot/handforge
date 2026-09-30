@@ -3,12 +3,13 @@ import { ITEMS, SECTIONS, PRAISE, TRY_AGAIN, ALPHABET } from './data.js';
 import { h, pick, shuffle, sayL, letterWord, letterPhrase, titleSpeech } from './games.js';
 import { LEVELS, TASKS_PER_LEVEL, starsFor } from './levels.js';
 import { say, hush, sfx, startAudio, setMusic, isMusicOn } from './audio.js';
-import { account, signIn, signOut, pull, schedulePush } from './account.js';
+import { account, signIn, signOut, pull, loaded, schedulePush } from './account.js';
+import { ls, storageWorks } from './storage.js';
 
 const app = document.getElementById('app');
 const store = {
-  get(k, d) { try { const v = localStorage.getItem('school.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('school.' + k, JSON.stringify(v)); } catch {} schedulePush(); },
+  get(k, d) { try { const v = ls.getItem('school.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { ls.setItem('school.' + k, JSON.stringify(v)); schedulePush(); },
 };
 // Прогресс: по разделу — массив звёзд за уровни (0 — не пройден).
 const prog = (id) => { const p = store.get('prog.' + id, []); return LEVELS[id].map((_, i) => p[i] || 0); };
@@ -91,7 +92,12 @@ function splash() {
   const a = account();
   const go = h('button', 'play-btn', a ? `▶ Играть` : '▶ Играть');
   if (a) {
-    go.onclick = () => { startAudio(); sfx.good(); menu(true); };
+    go.onclick = async () => {
+      startAudio(); sfx.good();
+      go.disabled = true; go.textContent = '⏳ Загружаю прохождение…';
+      await loaded;
+      menu(true);
+    };
     s.append(h('p', 'who', `👤 ${esc(a.nick)}`), go);
   } else if (isGuest()) {
     // играли без входа: сразу в меню, прохождение в этом браузере; предлагаем войти, чтобы не потерять
@@ -103,12 +109,15 @@ function splash() {
     go.onclick = () => { startAudio(); sfx.good(); login(); };
     s.append(go);
   }
+  if (!storageWorks) s.append(h('p', 'warn', a
+    ? '⚠️ Этот браузер не запоминает сайт. Прохождение сохраняется на сервере — при следующем открытии просто войди снова.'
+    : '⚠️ Этот браузер не запоминает прохождение. Нажми «Играть» и войди под своим именем — тогда всё сохранится.'));
   owlSay('', null, 'hello');
 }
 
 // ---------- вход ----------
 const isGuest = () => store.get('guest', false);
-const setGuest = (v) => { try { v ? localStorage.setItem('school.guest', 'true') : localStorage.removeItem('school.guest'); } catch {} };
+const setGuest = (v) => { v ? ls.setItem('school.guest', 'true') : ls.removeItem('school.guest'); };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function login(isNew = false) {
   setBg('assets/bg/menu.jpg');
@@ -125,9 +134,9 @@ function login(isNew = false) {
   card.append(h('label', '', 'Как тебя зовут?'), nick, h('label', '', isNew ? 'Придумай пароль (от 4 знаков). Запиши его!' : 'Пароль'), passRow, err, ok);
   const sw = h('button', 'link-btn', isNew ? 'Я уже играл(а) — войти' : 'Я здесь впервые — новый игрок'); sw.type = 'button';
   sw.onclick = () => { sfx.tap(); login(!isNew); };
-  const guest = h('button', 'link-btn dim', 'Играть без входа (прохождение сохранится только на этом устройстве)'); guest.type = 'button';
+  const guest = h('button', 'link-btn dim', storageWorks ? 'Играть без входа (прохождение сохранится только на этом устройстве)' : 'Играть без входа (этот браузер не запомнит прохождение)'); guest.type = 'button';
   guest.onclick = () => { sfx.tap(); setGuest(true); menu(true); };
-  card.append(sw, guest);
+  card.append(h('p', 'login-note', 'Войди под этим именем и на планшете, и на компьютере — прохождение будет общим.'), sw, guest);
   card.onsubmit = async (e) => {
     e.preventDefault();
     err.textContent = '';
@@ -172,6 +181,7 @@ function menu(first = false) {
   };
   const row = h('div', 'menu-bottom'); row.append(album, who);
   s.append(row);
+  if (!a) s.append(h('p', 'warn small', storageWorks ? 'Без входа прохождение хранится только на этом устройстве. Чтобы оно было и на планшете, и на компьютере — войди под одним именем.' : '⚠️ Этот браузер не запоминает прохождение — войди, чтобы оно сохранилось.'));
   owlSay(first ? 'Привет! Я совёнок Умка. Во что поиграем?' : 'Во что поиграем?',
     first ? 'Привет! Я совёнок Умка. Выбирай, во что будем играть!' : 'Во что поиграем?', 'hello')
     .then(() => setTimeout(() => { if (s.isConnected) bubble.classList.remove('show'); }, 1500)); // не закрывать кнопки внизу
@@ -436,5 +446,5 @@ setTimeout(() => ITEMS.forEach((it) => { const i = new Image(); i.src = it.img; 
 if (q.get('level')) {
   const [sid, n] = q.get('level').split('.');
   const sec = SECTIONS.find((x) => x.id === sid);
-  if (sec && LEVELS[sid][+n]) { startAudio(); play(sec, +n); } else pull().then(splash); // прохождение с сервера — до первого экрана
-} else pull().then(splash); // прохождение с сервера — до первого экрана
+  if (sec && LEVELS[sid][+n]) { startAudio(); play(sec, +n); } else { pull(); splash(); } // заставка сразу, прохождение с сервера грузится в фоне (меню его дождётся)
+} else { pull(); splash(); } // заставка сразу, прохождение с сервера грузится в фоне (меню его дождётся)
