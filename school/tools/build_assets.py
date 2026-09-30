@@ -24,13 +24,21 @@ def load(name):
     return img
 
 
-def cut_out(cell):
+# предметы с замкнутыми «окнами» фона (петля нитки, ручка чайника): белое внутри тоже убираем
+HOLES = {'s12_3', 's12_6'}
+
+
+def cut_out(cell, holes=False):
     """Белый фон, связанный с краем клетки, → прозрачный; белое внутри предмета остаётся."""
     a = np.asarray(cell).astype(np.int16)
     whiteish = (a.min(axis=2) > 232) & (a.max(axis=2) - a.min(axis=2) < 18)
     lab, _ = ndimage.label(whiteish)
     edge = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
     bg = np.isin(lab, list(edge))
+    if holes:  # крупные чисто-белые острова внутри — тоже фон
+        for k in range(1, lab.max() + 1):
+            m = lab == k
+            if m.sum() > 400 and a[m].min() > 238: bg |= m
     # мягкий край: полупрозрачная кайма в 2 px вместо «лесенки»
     solid = ~bg
     soft = ndimage.gaussian_filter(solid.astype(np.float32), 1.0)
@@ -59,21 +67,22 @@ def grid(img, n, prefix, folder, names=None, size=360):
         for c in range(n):
             i = r * n + c
             cell = img.crop((c * w // n, r * h // n, (c + 1) * w // n, (r + 1) * h // n))
-            im = cut_out(cell)
+            im = cut_out(cell, holes=f'{prefix}_{r * n + c}' in HOLES)
             im.thumbnail((size, size), Image.LANCZOS)
             name = names[i] if names else f'{prefix}_{i}'
             im.save(os.path.join(OUT, folder, name + '.webp'), quality=88, method=6)
 
 
-for s in range(1, 12):
+for s in range(1, 13):
     grid(load(f'sheet{s}'), 3, f's{s}', 'items')
 grid(load('mascot'), 2, '', 'owl', ['hello', 'joy', 'think', 'cheer'], size=520)
 grid(load('cups'), 2, '', 'cups', ['math', 'sounds', 'syllables', 'words'], size=420)
 grid(load('cup_abc'), 1, '', 'cups', ['abc'], size=420)
 grid(load('cup_build'), 1, '', 'cups', ['build'], size=420)
+grid(load('cup_letters'), 1, '', 'cups', ['letters'], size=420)
 
 os.makedirs(os.path.join(OUT, 'bg'), exist_ok=True)
-for b in ['bg_menu', 'bg_math', 'bg_sounds', 'bg_syllables', 'bg_words', 'bg_reward', 'bg_abc', 'bg_build']:
+for b in ['bg_menu', 'bg_math', 'bg_sounds', 'bg_syllables', 'bg_words', 'bg_reward', 'bg_abc', 'bg_build', 'bg_letters']:
     im = load(b)
     im.thumbnail((1920, 1920), Image.LANCZOS)
     im.save(os.path.join(OUT, 'bg', b[3:] + '.jpg'), quality=84, optimize=True, progressive=True)

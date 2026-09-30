@@ -97,6 +97,34 @@ LEVELS.build = [
   L('Всё вместе', [G.buildWord, { min: 3, max: 4, extra: 3 }], [G.buildWord, { min: 5, max: 8, extra: 1 }], [G.buildWord, { min: 3, max: 6, extra: 2, ear: true }], [G.buildWord, { min: 3, max: 7, extra: 1, soft: true }]),
 ];
 
+// «Буква за буквой»: каждая буква от А до Я — два урока (знакомство и закрепление) в порядке букваря,
+// после каждой группы — повторение всего выученного, в конце — весь алфавит.
+import { ITEMS, ALPHABET } from './data.js';
+const hasPic = (L) => ITEMS.some((i) => i.letter === L);
+const inWords = (L) => ITEMS.some((i) => i.word.toUpperCase().includes(L));
+const NAME = { Ь: 'Мягкий знак', Ъ: 'Твёрдый знак' };
+LEVELS.letters = [];
+GROUPS.forEach((group, k) => {
+  const before = learned(k);
+  group.forEach((ch) => {
+    const known = before.slice(0, before.indexOf(ch) + 1);
+    const title = NAME[ch] || `Буква ${ch}`;
+    const learnGames = [[G.findLetter, { target: ch, set: known.length > 1 ? known : [ch] }]];
+    if (hasPic(ch)) learnGames.push([G.letterToPic, { target: ch }], [G.picToLetter, { target: ch, set: known }]);
+    if (inWords(ch)) learnGames.push([G.letterInWord, { target: ch }]);
+    LEVELS.letters.push({ title, intro: [ch], games: learnGames });
+    const fixGames = [[G.findLetter, { target: ch, set: ALPHABET }], [G.similarLetters, { target: ch }]];
+    if (!'ЬЪЫ'.includes(ch)) fixGames.push([G.lowerCase, { target: ch }]);
+    if (inWords(ch)) fixGames.push([G.letterInWord, { target: ch }]);
+    if (hasPic(ch)) fixGames.push([G.picToLetter, { target: ch, set: ALPHABET }]);
+    LEVELS.letters.push({ title: `${NAME[ch] || ch}: закрепляем`, games: fixGames });
+  });
+  const all = learned(k);
+  LEVELS.letters.push(L(`Повторяем: ${group.join(' ')}`, [G.findLetter, { set: all }], [G.picToLetter, { set: all }],
+    [G.letterToPic, { set: all.filter(hasPic) }], [G.letterInWord, { set: all.filter(inWords) }]));
+});
+LEVELS.letters.push(L('Весь алфавит', [G.findLetter, {}], [G.picToLetter, {}], [G.letterToPic, {}], [G.letterInWord, {}], [G.lowerCase, {}], [G.similarLetters, {}], [G.abcGap, {}], [G.abcTrain, {}]));
+
 export const TASKS_PER_LEVEL = 8;
 // звёзды за уровень по числу ошибок
 export const starsFor = (mistakes) => (mistakes <= 1 ? 3 : mistakes <= 4 ? 2 : 1);

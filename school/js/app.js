@@ -1,6 +1,6 @@
 // «Школа Умки» — экраны: заставка → меню → карта уровней раздела → уровень (8 заданий) → награда; альбом.
 import { ITEMS, SECTIONS, PRAISE, TRY_AGAIN, ALPHABET } from './data.js';
-import { h, pick, shuffle, sayL, letterWord, letterPhrase } from './games.js';
+import { h, pick, shuffle, sayL, letterWord, letterPhrase, titleSpeech } from './games.js';
 import { LEVELS, TASKS_PER_LEVEL, starsFor } from './levels.js';
 import { say, hush, sfx, startAudio, setMusic, isMusicOn } from './audio.js';
 import { account, signIn, signOut, pull, schedulePush } from './account.js';
@@ -93,6 +93,12 @@ function splash() {
   if (a) {
     go.onclick = () => { startAudio(); sfx.good(); menu(true); };
     s.append(h('p', 'who', `👤 ${esc(a.nick)}`), go);
+  } else if (isGuest()) {
+    // играли без входа: сразу в меню, прохождение в этом браузере; предлагаем войти, чтобы не потерять
+    go.onclick = () => { startAudio(); sfx.good(); menu(true); };
+    const save = h('button', 'link-btn on-bg', '👤 Войти, чтобы прохождение не потерялось');
+    save.onclick = () => { startAudio(); sfx.tap(); login(); };
+    s.append(go, save);
   } else {
     go.onclick = () => { startAudio(); sfx.good(); login(); };
     s.append(go);
@@ -101,6 +107,8 @@ function splash() {
 }
 
 // ---------- вход ----------
+const isGuest = () => store.get('guest', false);
+const setGuest = (v) => { try { v ? localStorage.setItem('school.guest', 'true') : localStorage.removeItem('school.guest'); } catch {} };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function login(isNew = false) {
   setBg('assets/bg/menu.jpg');
@@ -118,7 +126,7 @@ function login(isNew = false) {
   const sw = h('button', 'link-btn', isNew ? 'Я уже играл(а) — войти' : 'Я здесь впервые — новый игрок'); sw.type = 'button';
   sw.onclick = () => { sfx.tap(); login(!isNew); };
   const guest = h('button', 'link-btn dim', 'Играть без входа (прохождение сохранится только на этом устройстве)'); guest.type = 'button';
-  guest.onclick = () => { sfx.tap(); menu(true); };
+  guest.onclick = () => { sfx.tap(); setGuest(true); menu(true); };
   card.append(sw, guest);
   card.onsubmit = async (e) => {
     e.preventDefault();
@@ -126,7 +134,7 @@ function login(isNew = false) {
     if (nick.value.trim().length < 2) { err.textContent = 'Имя — хотя бы 2 буквы.'; return; }
     if (pass.value.length < 4) { err.textContent = 'Пароль — хотя бы 4 знака.'; return; }
     ok.disabled = true;
-    try { await signIn(nick.value.trim(), pass.value, isNew); sfx.good(); menu(true); }
+    try { await signIn(nick.value.trim(), pass.value, isNew); setGuest(false); sfx.good(); menu(true); }
     catch (ex) { sfx.bad(); err.textContent = ex.message; ok.disabled = false; }
   };
   s.append(card);
@@ -160,7 +168,7 @@ function menu(first = false) {
   who.onclick = () => {
     sfx.tap();
     if (!a) return login();
-    if (confirm(`Выйти из игрока «${a.nick}»? Прохождение сохранено, войдёшь — всё вернётся.`)) { signOut(); splash(); }
+    if (confirm(`Выйти из игрока «${a.nick}»? Прохождение сохранено, войдёшь — всё вернётся.`)) { signOut(); setGuest(false); splash(); }
   };
   const row = h('div', 'menu-bottom'); row.append(album, who);
   s.append(row);
@@ -225,7 +233,7 @@ function map(sec) {
   requestAnimationFrame(() => { scroller.scrollTop = Math.max(0, ys[Math.min(cur, n - 1)] - scroller.clientHeight / 2); });
   const total = p.reduce((a, b) => a + b, 0);
   if (cur >= levels.length) owlSay('Все уровни пройдены! Можно переиграть любой.', 'Все уровни пройдены! Можно переиграть любой и собрать все звёзды.', 'cheer');
-  else owlSay(`Уровень ${cur + 1}: ${levels[cur].title}`, [`Уровень ${cur + 1}.`, levels[cur].title], total ? 'cheer' : 'hello');
+  else owlSay(`Уровень ${cur + 1}: ${levels[cur].title}`, [`Уровень ${cur + 1}.`, titleSpeech(levels[cur].title)], total ? 'cheer' : 'hello');
 }
 
 // ---------- уровень: 8 заданий подряд ----------

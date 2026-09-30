@@ -623,20 +623,23 @@ function letterOptions(L, set, n = 3) {
   return shuffle([L, ...[...pool, ...extra].slice(0, n - 1)]);
 }
 
-export const findLetter = ({ set = ALPHABET }) => {
-  const L = pick(set);
+// «Найди букву мэ.», но «Найди мягкий знак.» — знаки буквой не называем
+const findPhrase = (L) => ('ЬЪ'.includes(L) ? `Найди ${sayL(L)}.` : `Найди букву ${sayL(L)}.`);
+// target — урок одной буквы: задание всегда про неё
+export const findLetter = ({ set = ALPHABET, target = null }) => {
+  const L = target || pick(set);
   return {
-    text: 'Найди букву', voice: [`Найди букву ${sayL(L)}.`],
+    text: 'ЬЪ'.includes(L) ? 'Найди знак' : 'Найди букву', voice: [findPhrase(L)],
     build(stage, api) {
       const row = answerButtons(letterOptions(L, set), (o) => o === L, api, (o) => o, sayL);
       row.classList.add('letters');
-      stage.append(hearBtn([`Найди букву ${sayL(L)}.`]), row);
+      stage.append(hearBtn([findPhrase(L)]), row);
     },
   };
 };
 
-export const letterToPic = ({ set = ALPHABET }) => {
-  const L = pick(lettersWithPics(set));
+export const letterToPic = ({ set = ALPHABET, target: only = null }) => {
+  const L = only || pick(lettersWithPics(set));
   const target = pick(ITEMS.filter((i) => i.letter === L));
   const wrong = wrongPics(target, 2, (i) => i.letter !== L);
   return {
@@ -649,8 +652,9 @@ export const letterToPic = ({ set = ALPHABET }) => {
   };
 };
 
-export const picToLetter = ({ set = ALPHABET }) => {
-  const item = pick(ITEMS.filter((i) => set.includes(i.letter)));
+export const picToLetter = ({ set = ALPHABET, target = null }) => {
+  const item = pick(ITEMS.filter((i) => (target ? i.letter === target : set.includes(i.letter))));
+  if (target && !set.includes(target)) set = [target, ...set];
   return {
     text: 'С какой буквы начинается слово?', voice: [`С какой буквы начинается слово ${item.word}?`],
     build(stage, api) {
@@ -662,20 +666,22 @@ export const picToLetter = ({ set = ALPHABET }) => {
 };
 
 const LOOKALIKE = [['Ш', 'Щ', 'Ц'], ['Е', 'Ё', 'Э'], ['И', 'Й', 'Н'], ['Ь', 'Ъ', 'Ы'], ['О', 'С', 'Э'], ['П', 'Н', 'Л'], ['З', 'Э', 'В'], ['Б', 'В', 'Р'], ['Ж', 'К', 'Х'], ['Т', 'Г', 'Р'], ['Ч', 'У', 'Ц'], ['Ю', 'О', 'Я']];
-export const similarLetters = () => {
-  const g = pick(LOOKALIKE), L = pick(g);
+export const similarLetters = ({ target = null } = {}) => {
+  const groups = target ? LOOKALIKE.filter((g) => g.includes(target)) : LOOKALIKE;
+  const g = groups.length ? pick(groups) : [target, ...shuffle(ALPHABET.filter((x) => x !== target)).slice(0, 2)];
+  const L = target || pick(g);
   return {
-    text: 'Буквы похожи! Найди нужную', voice: ['Буквы похожи. Смотри внимательно!', `Найди букву ${sayL(L)}.`],
+    text: 'Буквы похожи! Найди нужную', voice: ['Буквы похожи. Смотри внимательно!', findPhrase(L)],
     build(stage, api) {
       const row = answerButtons(shuffle(g), (o) => o === L, api, (o) => o, sayL);
       row.classList.add('letters');
-      stage.append(hearBtn([`Найди букву ${sayL(L)}.`]), row);
+      stage.append(hearBtn([findPhrase(L)]), row);
     },
   };
 };
 
-export const lowerCase = () => {
-  const L = pick(ALPHABET.filter((x) => !'ЪЬЫ'.includes(x)));
+export const lowerCase = ({ target = null } = {}) => {
+  const L = target || pick(ALPHABET.filter((x) => !'ЪЬЫ'.includes(x)));
   const opts = letterOptions(L, ALPHABET).map((x) => x.toLowerCase());
   return {
     text: 'Найди такую же маленькую букву', voice: [`Это большая буква ${sayL(L)}.`, 'Найди такую же, только маленькую.'],
@@ -685,6 +691,37 @@ export const lowerCase = () => {
       const row = answerButtons(opts, (o) => o === L.toLowerCase(), api, (o) => o, (o) => sayL(o.toUpperCase()));
       row.classList.add('letters', 'lower');
       stage.append(big, row);
+    },
+  };
+};
+
+// Найди букву в слове: слово из плиток, нажать на каждое место, где стоит буква.
+export const letterInWord = ({ target = null, set = ALPHABET } = {}) => {
+  const L = target || pick(set.filter((x) => ITEMS.some((i) => i.word.toUpperCase().includes(x))));
+  const pool = ITEMS.filter((i) => i.word.toUpperCase().includes(L) && i.word.length <= 8);
+  const item = pick(pool.filter((i) => i.letter !== L).length && Math.random() < 0.6 ? pool.filter((i) => i.letter !== L) : pool);
+  const word = item.word.toUpperCase();
+  const count = [...word].filter((c) => c === L).length;
+  const name = 'ЬЪ'.includes(L) ? sayL(L) : `букву ${sayL(L)}`;
+  const phrase = count > 1 ? `Найди все буквы ${sayL(L)} в слове ${item.word}. Их ${numWord(count, 'f')}.` : `Найди ${name} в слове ${item.word}.`;
+  return {
+    text: count > 1 ? `Найди все «${L}» в слове` : `Найди «${L}» в слове`, voice: [phrase],
+    build(stage, api) {
+      let found = 0;
+      const row = h('div', 'word-tiles');
+      [...word].forEach((ch) => {
+        const t = h('button', 'tile letter', ch);
+        t.onclick = () => {
+          if (t.disabled || api.locked()) return;
+          if (ch === L) {
+            t.disabled = true; t.classList.add('found');
+            sfx.pop(); found++;
+            if (found === count) { api.hold(); say(item.word); api.right(row, 900); }
+          } else api.wrong(t);
+        };
+        row.append(t);
+      });
+      stage.append(hero(item, true, [phrase]), h('div', 'big-letter abc small', L), row);
     },
   };
 };
@@ -786,4 +823,25 @@ export function letterPhrase(L, it = letterWord(L)) {
   const n = sayL(L);
   return it ? `Это буква ${n}. ${n[0].toUpperCase() + n.slice(1)} — ${it.word}.` : `Это буква ${n}.`;
 }
+// Как совёнок произносит название уровня: буквы — по-детски и так, чтобы голос не спутал
+// («Буквы А О У» → «Буквы «а», «о-о», «у-у»»), знаки и числа — словами.
+const SAY_TITLE = { 'Знаки > < =': 'Знаки: больше, меньше, равно.', 'Слова с Ь и Й': 'Слова с мягким знаком и буквой и краткое.' };
+export function titleSpeech(title) {
+  if (SAY_TITLE[title]) return SAY_TITLE[title];
+  const vow = { О: '«о-о»', У: '«у-у»', Э: '«э-э»', Ы: '«ы» — как в слове сыр' };
+  const name = (L) => (isVowel(L) ? vow[L] || `«${L.toLowerCase()}»` : 'ЙЬЪ'.includes(L) ? sayL(L) : `«${sayL(L)}»`); // в кавычках голос не сливает букву со словом
+  let t = title.replace(/(\d+) слога/, (_, n) => `${NUM[+n]} слога`);
+  const words = t.split(' ');
+  const out = []; let letters = [];
+  const flush = () => { if (letters.length) { out.push(letters.map(name).join(', ')); letters = []; } };
+  for (const w of words) {
+    const m = w.match(/^([А-ЯЁ])(:?)$/);
+    if (m) { letters.push(m[1]); if (m[2]) { flush(); out[out.length - 1] += ':'; } } else { flush(); out.push(w); }
+  }
+  flush();
+  t = out.join(' ');
+  if (/^[«а-яё]/.test(t) && /^([А-ЯЁ]):? /.test(title)) t = 'Буква ' + t; // «А: закрепляем» → «Буква «а»: закрепляем»
+  return /[.!?]$/.test(t) ? t : t + '.';
+}
+
 export { byWord, sayL, letterWord };

@@ -14,7 +14,7 @@ globalThis.fetch = async () => ({ ok: false, json: async () => ({}) });
 
 const D = await import('../js/data.js');
 const { LEVELS } = await import('../js/levels.js');
-const { sayL, letterPhrase } = await import('../js/games.js');
+const { sayL, letterPhrase, titleSpeech } = await import('../js/games.js');
 
 const out = new Set();
 const add = (...xs) => xs.flat(Infinity).forEach((x) => { if (typeof x === 'string' && x.trim()) out.add(x.trim()); });
@@ -22,7 +22,7 @@ const add = (...xs) => xs.flat(Infinity).forEach((x) => { if (typeof x === 'stri
 // 1. голос заданий: каждый вид на каждом уровне — по 30000 раз (истории дают сотни сочетаний)
 for (const lv of Object.values(LEVELS).flat()) {
   for (const [fn, opts] of lv.games) for (let i = 0; i < 30000; i++) add(fn(opts).voice);
-  add(lv.title);
+  add(titleSpeech(lv.title));
 }
 // 2. то, что звучит по нажатию
 add(D.ITEMS.map((i) => [i.word, ...i.syl]));

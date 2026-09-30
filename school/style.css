@@ -383,3 +383,10 @@ img { -webkit-user-drag: none; }
   .read-word { font-size: min(clamp(56px, 12vmin, 110px), 11vw); padding: 4px 12px; letter-spacing: 0; }
 }
 .letter-card.glow { box-shadow: 0 7px 0 var(--c), 0 0 0 8px #fff, 0 0 40px var(--c); transform: scale(1.06); }
+
+/* найди букву в слове */
+.word-tiles { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.word-tiles .tile { min-width: clamp(52px, 9vmin, 84px); padding: 8px 10px; }
+.tile.found { background: var(--good); color: #fff; border-color: var(--good); box-shadow: 0 7px 0 #238a3b; animation: yay 0.5s; }
+.big-letter.small { font-size: clamp(56px, 10vmin, 90px); }
+.link-btn.on-bg { background: rgba(255,255,255,0.9); border-radius: 999px; padding: 8px 18px; text-decoration: none; box-shadow: var(--shadow); }

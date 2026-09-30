@@ -113,6 +113,11 @@ export function attachSchoolAccounts(app) {
     if (!key) return res.status(401).json({ error: "Нужно войти заново." });
     req.key = key; next();
   };
+  // где хранятся аккаунты: "db" — база (переживает перезапуск), "file" — файл (стирается при перезапуске Render)
+  r.get("/health", async (_req, res) => {
+    res.json({ store: (await db()) ? "db" : "file" });
+  });
+
   r.get("/progress", auth, async (req, res) => {
     try {
       const acc = await getAccount(req.key);

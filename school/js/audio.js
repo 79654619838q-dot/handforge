@@ -3,6 +3,10 @@
 let ctx, master, musicGain, musicTimer = null;
 // ?mute=1 — полная тишина (для проверок): ни музыки, ни эффектов, ни голоса
 const MUTE = new URLSearchParams(location.search).has('mute');
+// ?check=1 — для проверок: каждая фраза проходит настоящий путь (поиск записи, загрузка, раскодирование),
+// но не играет; итог — в window.__voiceTrace
+const CHECK = new URLSearchParams(location.search).has('check');
+const trace = (part, how, extra) => { if (CHECK) (window.__voiceTrace ||= []).push({ part, how, extra }); };
 let musicOn = true;
 try { musicOn = localStorage.getItem('school.music') !== '0'; } catch {}
 
@@ -129,7 +133,7 @@ let current = null;
 function loadVoice(file) {
   if (!buffers.has(file)) {
     buffers.set(file, fetch('assets/voice/' + file).then((r) => r.arrayBuffer())
-      .then((b) => new Promise((res, rej) => ac().decodeAudioData(b, res, rej)))
+      .then((b) => new Promise((res, rej) => { const p = ac().decodeAudioData(b, res, rej); if (p && p.catch) p.catch(() => {}); })) // ошибку уже передаёт rej
       .catch((e) => { buffers.delete(file); throw e; }));
   }
   return buffers.get(file);
@@ -181,7 +185,7 @@ let speakId = 0;
 // или когда началась новая речь — старая прерывается.
 export function say(parts, { rate = 0.9, pitch = 1.1 } = {}) {
   const my = ++speakId;
-  const isMine = () => my === speakId;
+  const isMine = () => CHECK || my === speakId; // в проверке каждую фразу доводим до конца, даже если её перебили
   stopVoice();
   const list = (Array.isArray(parts) ? parts : [parts]).filter((p) => p || p === 0);
   if (window.__sayLog) window.__sayLog.push(...list.filter((p) => typeof p === 'string')); // для проверок: что говорилось
@@ -193,6 +197,11 @@ export function say(parts, { rate = 0.9, pitch = 1.1 } = {}) {
     if (!isMine()) return;
     if (typeof part === 'number') return new Promise((r) => setTimeout(r, part));
     if (MUTE) return new Promise((r) => setTimeout(r, 30));
+    if (CHECK) {
+      const f = voiceIndex[part.trim()];
+      if (!f) { trace(part, 'НЕТ ЗАПИСИ'); return; }
+      return loadVoice(f).then((b) => trace(part, b.duration > 0.15 ? 'ok' : 'ПУСТО', +b.duration.toFixed(2)), (e) => trace(part, 'ОШИБКА ЗАГРУЗКИ', String(e)));
+    }
     const file = voiceIndex[part.trim()];
     return (file ? playFile(file, isMine).catch(() => speakTTS(part, rate, pitch, isMine)) : speakTTS(part, rate, pitch, isMine))
       .then(() => new Promise((r) => setTimeout(r, 140))); // короткий вдох между фразами
