@@ -215,7 +215,7 @@ img { -webkit-user-drag: none; }
 @keyframes sticker-in { from { transform: scale(0) rotate(-200deg); } }
 .sticker-name { font-size: clamp(28px, 5vmin, 44px); font-weight: 900; color: #6a4cff; }
 .sticker.locked img { filter: brightness(0) opacity(0.15); }
-.album { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 14px; width: min(100%, 1100px); margin-top: 16px; padding-bottom: 20px; }
+/* альбом и плакат: размер клеток считает fitGrid() — всё на одном экране */
 
 /* ---------- эффекты ---------- */
 .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; }
@@ -343,7 +343,7 @@ img { -webkit-user-drag: none; }
 .letter-card.big span { font-size: clamp(18px, 3vmin, 26px); }
 .letter-card.bump { animation: yay 0.5s; }
 .intro .play-btn { margin-bottom: auto; }
-.poster { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; width: min(100%, 1100px); margin-top: 14px; padding-bottom: 20px; }
+
 .poster-btn { margin: 8px 0 0; }
 
 /* ================= собери слово ================= */
@@ -395,3 +395,17 @@ img { -webkit-user-drag: none; }
 .warn { margin: 6px auto 0; max-width: 560px; background: #fff7d6; border: 3px solid #ffc93c; color: #6b4a00; border-radius: 18px; padding: 8px 14px; font-size: clamp(14px, 2.4vmin, 18px); text-align: center; box-shadow: var(--shadow); }
 .warn.small { font-size: clamp(12px, 2vmin, 15px); padding: 6px 12px; align-self: flex-end; max-width: 420px; }
 .login-note { margin: 4px 0 0; font-size: 14px; color: #5a5280; text-align: center; }
+
+/* ================= альбом без прокрутки ================= */
+.album-screen, .poster-screen { overflow: hidden; padding-bottom: 8px; }
+.album-screen ~ .owl, .poster-screen ~ .owl { display: none; } /* совёнок не закрывает клетки */
+.sticker-grid, .poster-grid { display: grid; gap: 8px; justify-content: center; align-content: start; width: 100%; margin-top: 10px; }
+.sticker-grid .sticker { width: var(--cell); padding: calc(var(--cell) * 0.06); border-radius: calc(var(--cell) * 0.18); border-width: 3px; box-shadow: 0 4px 0 #e5ddff; }
+.sticker-grid .sticker span { font-size: clamp(10px, calc(var(--cell) * 0.13), 15px); line-height: 1.1; }
+.sticker-grid.tiny .sticker span { display: none; }
+.sticker-grid .sticker.cup { border-color: #ffd23c; background: #fff8dc; }
+.poster-grid .letter-card { width: var(--cell); padding: 4px; border-width: 3px; }
+.poster-grid .letter-card b { font-size: calc(var(--cell) * 0.34); }
+.poster-grid .letter-card img { width: calc(var(--cell) * 0.5); }
+.poster-grid .letter-card span { font-size: clamp(9px, calc(var(--cell) * 0.12), 14px); }
+.poster-grid.tiny .letter-card span { display: none; }

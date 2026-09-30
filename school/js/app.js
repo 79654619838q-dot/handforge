@@ -353,12 +353,13 @@ function intro(sec, li) {
 }
 function abcPoster(sec) {
   setBg(sec.bg);
-  const s = screen('poster');
+  const s = screen('poster-screen');
   s.style.setProperty('--c', sec.color);
   s.append(topBar({ back: () => map(sec), title: 'Вся азбука', color: sec.color }));
-  const grid = h('div', 'poster');
+  const grid = h('div', 'poster-grid');
   ALPHABET.forEach((L) => grid.append(letterCard(L)));
   s.append(grid);
+  fitGrid(grid, 26);
   owlSay('Нажми на любую букву!', 'Это вся азбука. Нажми на любую букву!', 'cheer');
 }
 
@@ -405,21 +406,46 @@ function reward(sec, li, got, firstTime, cupNow) {
 }
 
 // ---------- альбом наклеек ----------
+// Подобрать размер клеток так, чтобы вся сетка помещалась на экране без прокрутки.
+function fitGrid(grid, labelH = 0) {
+  const fit = () => {
+    if (!grid.isConnected) { removeEventListener('resize', fit); return; }
+    const n = grid.children.length, gap = 8;
+    const W = grid.clientWidth, H = innerHeight - grid.getBoundingClientRect().top - 12;
+    const pickBest = (lh) => {
+      let best = { cell: 0, cols: 1 };
+      for (let cols = 1; cols <= n; cols++) {
+        const rows = Math.ceil(n / cols);
+        const cell = Math.floor(Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows - lh));
+        if (cell > best.cell) best = { cell, cols };
+      }
+      return best;
+    };
+    let best = pickBest(labelH);
+    if (best.cell < 84 && grid.classList.contains('sticker-grid')) best = pickBest(0); // подписи всё равно спрячутся — место под них не нужно
+    const cell = Math.max(28, Math.min(best.cell, 150));
+    grid.style.gridTemplateColumns = `repeat(${best.cols}, ${cell}px)`;
+    grid.style.setProperty('--cell', cell + 'px');
+    grid.classList.toggle('tiny', cell < 84); // в маленьких клетках подписи не помещаются — слово звучит по нажатию
+  };
+  requestAnimationFrame(fit);
+  addEventListener('resize', fit);
+}
+
 function stickers() {
   setBg('assets/bg/reward.jpg');
-  const s = screen('album');
-  s.append(topBar({ back: menu, title: 'Мои наклейки' }));
-  const cups = h('div', 'cups');
+  const owned = store.get('stickers', []);
+  const s = screen('album-screen');
+  s.append(topBar({ back: menu, title: `Мои наклейки ${owned.length} / ${ITEMS.length}` }));
+  // кубки и наклейки — одна сетка, всё видно сразу, без прокрутки
+  const grid = h('div', 'sticker-grid');
   SECTIONS.forEach((sec) => {
     const has = sectionDone(sec.id);
     const c = h('button', 'sticker cup' + (has ? '' : ' locked'));
-    const im = h('img'); im.src = sec.cup; im.alt = sec.title; c.append(im, h('span', '', sec.title));
+    const im = h('img'); im.src = sec.cup; im.alt = sec.title; c.append(im);
     c.onclick = () => { sfx.tap(); say(has ? `Кубок за раздел ${sec.title}!` : `Пройди все уровни в разделе ${sec.title}, и получишь кубок!`); };
-    cups.append(c);
+    grid.append(c);
   });
-  s.append(cups);
-  const owned = store.get('stickers', []);
-  const grid = h('div', 'album');
   ITEMS.forEach((it) => {
     const has = owned.includes(it.word);
     const c = h('button', 'sticker' + (has ? '' : ' locked'));
@@ -430,8 +456,8 @@ function stickers() {
     grid.append(c);
   });
   s.append(grid);
-  owlSay(owned.length ? `У тебя ${owned.length} из ${ITEMS.length}!` : 'Проходи уровни — получишь наклейки!',
-    owned.length ? 'Это твои наклейки! Собери все!' : 'Проходи уровни, и получишь наклейки!', 'cheer');
+  fitGrid(grid, 16);
+  owlSay('', owned.length ? 'Это твои наклейки! Собери все!' : 'Проходи уровни, и получишь наклейки!', 'cheer');
 }
 
 // Для проверки: ?level=math.3 — сразу этот уровень; ?open=all — открыть все уровни.
