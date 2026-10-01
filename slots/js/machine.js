@@ -136,7 +136,7 @@ export function machineScreen(app, m, { onLevel }) {
     if (fs) {
       // пока идёт показ — множитель этого вращения, после — следующего
       const { fsMult } = fsMultipliers(m, Math.max(0, F().i - (busy ? 1 : 0)));
-      const multTxt = m.fs.mode === 'sticky' ? `липких капитанов: ${F().sticky.length}` : `×${fsMult}`;
+      const multTxt = (m.fs.mode === 'wildMult' ? `WILD в линии ×${m.fs.mult}` : `×${fsMult}`) + (m.features.sticky ? ` · липких: ${F().sticky.length}` : '');
       banner.hidden = false;
       banner.innerHTML = `<b>Бесплатные вращения</b><span>осталось <b>${F().left}</b></span><span class="mult">${multTxt}</span><span>выигрыш <b>${fmt(F().total)}</b></span>`;
     } else banner.hidden = true;
@@ -491,7 +491,7 @@ export function machineScreen(app, m, { onLevel }) {
     }
     if (fs && m.features.sticky) {
       view.setSticky(o.fx.sticky);
-      if (o.fx.newSticky.length) { fxBanner(`+${o.fx.newSticky.length} ${plural(o.fx.newSticky.length, 'липкий капитан', 'липких капитана', 'липких капитанов')}`, 'sticky'); await sleep(400); }
+      if (o.fx.newSticky.length) { fxBanner(`+${o.fx.newSticky.length} ${plural(o.fx.newSticky.length, 'липкий WILD', 'липких WILD', 'липких WILD')}`, 'sticky'); await sleep(400); }
     }
     if (win && o.mult.sum) { sfx.mult(o.mult.sum); fxBanner(`Множитель <b>×${o.mult.sum}</b>!`, 'mult'); view.showWins(o.mult.cells, [], false); await sleep(600); }
     if (win && o.mult.streak > 1) { sfx.mult(o.mult.streak); fxBanner(`${pic(COMMON.fire, '🔥', 'fx-ico')} Горячая серия <b>×${o.mult.streak}</b>`, 'streak'); await sleep(300); }
@@ -589,16 +589,17 @@ function paytable(m, bet) {
   const lines = LINES.map((ln, i) => `<div class="pt-line" title="Линия ${i + 1}"><i>${i + 1}</i>${[0, 1, 2].map((row) =>
     ln.map((r) => `<s class="${r === row ? 'on' : ''}" style="${r === row ? 'background:' + LINE_COLORS[i] : ''}"></s>`).join('')).join('')}</div>`).join('');
   const fs = m.freeSpins, sp = m.scatterPay;
-  const sig = m.features.expand
-    ? item(symPic(m, 'wild'), 'Маска на весь барабан', 'Выпавшая маска фараона растягивается на весь барабан — во всех трёх рядах WILD. И в обычной игре, и в бесплатных вращениях.')
-    : m.features.sticky
-      ? item(symPic(m, 'wild'), 'Липкие капитаны', 'В бесплатных вращениях каждый выпавший капитан остаётся на месте до конца раунда — с каждым вращением WILD всё больше.')
-      : item(symPic(m, 'mystery'), 'Таинственный «?»', 'Все знаки «?» на экране превращаются в один и тот же символ. Они стоят стопками — бывает, что весь барабан становится одним символом.');
+  const wn = esc(m.symbols.wild.name);
+  const sig = [
+    m.features.expand && item(symPic(m, 'wild'), 'WILD на весь барабан', `Выпавший ${wn} растягивается на весь барабан — во всех трёх рядах WILD. И в обычной игре, и в бесплатных вращениях.`),
+    m.features.sticky && item(symPic(m, 'wild'), 'Липкие WILD', `В бесплатных вращениях каждый выпавший ${wn} остаётся на месте до конца раунда — с каждым вращением WILD всё больше.`),
+    m.features.mystery && item(symPic(m, 'mystery'), 'Таинственный «?»', 'Все знаки «?» на экране превращаются в один и тот же символ. Они стоят стопками — бывает, что весь барабан становится одним символом.'),
+  ].filter(Boolean).join('');
   const { el } = modal(`
     <button class="x">✕</button>
     <h2>${m.title}: правила и выплаты</h2>
     <p class="sub">Цифры — выигрыш в монетах при ставке ${fmt(bet)} за 5, 4 и 3 одинаковых символа на линии, считая с левого барабана.</p>
-    <h3>Особенность автомата</h3>
+    <h3>Помощники на барабанах</h3>
     <div class="pt-specials">${sig}</div>
     <h3>Особые знаки</h3>
     <div class="pt-specials">
