@@ -79,28 +79,29 @@ export function machineScreen(app, m, { onLevel }) {
   const jpCounters = Object.fromEntries(JACKPOTS.map((j) => [j.id, new Counter(app.querySelector(`.jp-pill[data-t="${j.id}"] span`), 0)]));
   hud.jp = jpCounters.grand;
 
-  // рисованная рамка: окно рамки ложится ровно на барабаны
+  // рисованная рамка «из кусков» (border-image): углы и середины сверху/снизу — как нарисованы,
+  // по высоте растягиваются только боковые стороны, поэтому окно рамки любой пропорции ложится на барабаны 5:3
   loadFrames().then((meta) => {
     const f = meta[m.id];
     if (!f || !alive) return;
+    const src = asset(`${m.id}/frame.webp`);
     const img = new Image();
-    img.className = 'frame-art';
-    img.alt = '';
     img.onload = () => {
       if (!alive) return;
       const fr = $('.frame');
       fr.classList.add('has-art');
-      fr.append(img);
       const ww = f.x1 - f.x0, wh = f.y1 - f.y0;
-      view.onResize = (W, H) => {
-        const sx = W / ww, sy = H / wh;
-        // поля блока = края рамки вокруг окна: тогда по центру стоит вся рамка, а не только барабаны
-        fr.style.padding = `${f.y0 * sy}px ${(f.iw - f.x1) * sx}px ${(f.ih - f.y1) * sy}px ${f.x0 * sx}px`;
-        Object.assign(img.style, { width: f.iw * sx + 'px', height: f.ih * sy + 'px', left: 0, top: 0 });
+      const top = f.y0, right = f.iw - f.x1, bottom = f.ih - f.y1, left = f.x0;
+      fr.style.borderImageSource = `url(${src})`;
+      fr.style.borderImageSlice = `${top} ${right} ${bottom} ${left}`;
+      view.onResize = (W) => {
+        const s = W / ww; // масштаб рамки — по ширине окна
+        fr.style.borderWidth = `${top * s}px ${right * s}px ${bottom * s}px ${left * s}px`;
       };
-      view.setFrameArt({ kx: f.iw / ww, ky: f.ih / wh });
+      // ширина всей рамки — iw/ww ширин окна; высота — окно (3/5 ширины) плюс верх и низ рамки
+      view.setFrameArt({ kx: f.iw / ww, ky: 1 + ((top + bottom) / ww) * (5 / 3) });
     };
-    img.src = asset(`${m.id}/frame.webp`);
+    img.src = src;
   });
 
   function refreshJackpots(ms = 400) {

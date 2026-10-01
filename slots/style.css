@@ -77,7 +77,7 @@ a { color: inherit; }
 .logo-pic img { display: none; }
 .logo-pic.ok img { display: block; }
 .logo-pic.ok .txt { display: none; }
-.m-title .logo-pic img { height: 46px; width: auto; }
+.m-title .logo-pic img { height: 54px; width: auto; }
 .m-head .logo-pic img { height: 76px; width: auto; max-width: 100%; margin: 0 auto; object-fit: contain; }
 
 /* ---------- лобби ---------- */
@@ -86,6 +86,7 @@ a { color: inherit; }
 .hero .logo-pic img { max-width: min(640px, 90vw); max-height: 200px; margin: 0 auto; filter: drop-shadow(0 10px 30px rgba(0,0,0,.7)) drop-shadow(0 0 30px rgba(255,190,60,.35)); }
 .mcard-title { position: absolute; z-index: 1; top: 8px; left: 50%; transform: translateX(-50%); max-width: 86%; max-height: 38%; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.8)); }
 .lobby { overflow-y: auto; display: block; }
+.lobby > .bg { position: fixed; }
 .lobby .top { position: sticky; top: 0; }
 .jp-banner {
   margin: 26px auto 8px; max-width: 820px; width: calc(100% - 32px);
@@ -175,7 +176,7 @@ a { color: inherit; }
   background: linear-gradient(145deg, #fff1b8, #d9a520 22%, #7d4f08 45%, #f5cf62 62%, #a8740f 82%, #ffe08a);
   box-shadow: 0 0 0 2px rgba(0,0,0,.6), 0 20px 60px rgba(0,0,0,.75), 0 0 50px -10px var(--a1);
 }
-.frame.has-art { background: none; box-shadow: none; border-radius: 0; position: relative; }
+.cabinet .frame.has-art { background: none; box-shadow: none; border-radius: 0; position: relative; padding: 0; border-style: solid; border-color: transparent; border-image-repeat: stretch; filter: drop-shadow(0 18px 30px rgba(0,0,0,.7)); }
 .frame.has-art canvas { border-radius: 6px; box-shadow: none; }
 .frame-art { position: absolute; pointer-events: none; z-index: 2; filter: drop-shadow(0 18px 30px rgba(0,0,0,.7)); }
 .frame canvas {

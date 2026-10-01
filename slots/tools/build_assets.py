@@ -23,6 +23,10 @@ SHEETS = {
     'common_icons': ('common', 2, ['jackpot', 'coin', 'gift', 'pile']),
     'feature_icons': ('common', 3, ['mystery', 'orb', 'chest', 'chest_open', 'wheel', 'medal', 'star', 'fire', 'bolt']),
 }
+# символы с замкнутыми белыми «окнами» (петля анха, просвет у скарабея) — окна тоже фон
+HOLES = {'egypt/l1', 'egypt/l2'}
+# символы с сиянием вокруг: прозрачность по «белизне» по всей картинке, а не только по краю
+SOFT = {'egypt/scatter'}
 BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby'}
 FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space'}
 LOGOS = {'logo': 'common/logo', 'title_egypt': 'egypt/title', 'title_pirate': 'pirate/title', 'title_space': 'space/title'}
@@ -75,8 +79,20 @@ def rgba(a, mask):
     return Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), 'RGBA')
 
 
-def cutout(a, mask):
-    im = rgba(a, mask)
+def soft_rgba(a, mask):
+    """Мягкий вырез для сияния: чем ближе пиксель к белому, тем прозрачнее."""
+    # мягко только у края (сияние), внутри предмета — непрозрачно (белое солнце не должно пропасть)
+    m = a.min(axis=2).astype(np.float32)
+    edge = mask & ndimage.binary_dilation(~mask, iterations=22)
+    alpha = np.where(edge, np.clip((255 - m) / 90.0, 0, 1), mask.astype(np.float32)).astype(np.float32)
+    rgb = a.astype(np.float32)
+    k = np.maximum(alpha, 0.05)[..., None]
+    rgb = np.clip((rgb - 255 * (1 - k)) / k, 0, 255)
+    return Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), 'RGBA')
+
+
+def cutout(a, mask, soft=False):
+    im = soft_rgba(a, mask) if soft else rgba(a, mask)
     box = im.getchannel('A').point(lambda v: 255 if v > 24 else 0).getbbox()
     im = im.crop(box)
     pad = int(max(im.size) * 0.03)
@@ -108,7 +124,10 @@ def split(img, n, names, folder, size=420):
             print(f'  {folder}/{name}: клетка пустая!')
             continue
         mask = np.isin(lab, comps)
-        im = cutout(a, mask)
+        key = f'{folder}/{name}'
+        if key in HOLES:
+            mask &= ~holes_too(a, ~mask, 0.0002)
+        im = cutout(a, mask, soft=key in SOFT)
         im.thumbnail((size, size), Image.LANCZOS)
         im.save(os.path.join(OUT, folder, name + '.webp'), quality=90, method=6)
         print(f'  {folder}/{name}.webp {im.size}')
@@ -141,8 +160,8 @@ for raw, mid in FRAMES.items():
     im = rgba(a, ~bg)
     ys, xs = np.where(win)
     x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
-    # рамка чуть заходит на барабаны — без щели между ними
-    dx, dy = (x1 - x0) * 0.008, (y1 - y0) * 0.012
+    # окно чуть шире настоящего — внутренний край рамки ложится вплотную к барабанам, без щели
+    dx, dy = -(x1 - x0) * 0.002, -(y1 - y0) * 0.003
     box = im.getchannel('A').point(lambda v: 255 if v > 24 else 0).getbbox()
     im = im.crop(box)
     k = min(1, 1800 / im.width)
