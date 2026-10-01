@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { attachCellServer } from "./cell-server.js";
 import { attachRatingRoutes } from "./cell-rating.js";
 import { attachSchoolAccounts } from "./school-accounts.js";
+import { attachSlotsRating } from "./slots-rating.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8877;
@@ -128,6 +129,8 @@ app.use("/school", express.static(SCHOOL_DIR, {
 }));
 
 // «Золотые барабаны» — игровые автоматы на ненастоящие монеты, статическая, без сборки.
+// Общий рейтинг игроков — /slots/api/rating (см. slots-rating.js).
+attachSlotsRating(app);
 app.get("/slots", (req, res, next) => {
   if (req.path === "/slots") return res.redirect(301, "/slots/");
   next();

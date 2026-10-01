@@ -130,6 +130,60 @@ export const sfx = {
     });
     tone(N(48), t + 1.0, 1.2, { type: 'triangle', vol: 0.25 });
   },
+  // «?» переворачиваются
+  reveal() {
+    if (!on()) return;
+    const t = ac().currentTime;
+    noise(t, 0.4, { vol: 0.25, freq: 800, sweepTo: 5000, q: 3 });
+    arp([79, 83, 86, 91], 0.06, 0.3, { type: 'triangle', vol: 0.15 });
+  },
+  // прилетели подарочные WILD
+  gift() {
+    if (!on()) return;
+    const t = ac().currentTime;
+    for (let i = 0; i < 4; i++) { noise(t + i * 0.12, 0.15, { vol: 0.2, freq: 2500, sweepTo: 600, q: 2 }); tone(N(84 + i * 3), t + i * 0.12 + 0.1, 0.25, { type: 'triangle', vol: 0.15 }); }
+  },
+  // маска растягивается на весь барабан
+  expand() {
+    if (!on()) return;
+    const t = ac().currentTime;
+    tone(110, t, 0.6, { type: 'sawtooth', vol: 0.12, to: 440 });
+    tone(220, t + 0.05, 0.6, { type: 'triangle', vol: 0.2, to: 880 });
+  },
+  // множитель сработал
+  mult(k = 2) {
+    if (!on()) return;
+    const base = 72 + Math.min(12, k * 2);
+    arp([base, base + 4, base + 7, base + 12, base + 16], 0.05, 0.3, { type: 'square', vol: 0.07 });
+  },
+  chest() {
+    if (!on()) return;
+    const t = ac().currentTime;
+    noise(t, 0.12, { vol: 0.3, freq: 500, q: 1 });
+    tone(330, t, 0.15, { type: 'triangle', vol: 0.2, to: 660 });
+  },
+  prize(big) {
+    if (!on()) return;
+    arp(big ? [76, 79, 84, 88, 91] : [79, 84, 88], 0.05, 0.3, { type: 'triangle', vol: 0.22 });
+  },
+  empty() {
+    if (!on()) return;
+    const t = ac().currentTime;
+    tone(300, t, 0.3, { type: 'triangle', vol: 0.2, to: 180 });
+  },
+  levelUp() {
+    if (!on()) return;
+    arp([72, 76, 79, 84, 79, 84, 88], 0.08, 0.35, { type: 'triangle', vol: 0.22 });
+  },
+  medal() {
+    if (!on()) return;
+    arp([88, 91, 96], 0.07, 0.4, { type: 'sine', vol: 0.2 });
+  },
+  wheelTick() {
+    if (!on()) return;
+    const t = ac().currentTime;
+    tone(1800, t, 0.03, { type: 'square', vol: 0.04 });
+  },
   jackpot() {
     if (!on()) return;
     this.fanfare();

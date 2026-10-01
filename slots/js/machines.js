@@ -1,46 +1,65 @@
-// Автоматы: символы, выплаты, правила бесплатных вращений.
+// Автоматы: символы, выплаты, правила бесплатных вращений и «фирменные» помощники.
 // Картинки символов — assets/<автомат>/<символ>.webp (из ChatGPT, см. tools/build_assets.py);
 // пока файла нет, барабан рисует запасной значок (emoji на цветной плашке).
 //
 // Выплаты линий — в ставках на линию (общая ставка / 20) за 3, 4, 5 одинаковых слева направо.
 // Выплаты «Бонуса» — в общих ставках за 3, 4, 5 штук в любом месте.
 // Отдача выверена прогоном tools/sim.mjs — после правки чисел или весов прогнать заново и записать итог сюда.
-// 01.10.2026, 2 млн вращений на автомат, ставка 100: без джекпота 80–84%, с джекпотом ≈ 96–101%
-// (джекпот при больших ставках весит меньше); выигрыш в 35% вращений, бесплатные раз в ~120,
-// джекпот раз в ~3 400 вращений.
+// 01.10.2026, 2 млн вращений на автомат, ставка 100, со всеми помощниками и бонус-играми:
+//   без Гранда 86–88%, с Грандом ≈ 97–98% (Гранд при больших ставках весит меньше); выигрыш в 30–35% вращений;
+//   бесплатные раз в ~170 (40–44 ставки за раунд, «Купить бонус» за 50 отдаёт в среднем 39–41);
+//   сундуки раз в ~400 (23 ставки), джекпот-игра раз в ~110, Гранд раз в 5–7 тыс.; подарок WILD раз в 40.
 
 // Номер версии картинок: картинки кэшируются браузером на неделю — после замены файлов увеличить
 export const V = '?v=1';
 export const asset = (path) => 'assets/' + path + V;
 
 // Общие для всех автоматов значки
+const C = (file) => asset(`common/${file}.webp`);
 export const COMMON = {
-  jackpot: { name: 'Джекпот', img: asset('common/jackpot.webp'), emoji: '👑', color: '#f5c542', label: 'ДЖЕКПОТ' },
+  logo: asset('common/logo.webp'),
+  coin: C('coin'), gift: C('gift'), pile: C('pile'), crown: C('jackpot'),
+  chestOpen: C('chest_open'), wheel: C('wheel'), medal: C('medal'), star: C('star'), fire: C('fire'), bolt: C('bolt'),
 };
+const SHARED_SYMBOLS = {
+  jackpot: { name: 'Корона', img: C('jackpot'), emoji: '👑', color: '#f5c542', label: 'ДЖЕКПОТ' },
+  pick:    { name: 'Сундук', img: C('chest'), emoji: '🧰', color: '#b8741a', label: 'СУНДУК' },
+  x2:      { name: 'Множитель ×2', img: C('orb'), emoji: '', color: '#ffb02e', mult: 2, text: '×2' },
+  x3:      { name: 'Множитель ×3', img: C('orb'), emoji: '', color: '#ff7a2e', mult: 3, text: '×3' },
+  x5:      { name: 'Множитель ×5', img: C('orb'), emoji: '', color: '#ff3e6a', mult: 5, text: '×5' },
+  mystery: { name: 'Таинственный «?»', img: C('mystery'), emoji: '❓', color: '#7a3dff', text: '?' },
+};
+export const MULT_SYMS = ['x2', 'x3', 'x5'];
+export const REGULAR = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3', 'l4'];
 
-// веса символов на барабанах (сколько штук на ленте); wild на первом барабане нет
-const W = {
-  //        1   2   3   4   5
-  h1:      [3,  3,  3,  3,  3],
-  h2:      [4,  4,  4,  4,  4],
-  h3:      [5,  5,  5,  5,  5],
-  l1:      [6,  6,  6,  6,  6],
-  l2:      [7,  7,  7,  7,  7],
-  l3:      [8,  8,  8,  8,  8],
-  l4:      [8,  8,  8,  8,  8],
-  wild:    [0,  2,  2,  2,  2],
-  scatter: [1,  2,  2,  2,  1],
-  jackpot: [3,  3,  3,  3,  3],
+// веса символов на барабанах (сколько штук на ленте)
+//                1  2  3  4  5
+const BASE_W = {
+  h1:           [6, 6, 6, 6, 6],
+  h2:           [8, 8, 8, 8, 8],
+  h3:           [10, 10, 10, 10, 10],
+  l1:           [12, 12, 12, 12, 12],
+  l2:           [14, 14, 14, 14, 14],
+  l3:           [14, 14, 14, 14, 14],
+  l4:           [16, 16, 16, 16, 16],
+  wild:         [0, 3, 3, 3, 3],   // на первом барабане WILD нет
+  scatter:      [2, 3, 3, 3, 2],
+  jackpot:      [3, 3, 3, 3, 3],
+  pick:         [4, 0, 4, 0, 4],   // сундуки только на 1, 3, 5 барабанах
+  x2:           [0, 0, 1, 0, 0],
+  x3:           [0, 0, 0, 1, 0],
+  x5:           [0, 1, 0, 0, 0],
 };
+const w = (over) => ({ ...BASE_W, ...over });
 
 const PAY = {
-  h1: [0, 0, 0, 50, 200, 1000],
-  h2: [0, 0, 0, 30, 120, 500],
-  h3: [0, 0, 0, 25, 80, 300],
-  l1: [0, 0, 0, 12, 40, 150],
-  l2: [0, 0, 0, 10, 30, 120],
-  l3: [0, 0, 0, 8, 24, 80],
-  l4: [0, 0, 0, 6, 18, 60],
+  h1: [0, 0, 0, 30, 110, 550],
+  h2: [0, 0, 0, 18, 70, 280],
+  h3: [0, 0, 0, 15, 40, 175],
+  l1: [0, 0, 0, 7, 20, 80],
+  l2: [0, 0, 0, 6, 18, 70],
+  l3: [0, 0, 0, 5, 14, 50],
+  l4: [0, 0, 0, 4, 10, 35],
 };
 
 export const MACHINES = [
@@ -49,12 +68,15 @@ export const MACHINES = [
     title: 'Сокровища фараона',
     tagline: 'Гробницы, золото и древние боги',
     seed: 1101,
-    weights: W,
+    weights: w({ wild: [0, 1, 1, 1, 0] }),
+    // в бесплатных вращениях свои ленты: масок больше
+    fsWeights: w({ wild: [0, 4, 4, 4, 0] }),
     pay: PAY,
     scatterPay: [0, 0, 0, 2, 10, 50],
     freeSpins: [0, 0, 0, 15, 20, 25],
-    // все выигрыши в бесплатных вращениях ×3
-    fs: { mode: 'mult', mult: 3, text: 'Все выигрыши ×3' },
+    features: { expand: true },
+    feature: 'Маска фараона растягивается на весь барабан',
+    fs: { mode: 'mult', mult: 3, text: 'Все выигрыши ×3, маска по-прежнему на весь барабан' },
     symbols: {
       wild:    { name: 'Маска фараона', emoji: '🗿', color: '#e8b33a', label: 'WILD' },
       scatter: { name: 'Пирамида', emoji: '🔺', color: '#f0d27a', label: 'БОНУС' },
@@ -72,18 +94,20 @@ export const MACHINES = [
     title: 'Остров пиратов',
     tagline: 'Сундуки, корабли и карта сокровищ',
     seed: 2202,
-    weights: W,
+    weights: w({}),
+    fsWeights: w({ wild: [0, 4, 5, 5, 4] }),
     pay: PAY,
     scatterPay: [0, 0, 0, 2, 10, 50],
-    freeSpins: [0, 0, 0, 12, 16, 20],
-    // каждый капитан в выигрышной линии утраивает её (два — ×9)
-    fs: { mode: 'wildMult', mult: 3, text: 'Каждый капитан в линии утраивает выигрыш' },
+    freeSpins: [0, 0, 0, 10, 12, 15],
+    features: { sticky: true },
+    feature: 'В бесплатных вращениях капитаны прилипают до конца раунда',
+    fs: { mode: 'sticky', text: 'Капитаны липкие: каждый остаётся на месте до конца раунда' },
     symbols: {
       wild:    { name: 'Капитан', emoji: '🏴‍☠️', color: '#8a2b2b', label: 'WILD' },
       scatter: { name: 'Карта сокровищ', emoji: '🗺️', color: '#d9b26a', label: 'БОНУС' },
       h1: { name: 'Галеон', emoji: '⛵', color: '#3b2a1e' },
       h2: { name: 'Попугай', emoji: '🦜', color: '#c0392b' },
-      h3: { name: 'Сундук', emoji: '💰', color: '#b8860b' },
+      h3: { name: 'Сундук с золотом', emoji: '💰', color: '#b8860b' },
       l1: { name: 'Череп и сабли', emoji: '☠️', color: '#555' },
       l2: { name: 'Компас', emoji: '🧭', color: '#a07a3a' },
       l3: { name: 'Подзорная труба', emoji: '🔭', color: '#7a5a2a' },
@@ -95,11 +119,15 @@ export const MACHINES = [
     title: 'Звёздная удача',
     tagline: 'Ракеты, пришельцы и далёкие планеты',
     seed: 3303,
-    weights: W,
+    // «?» стоят стопками по 3 — бывает, что весь барабан превращается в один символ
+    weights: w({ mystery: [3, 3, 3, 3, 3], scatter: [2, 3, 3, 3, 3] }),
+    fsWeights: w({ mystery: [9, 9, 9, 9, 9] }),
+    stacks: { mystery: 3 },
     pay: PAY,
     scatterPay: [0, 0, 0, 2, 10, 50],
-    freeSpins: [0, 0, 0, 8, 12, 15],
-    // множитель растёт на 1 с каждым бесплатным вращением: ×1, ×2, ×3…
+    freeSpins: [0, 0, 0, 12, 15, 18],
+    features: { mystery: true },
+    feature: 'Все «?» превращаются в один и тот же символ',
     fs: { mode: 'grow', start: 1, step: 1, text: 'Множитель растёт с каждым вращением: ×1, ×2, ×3…' },
     symbols: {
       wild:    { name: 'Космонавт', emoji: '👨‍🚀', color: '#d4a017', label: 'WILD' },
@@ -117,7 +145,7 @@ export const MACHINES = [
 
 for (const m of MACHINES) {
   for (const [id, s] of Object.entries(m.symbols)) s.img ||= asset(`${m.id}/${id}.webp`);
-  m.symbols.jackpot = COMMON.jackpot;
+  for (const [id, s] of Object.entries(SHARED_SYMBOLS)) if (m.weights[id]?.some((x) => x > 0)) m.symbols[id] = s;
 }
 
 export const byId = (id) => MACHINES.find((m) => m.id === id);
@@ -127,6 +155,26 @@ export const BETS = [20, 40, 100, 200, 500, 1000, 2000];
 export const DEFAULT_BET = 100;
 export const START_BALANCE = 10000;
 export const GIFT = 10000;
-// Джекпот общий для всех автоматов: стартует с JACKPOT_SEED и растёт на долю каждой ставки
+
+// Общие для всех помощники
+export const GIFT_WILD_CHANCE = 1 / 40;   // «Подарок»: на барабаны прилетают 2–4 WILD (только в обычной игре)
+export const STREAK = [[4, 3], [2, 2]];   // горячая серия: после 2 выигрышей подряд ×2, после 4 — ×3
+export const BUY_BONUS = 50;              // «Купить бонус» = 50 ставок → бесплатные вращения как за 3 бонуса
+
+// Четыре джекпота. Мини/Малый/Большой — во столько-то ставок, Гранд — общий растущий.
+export const JACKPOTS = [
+  { id: 'mini', name: 'Мини', bet: 3, color: '#5ad1ff' },
+  { id: 'minor', name: 'Малый', bet: 10, color: '#7dff6a' },
+  { id: 'major', name: 'Большой', bet: 50, color: '#ff8ff0' },
+  { id: 'grand', name: 'Гранд', bet: 0, color: '#ffd84a' },
+];
+// шансы джекпотов в джекпот-игре по числу корон (3, 4); 5 корон — сразу Гранд
+export const JACKPOT_ODDS = {
+  3: { mini: 0.635, minor: 0.25, major: 0.10, grand: 0.015 },
+  4: { mini: 0.20, minor: 0.40, major: 0.30, grand: 0.10 },
+};
 export const JACKPOT_SEED = 50000;
 export const JACKPOT_SHARE = 0.02;
+
+// «Выбери сундук»: 12 сундуков, внутри призы (в ставках), «×2 ко всему» и два «Забрать»
+export const PICK = { size: 12, prizes: [1, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 15], double: 1, collect: 2 };

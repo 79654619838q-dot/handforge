@@ -2,7 +2,9 @@
 # slots-art/raw/<имя>.b64.json (base64 PNG, сохранённый из страницы чата) →
 #   assets/<автомат>/<символ>.webp — символы с листов 3×3, белый фон убран;
 #   assets/common/{jackpot,coin,gift,pile}.webp — общий лист 2×2;
-#   assets/bg/<имя>.jpg — фоны.
+#   assets/bg/<имя>.jpg — фоны;
+#   assets/<автомат>/frame.webp + assets/frames.json — рамка барабанов и где в ней окно;
+#   assets/common/logo.webp, assets/<автомат>/title.webp — надписи-логотипы.
 # python slots/tools/build_assets.py   (чего нет в raw — пропускается)
 import base64, io, json, os
 import numpy as np
@@ -19,8 +21,11 @@ SHEETS = {
     'pirate_symbols': ('pirate', 3, SYM),
     'space_symbols': ('space', 3, SYM),
     'common_icons': ('common', 2, ['jackpot', 'coin', 'gift', 'pile']),
+    'feature_icons': ('common', 3, ['mystery', 'orb', 'chest', 'chest_open', 'wheel', 'medal', 'star', 'fire', 'bolt']),
 }
 BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby'}
+FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space'}
+LOGOS = {'logo': 'common/logo', 'title_egypt': 'egypt/title', 'title_pirate': 'pirate/title', 'title_space': 'space/title'}
 
 
 def load(name):
@@ -42,8 +47,22 @@ def background(a):
     return np.isin(lab, list(edge))
 
 
-def cutout(a, mask):
-    """Предмет на прозрачном фоне: кайма в 2 px полупрозрачная по «белизне», белый ореол снят."""
+def whites(a):
+    return (a.min(axis=2) > 228) & (a.max(axis=2) - a.min(axis=2) < 20)
+
+
+def holes_too(a, bg, min_frac=0.0004):
+    """Крупные белые «окна» внутри (буква О, просвет орнамента) — тоже фон."""
+    lab, k = ndimage.label(whites(a) & ~bg)
+    if not k:
+        return bg
+    sizes = ndimage.sum(np.ones_like(lab), lab, range(1, k + 1))
+    big = [i + 1 for i, sz in enumerate(sizes) if sz > a.shape[0] * a.shape[1] * min_frac]
+    return bg | np.isin(lab, big)
+
+
+def rgba(a, mask):
+    """Полный размер, кайма в 2 px полупрозрачная по «белизне», белый ореол снят."""
     bg = ~mask
     band = mask & ndimage.binary_dilation(bg, iterations=2)
     m = a.min(axis=2).astype(np.float32)
@@ -53,8 +72,11 @@ def cutout(a, mask):
     k = np.maximum(alpha, 0.05)[..., None]
     dec = np.clip((rgb - 255 * (1 - k)) / k, 0, 255)
     rgb = np.where(band[..., None], dec, rgb)
-    out = np.dstack([rgb, alpha * 255]).astype(np.uint8)
-    im = Image.fromarray(out, 'RGBA')
+    return Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), 'RGBA')
+
+
+def cutout(a, mask):
+    im = rgba(a, mask)
     box = im.getchannel('A').point(lambda v: 255 if v > 24 else 0).getbbox()
     im = im.crop(box)
     pad = int(max(im.size) * 0.03)
@@ -99,6 +121,55 @@ for raw, (folder, n, names) in SHEETS.items():
         continue
     print(raw, img.size)
     split(img, n, names, folder, size=520 if folder == 'common' else 420)
+
+meta_path = os.path.join(OUT, 'frames.json')
+meta = json.load(open(meta_path, encoding='utf-8')) if os.path.exists(meta_path) else {}
+for raw, mid in FRAMES.items():
+    img = load(raw)
+    if img is None:
+        print(f'{raw}: нет файла — пропуск')
+        continue
+    a = np.asarray(img).astype(np.int16)
+    H, W = a.shape[:2]
+    lab, _ = ndimage.label(whites(a))
+    win_lab = lab[H // 2, W // 2]
+    if not win_lab:
+        print(f'{raw}: в центре нет белого окна — пропуск')
+        continue
+    win = lab == win_lab
+    bg = holes_too(a, background(a) | win)
+    im = rgba(a, ~bg)
+    ys, xs = np.where(win)
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    # рамка чуть заходит на барабаны — без щели между ними
+    dx, dy = (x1 - x0) * 0.008, (y1 - y0) * 0.012
+    box = im.getchannel('A').point(lambda v: 255 if v > 24 else 0).getbbox()
+    im = im.crop(box)
+    k = min(1, 1800 / im.width)
+    if k < 1:
+        im = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
+    os.makedirs(os.path.join(OUT, mid), exist_ok=True)
+    im.save(os.path.join(OUT, mid, 'frame.webp'), quality=90, method=6)
+    meta[mid] = {'iw': im.width, 'ih': im.height,
+                 'x0': round(float(x0 + dx - box[0]) * k, 1), 'y0': round(float(y0 + dy - box[1]) * k, 1),
+                 'x1': round(float(x1 - dx - box[0]) * k, 1), 'y1': round(float(y1 - dy - box[1]) * k, 1)}
+    print(f'  {mid}/frame.webp {im.size}, окно {meta[mid]}, пропорция окна {(x1 - x0) / (y1 - y0):.3f} (нужно 1.667)')
+if meta:
+    os.makedirs(OUT, exist_ok=True)
+    json.dump(meta, open(meta_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+
+for raw, out in LOGOS.items():
+    img = load(raw)
+    if img is None:
+        print(f'{raw}: нет файла — пропуск')
+        continue
+    a = np.asarray(img).astype(np.int16)
+    bg = holes_too(a, background(a))
+    im = cutout(a, ~bg)
+    im.thumbnail((1400, 700), Image.LANCZOS)
+    os.makedirs(os.path.dirname(os.path.join(OUT, out)), exist_ok=True)
+    im.save(os.path.join(OUT, out + '.webp'), quality=90, method=6)
+    print(f'  {out}.webp {im.size}')
 
 os.makedirs(os.path.join(OUT, 'bg'), exist_ok=True)
 for raw, name in BGS.items():
