@@ -1,7 +1,7 @@
 // Единая точка входа под одну публичную ссылку. Ничего не переписывает изнутри
 // Poker и PhotoQuest — просто раскладывает трафик по путям: "/" — меню выбора,
 // "/poker" — HandForge Poker, "/quest" — PhotoQuest, "/cell" — Cell Survival, "/dressup" — «Наряди принцессу»,
-// "/journal" — журнал покерной сессии.
+// "/journal" — журнал покерной сессии, "/slots" — игровые автоматы на ненастоящие монеты.
 // PhotoQuest отдаёт готовую сборку (npm run build), Poker работает как обычно.
 
 import express from "express";
@@ -21,6 +21,7 @@ const CELL_DIST = path.join(__dirname, "..", "cell-survival", "dist");
 const DRESSUP_DIR = path.join(__dirname, "..", "dressup");
 const JOURNAL_DIR = path.join(__dirname, "..", "journal");
 const SCHOOL_DIR = path.join(__dirname, "..", "school");
+const SLOTS_DIR = path.join(__dirname, "..", "slots");
 
 const app = express();
 
@@ -126,6 +127,20 @@ app.use("/school", express.static(SCHOOL_DIR, {
   },
 }));
 
+// «Золотые барабаны» — игровые автоматы на ненастоящие монеты, статическая, без сборки.
+app.get("/slots", (req, res, next) => {
+  if (req.path === "/slots") return res.redirect(301, "/slots/");
+  next();
+});
+app.get("/slots/tools/*", (_req, res) => res.sendStatus(404));
+app.use("/slots", express.static(SLOTS_DIR, {
+  index: "index.html",
+  setHeaders: (res, file) => {
+    if (/\.(html|js|css|json)$/.test(file)) res.setHeader("Cache-Control", "no-cache");
+    else res.setHeader("Cache-Control", "public, max-age=604800");
+  },
+}));
+
 // Журнал покерной сессии — одна статическая страница, данные только в браузере игрока.
 app.get("/journal", (req, res, next) => {
   if (req.path === "/journal") return res.redirect(301, "/journal/");
@@ -151,6 +166,7 @@ const server = app.listen(PORT, () => {
   console.log(`  /dressup → ${DRESSUP_DIR}`);
   console.log(`  /journal → ${JOURNAL_DIR}`);
   console.log(`  /school  → ${SCHOOL_DIR}`);
+  console.log(`  /slots   → ${SLOTS_DIR}`);
   console.log(`  /api     → ${QUEST_API_TARGET}`);
 });
 
