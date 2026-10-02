@@ -10,9 +10,13 @@
 //   бесплатные раз в ~193 (40–47 ставок за раунд, «Купить бонус» за 50 отдаёт в среднем 39–47);
 //   сундуки раз в ~440 (24 ставки), джекпот-игра раз в ~120, Гранд раз в 6–7 тыс.; подарок WILD раз в 40.
 //   Ценность бесплатных резко растёт с их числом (липкие WILD копятся): +2 вращения ≈ +40% — менять осторожно.
+// 02.10.2026 новые автоматы (открываются за монеты, чем дороже — тем щедрее), 2 млн вращений, без Гранда:
+//   «Сладкая страна» 89%, «Сага викингов» 91%, «Золото ацтеков» 94%; «Купить бонус» везде отдаёт меньше 50.
+//   Усилители (`node slots/tools/sim.mjs 2000000 --boost`) возвращают в среднем: «Двойной выигрыш» 79–91% цены,
+//   «Магнит» 74–90%, «Горячая рука» 76–90%, «Дождь WILD» 71–88% — ни один не окупается полностью.
 
 // Номер версии картинок: картинки кэшируются браузером на неделю — после замены файлов увеличить
-export const V = '?v=2';
+export const V = '?v=3';
 export const asset = (path) => 'assets/' + path + V;
 
 // Общие для всех автоматов значки
@@ -21,6 +25,8 @@ export const COMMON = {
   logo: asset('common/logo.webp'),
   coin: C('coin'), gift: C('gift'), pile: C('pile'), crown: C('jackpot'),
   chestOpen: C('chest_open'), wheel: C('wheel'), medal: C('medal'), star: C('star'), fire: C('fire'), bolt: C('bolt'),
+  boostX2: C('boost_x2'), magnet: C('magnet'), hot: C('hot'), rainWild: C('rain_wild'), lock: C('lock'), bag: C('bag'),
+  wealth: C('wealth'), hourglass: C('hourglass'), trophy: C('trophy'),
 };
 const SHARED_SYMBOLS = {
   jackpot: { name: 'Корона', img: C('jackpot'), emoji: '👑', color: '#f5c542', label: 'ДЖЕКПОТ' },
@@ -66,6 +72,8 @@ const PAY = {
 };
 
 const EGYPT_K = 1.15, PIRATE_K = 1.28, SPACE_K = 1.15;
+// новые автоматы чем дороже, тем щедрее
+const CANDY_K = 1.15, VIKING_K = 1.25, AZTEC_K = 1.4;
 
 export const MACHINES = [
   {
@@ -148,6 +156,89 @@ export const MACHINES = [
       l4: { name: 'Кристалл', emoji: '💎', color: '#8e44ad' },
     },
   },
+  // ===== открываются за монеты (price) =====
+  {
+    id: 'candy',
+    title: 'Сладкая страна',
+    tagline: 'Леденцы, кексы и мармеладные мишки',
+    price: 50000,
+    seed: 4404,
+    weights: w({ wild: [0, 1, 1, 1, 0], mystery: [3, 3, 3, 3, 3] }),
+    fsWeights: w({ wild: [0, 2, 2, 2, 0], mystery: [3, 3, 3, 3, 3] }),
+    pay: scale(PAY, CANDY_K),
+    scatterPay: [0, 0, 0, 2, 10, 50],
+    freeSpins: [0, 0, 0, 10, 12, 15],
+    features: { expand: true, sticky: true, mystery: true },
+    stacks: { mystery: 3 },
+    feature: 'WILD на весь барабан, липкие WILD в бесплатных вращениях и таинственный «?»',
+    // в каждом бесплатном вращении — свой случайный множитель
+    fs: { mode: 'random', table: { 1: 35, 2: 30, 3: 17, 5: 12, 10: 5, 25: 1 }, text: 'В каждом вращении случайный множитель до ×25, WILD прилипают' },
+    symbols: {
+      wild:    { name: 'Радужный леденец', emoji: '🍭', color: '#ff5ab4', label: 'WILD' },
+      scatter: { name: 'Пряничный домик', emoji: '🏠', color: '#c8762a', label: 'БОНУС' },
+      h1: { name: 'Кекс', emoji: '🧁', color: '#ff7aa8' },
+      h2: { name: 'Пончик', emoji: '🍩', color: '#a0522d' },
+      h3: { name: 'Мармеладный мишка', emoji: '🧸', color: '#e53935' },
+      l1: { name: 'Конфета', emoji: '🍬', color: '#1e88e5' },
+      l2: { name: 'Макарон', emoji: '🍪', color: '#f48fb1' },
+      l3: { name: 'Драже', emoji: '🫘', color: '#43a047' },
+      l4: { name: 'Звёздочка', emoji: '⭐', color: '#fb8c00' },
+    },
+  },
+  {
+    id: 'viking',
+    title: 'Сага викингов',
+    tagline: 'Драккары, молот Тора и северное сияние',
+    price: 150000,
+    seed: 5505,
+    weights: w({ wild: [0, 1, 1, 1, 0], mystery: [3, 3, 3, 3, 3] }),
+    fsWeights: w({ wild: [0, 2, 2, 2, 0], mystery: [3, 3, 3, 3, 3] }),
+    pay: scale(PAY, VIKING_K),
+    scatterPay: [0, 0, 0, 2, 10, 50],
+    freeSpins: [0, 0, 0, 6, 8, 10],
+    features: { expand: true, sticky: true, mystery: true },
+    stacks: { mystery: 3 },
+    feature: 'WILD на весь барабан, липкие WILD в бесплатных вращениях и таинственный «?»',
+    fs: { mode: 'wildMult', mult: 3, text: 'WILD прилипают, и каждый в линии утраивает её' },
+    symbols: {
+      wild:    { name: 'Конунг', emoji: '🧔', color: '#8d6e63', label: 'WILD' },
+      scatter: { name: 'Иггдрасиль', emoji: '🌳', color: '#2e7d32', label: 'БОНУС' },
+      h1: { name: 'Валькирия', emoji: '🛡️', color: '#90a4ae' },
+      h2: { name: 'Драккар', emoji: '⛵', color: '#6d4c41' },
+      h3: { name: 'Молот Тора', emoji: '🔨', color: '#5c6bc0' },
+      l1: { name: 'Щит', emoji: '🛡️', color: '#8d6e63' },
+      l2: { name: 'Секира', emoji: '🪓', color: '#78909c' },
+      l3: { name: 'Рог', emoji: '📯', color: '#a1887f' },
+      l4: { name: 'Рунный камень', emoji: '🪨', color: '#546e7a' },
+    },
+  },
+  {
+    id: 'aztec',
+    title: 'Золото ацтеков',
+    tagline: 'Храмы джунглей, ягуары и пернатый змей',
+    price: 500000,
+    seed: 6606,
+    weights: w({ wild: [0, 1, 1, 1, 0], mystery: [3, 3, 3, 3, 3] }),
+    fsWeights: w({ wild: [0, 2, 2, 2, 0], mystery: [6, 6, 6, 6, 6] }),
+    pay: scale(PAY, AZTEC_K),
+    scatterPay: [0, 0, 0, 2, 10, 50],
+    freeSpins: [0, 0, 0, 10, 12, 15],
+    features: { expand: true, sticky: true, mystery: true },
+    stacks: { mystery: 3 },
+    feature: 'WILD на весь барабан, липкие WILD в бесплатных вращениях и таинственный «?»',
+    fs: { mode: 'mult', mult: 2, text: 'Все выигрыши ×2, «?» вдвое больше, WILD прилипают' },
+    symbols: {
+      wild:    { name: 'Император', emoji: '🪶', color: '#e6a817', label: 'WILD' },
+      scatter: { name: 'Пирамида-храм', emoji: '🛕', color: '#c9a227', label: 'БОНУС' },
+      h1: { name: 'Камень солнца', emoji: '🌞', color: '#d4a017' },
+      h2: { name: 'Маска ягуара', emoji: '🐆', color: '#e0a030' },
+      h3: { name: 'Пернатый змей', emoji: '🐍', color: '#2e7d32' },
+      l1: { name: 'Нефритовая маска', emoji: '🗿', color: '#26a69a' },
+      l2: { name: 'Золотой идол', emoji: '🏺', color: '#c9a227' },
+      l3: { name: 'Кинжал', emoji: '🗡️', color: '#455a64' },
+      l4: { name: 'Кецаль', emoji: '🦜', color: '#43a047' },
+    },
+  },
 ];
 
 for (const m of MACHINES) {
@@ -156,6 +247,17 @@ for (const m of MACHINES) {
 }
 
 export const byId = (id) => MACHINES.find((m) => m.id === id);
+
+// Усилители из магазина. price — в ставках: усилитель работает при ставке, при которой куплен, или меньше.
+// spins — на сколько обычных (платных) вращений. Цены выверены sim.mjs: усилитель возвращает 85–90% цены.
+export const BOOSTERS = [
+  { id: 'x2', name: 'Двойной выигрыш', text: 'Выигрыши на линиях и за бонус ×2', spins: 30, price: 20, icon: 'boostX2', emoji: '💰' },
+  { id: 'magnet', name: 'Магнит бонусов', text: 'Знак «Бонус» выпадает намного чаще — бесплатные вращения чаще', spins: 40, price: 65, icon: 'magnet', emoji: '🧲' },
+  { id: 'hot', name: 'Горячая рука', text: 'Горячая серия не сгорает при проигрыше', spins: 40, price: 48, icon: 'hot', emoji: '❤️‍🔥' },
+  { id: 'wilds', name: 'Дождь WILD', text: 'Подарочные WILD прилетают в 5 раз чаще', spins: 50, price: 25, icon: 'rainWild', emoji: '🎁' },
+];
+export const MAGNET_SCATTER = 2;   // во сколько раз больше знаков «Бонус» на лентах под «Магнитом»
+export const RAIN_WILD = 5;        // во сколько раз чаще подарочные WILD под «Дождём WILD»
 
 // Ставки (всего за вращение, 20 линий) и стартовые деньги
 export const BETS = [20, 40, 100, 200, 500, 1000, 2000];

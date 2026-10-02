@@ -1,4 +1,5 @@
-// Общий рейтинг «Золотых барабанов»: кто выше всех поднялся со стартовых 10 000 монет (рекорд счёта).
+// Общий рейтинг «Золотых барабанов»: два списка — «Рекорд» (выше всех поднялся со стартовых 10 000)
+// и «Самый богатый» (монеты сейчас + всё, что куплено в магазине игры).
 // Хранение: Postgres из DATABASE_URL (та же база, что у PhotoQuest), отдельная схема "slots" —
 // prisma db push трогает только схему public, наши таблицы он не видит и не удалит.
 // Без DATABASE_URL (локально) — файл hub/.slots-rating.json.
@@ -26,6 +27,7 @@ async function db() {
         id text PRIMARY KEY, name text NOT NULL, best bigint NOT NULL DEFAULT 0, balance bigint NOT NULL DEFAULT 0,
         spins integer NOT NULL DEFAULT 0, jackpots integer NOT NULL DEFAULT 0, level integer NOT NULL DEFAULT 1,
         updated timestamptz NOT NULL DEFAULT now())`);
+      await pool.query(`ALTER TABLE slots.rating ADD COLUMN IF NOT EXISTS wealth bigint NOT NULL DEFAULT 0`);
       return pool;
     })().catch((e) => { console.error("[slots-rating] база недоступна, рейтинг в файле:", e.message); ready = Promise.resolve(null); return null; });
   }
@@ -39,12 +41,12 @@ function writeFile(d) { try { fs.writeFileSync(FILE, JSON.stringify(d)); } catch
 export async function recordScore(b) {
   const id = clean(b.id, 64), name = clean(b.name, 24) || "Игрок";
   if (!id) return;
-  const row = { best: num(b.best), balance: num(b.balance), spins: Math.min(2e9, num(b.spins)), jackpots: Math.min(1e6, num(b.jackpots)), level: Math.max(1, Math.min(9999, num(b.level))) };
+  const row = { best: num(b.best), wealth: num(b.wealth ?? b.balance), balance: num(b.balance), spins: Math.min(2e9, num(b.spins)), jackpots: Math.min(1e6, num(b.jackpots)), level: Math.max(1, Math.min(9999, num(b.level))) };
   const p = await db();
   if (p) {
-    await p.query(`INSERT INTO slots.rating (id, name, best, balance, spins, jackpots, level) VALUES ($1,$2,$3,$4,$5,$6,$7)
-      ON CONFLICT (id) DO UPDATE SET name=$2, best=GREATEST(slots.rating.best,$3), balance=$4, spins=$5, jackpots=$6, level=$7, updated=now()`,
-      [id, name, row.best, row.balance, row.spins, row.jackpots, row.level]);
+    await p.query(`INSERT INTO slots.rating (id, name, best, balance, spins, jackpots, level, wealth) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      ON CONFLICT (id) DO UPDATE SET name=$2, best=GREATEST(slots.rating.best,$3), balance=$4, spins=$5, jackpots=$6, level=$7, wealth=$8, updated=now()`,
+      [id, name, row.best, row.balance, row.spins, row.jackpots, row.level, row.wealth]);
     return;
   }
   const d = readFile();
@@ -53,22 +55,24 @@ export async function recordScore(b) {
   d[id] = r; writeFile(d);
 }
 
-export async function topList(limit = 50, me = "") {
+// by: "best" — по рекорду, "wealth" — по богатству (имя столбца берём только из этого списка)
+export async function topList(limit = 50, me = "", by = "best") {
+  const col = by === "wealth" ? "wealth" : "best";
   const p = await db();
   let rows, mine = null;
   if (p) {
-    rows = (await p.query(`SELECT id, name, best, balance, spins, jackpots, level FROM slots.rating ORDER BY best DESC, updated ASC LIMIT $1`, [limit])).rows;
+    rows = (await p.query(`SELECT id, name, best, wealth, balance, spins, jackpots, level FROM slots.rating ORDER BY ${col} DESC, updated ASC LIMIT $1`, [limit])).rows;
     if (me) {
-      const r = (await p.query(`SELECT id, name, best, balance, spins, jackpots, level, (SELECT count(*) FROM slots.rating o WHERE o.best > r.best) + 1 AS place FROM slots.rating r WHERE id=$1`, [me])).rows[0];
+      const r = (await p.query(`SELECT id, name, best, wealth, balance, spins, jackpots, level, (SELECT count(*) FROM slots.rating o WHERE o.${col} > r.${col}) + 1 AS place FROM slots.rating r WHERE id=$1`, [me])).rows[0];
       if (r) mine = { ...r, place: Number(r.place) };
     }
   } else {
-    const all = Object.values(readFile()).sort((a, b) => b.best - a.best || a.updated - b.updated);
+    const all = Object.values(readFile()).sort((a, b) => (b[col] || 0) - (a[col] || 0) || a.updated - b.updated);
     rows = all.slice(0, limit);
     const i = all.findIndex((r) => r.id === me);
     if (i >= 0) mine = { ...all[i], place: i + 1 };
   }
-  const out = (r) => ({ name: r.name, best: Number(r.best), balance: Number(r.balance), spins: r.spins, jackpots: r.jackpots, level: r.level });
+  const out = (r) => ({ name: r.name, best: Number(r.best), wealth: Number(r.wealth || 0), balance: Number(r.balance), spins: r.spins, jackpots: r.jackpots, level: r.level });
   return { store: p ? "db" : "file", top: rows.map((r, i) => ({ place: i + 1, ...out(r), me: r.id === me })), me: mine && { place: mine.place, ...out(mine) } };
 }
 
@@ -84,6 +88,6 @@ export function attachSlotsRating(app) {
   });
   app.get("/slots/api/rating", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    try { res.json(await topList(50, clean(req.query.me, 64))); } catch (e) { console.error("[slots-rating]", e.message); res.status(500).json({ top: [], me: null }); }
+    try { res.json(await topList(50, clean(req.query.me, 64), req.query.by === "wealth" ? "wealth" : "best")); } catch (e) { console.error("[slots-rating]", e.message); res.status(500).json({ top: [], me: null }); }
   });
 }

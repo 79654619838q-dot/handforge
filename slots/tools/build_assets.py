@@ -22,14 +22,22 @@ SHEETS = {
     'space_symbols': ('space', 3, SYM),
     'common_icons': ('common', 2, ['jackpot', 'coin', 'gift', 'pile']),
     'feature_icons': ('common', 3, ['mystery', 'orb', 'chest', 'chest_open', 'wheel', 'medal', 'star', 'fire', 'bolt']),
+    'candy_symbols': ('candy', 3, SYM),
+    'viking_symbols': ('viking', 3, SYM),
+    'aztec_symbols': ('aztec', 3, SYM),
+    'shop_icons': ('common', 3, ['boost_x2', 'magnet', 'hot', 'rain_wild', 'lock', 'bag', 'wealth', 'hourglass', 'trophy']),
 }
 # символы с замкнутыми белыми «окнами» (петля анха, просвет у скарабея) — окна тоже фон
 HOLES = {'egypt/l1', 'egypt/l2'}
 # символы с сиянием вокруг: прозрачность по «белизне» по всей картинке, а не только по краю
 SOFT = {'egypt/scatter'}
-BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby'}
-FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space'}
-LOGOS = {'logo': 'common/logo', 'title_egypt': 'egypt/title', 'title_pirate': 'pirate/title', 'title_space': 'space/title'}
+# надписи, где белое внутри — часть рисунка (белые полоски леденцов), а не дырки букв
+LOGO_KEEP_WHITE = {'title_candy'}
+FRAME_KEEP_WHITE = {'frame_candy'}  # белые полоски леденцовых тростей
+BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby', 'bg_candy': 'candy', 'bg_viking': 'viking', 'bg_aztec': 'aztec'}
+FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space', 'frame_candy': 'candy', 'frame_viking': 'viking', 'frame_aztec': 'aztec'}
+LOGOS = {'logo': 'common/logo', 'title_egypt': 'egypt/title', 'title_pirate': 'pirate/title', 'title_space': 'space/title',
+         'title_candy': 'candy/title', 'title_viking': 'viking/title', 'title_aztec': 'aztec/title'}
 
 
 def load(name):
@@ -156,7 +164,7 @@ for raw, mid in FRAMES.items():
         print(f'{raw}: в центре нет белого окна — пропуск')
         continue
     win = lab == win_lab
-    bg = holes_too(a, background(a) | win)
+    bg = (background(a) | win) if raw in FRAME_KEEP_WHITE else holes_too(a, background(a) | win)
     im = rgba(a, ~bg)
     ys, xs = np.where(win)
     x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
@@ -183,7 +191,7 @@ for raw, out in LOGOS.items():
         print(f'{raw}: нет файла — пропуск')
         continue
     a = np.asarray(img).astype(np.int16)
-    bg = holes_too(a, background(a))
+    bg = background(a) if raw in LOGO_KEEP_WHITE else holes_too(a, background(a))
     im = cutout(a, ~bg)
     im.thumbnail((1400, 700), Image.LANCZOS)
     os.makedirs(os.path.dirname(os.path.join(OUT, out)), exist_ok=True)

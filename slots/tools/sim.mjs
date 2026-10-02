@@ -1,10 +1,11 @@
 // Проверка отдачи автоматов: node slots/tools/sim.mjs [вращений=2000000] [автомат]
 // Гоняет тот же код, что и игра (engine.js + machines.js), со всеми помощниками и бонус-играми.
-import { MACHINES, JACKPOTS, JACKPOT_SEED, JACKPOT_SHARE, BUY_BONUS } from '../js/machines.js';
+import { MACHINES, JACKPOTS, JACKPOT_SEED, JACKPOT_SHARE, BUY_BONUS, BOOSTERS, GIFT_WILD_CHANCE, RAIN_WILD } from '../js/machines.js';
 import { buildStrips, resolveSpin, seeded } from '../js/engine.js';
 
 const N = Number(process.argv[2] || 2e6);
-const only = process.argv[3];
+const only = process.argv.slice(3).find((a) => !a.startsWith('--'));
+const BOOST = process.argv.includes('--boost'); // посчитать, сколько добавляет каждый усилитель
 const BET = 100;
 const JP_BET = Object.fromEntries(JACKPOTS.map((j) => [j.id, j.bet]));
 
@@ -75,4 +76,28 @@ for (const m of MACHINES) {
   console.log(`  сундуки ${every(S.pickTrig)} (${(S.pick / Math.max(1, S.pickTrig) / BET).toFixed(1)}×); джекпот-игра ${every(S.jpTrig)}: мини ${every(jpCount.mini)}, малый ${every(jpCount.minor)}, большой ${every(jpCount.major)}, гранд ${every(jpCount.grand)}`);
   console.log(`  подарок ${every(S.gift)}, растущий WILD ${every(S.expand)}, «?» ${every(S.mystery)}, множитель на барабанах ${every(S.multHit)}, горячая серия ${every(S.streak2)}`);
   console.log(`  ≥15× ${every(S.big15)}, ≥40× ${every(S.big40)}, ≥100× ${every(S.big100)}; рекорд ${(S.max / BET).toFixed(0)}×`);
+
+  if (BOOST) {
+    // отдача обычных вращений (с бесплатными, сундуками и джекпотами Мини–Большой) с усилителем и без
+    const magStrips = buildStrips(m, 'magnet');
+    const run = (b, n) => {
+      const r = seeded(999 + m.seed);
+      let won = 0, streak = 0;
+      for (let i = 0; i < n; i++) {
+        const o = resolveSpin(m, b === 'magnet' ? magStrips : strips, { rnd: r, bet: BET, streak, boostMult: b === 'x2' ? 2 : 1, giftChance: b === 'wilds' ? GIFT_WILD_CHANCE * RAIN_WILD : GIFT_WILD_CHANCE });
+        let w = o.total + extras(o, false);
+        if (o.scatter.fs) w += runFs(o.scatter.fs, false);
+        won += w;
+        if (w > 0 || o.jackpot) streak++; else if (b !== 'hot') streak = 0;
+      }
+      return won / (n * BET);
+    };
+    const n = Math.max(200000, N / 4);
+    const base = run(null, n);
+    const parts = BOOSTERS.map((bo) => {
+      const gain = (run(bo.id, n) - base) * bo.spins;            // в ставках за весь срок усилителя
+      return `${bo.name}: +${gain.toFixed(1)} ставок за ${bo.spins} вращ. → цена при 88%: ${(gain / 0.88).toFixed(0)}`;
+    });
+    console.log('  усилители: ' + parts.join('; '));
+  }
 }

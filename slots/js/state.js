@@ -10,6 +10,8 @@ function freshStats() {
     rewards: 0,      // монеты за уровни, задания, медали и колесо
     picks: 0, buys: 0, wheelSpins: 0, maxStreak: 0, maxBalance: START_BALANCE, giftWilds: 0, multHits: 0,
     bestMult: 0, mult5: 0, taskDays: 0,
+    shopSpent: 0,    // потрачено в магазине (усилители, новые автоматы) — для «Самого богатого»
+    shopBuys: 0, boostsBought: 0,
     jp: { mini: 0, minor: 0, major: 0, grand: 0 },
     played: {},      // в каких автоматах играл
   };
@@ -29,6 +31,8 @@ function fresh() {
     tasks: null,       // задания дня: { day, list: [{ id, have, done }], bonus }
     medals: {},        // медаль → когда получена
     wheelAt: 0,        // когда последний раз крутили колесо удачи
+    boosts: {},        // действующие усилители: { x2: { left, bet } }
+    unlocked: {},      // открытые за монеты автоматы
     stats: freshStats(),
   };
 }
@@ -48,7 +52,7 @@ function load() {
   if (!s.fs || typeof s.fs !== 'object') s.fs = {};
   if (typeof s.fs.machine === 'string') { const { machine, ...rest } = s.fs; s.fs = { [machine]: rest }; } // старая запись
   for (const f of Object.values(s.fs)) f.sticky ||= [];
-  for (const k of ['streak', 'medals', 'bets']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
+  for (const k of ['streak', 'medals', 'bets', 'boosts', 'unlocked']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
   if (!Number.isFinite(s.xp)) s.xp = 0;
   if (!Number.isFinite(s.level) || s.level < 1) s.level = 1;
   return s;

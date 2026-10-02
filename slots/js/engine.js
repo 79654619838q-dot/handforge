@@ -1,7 +1,7 @@
 // Математика автомата без экрана: ленты барабанов, остановка, помощники, подсчёт выигрыша,
 // исходы «Выбери сундук» и джекпот-игры. Тот же код гоняет tools/sim.mjs для проверки отдачи —
 // поэтому здесь ни DOM, ни звука. Весь исход вращения решается сразу, экран его только показывает.
-import { REGULAR, MULT_SYMS, GIFT_WILD_CHANCE, STREAK, JACKPOT_ODDS, PICK } from './machines.js';
+import { REGULAR, MULT_SYMS, GIFT_WILD_CHANCE, STREAK, JACKPOT_ODDS, PICK, MAGNET_SCATTER } from './machines.js';
 
 export const REELS = 5;
 export const ROWS = 3;
@@ -56,10 +56,13 @@ function weighted(table, rnd) {
 }
 
 // Ленты: символы по весам, перемешаны; стопки (machine.stacks) стоят подряд.
-// fs = true — ленты бесплатных вращений (machine.fsWeights), если у автомата они свои.
-export function buildStrips(machine, fs = false) {
-  const weights = (fs && machine.fsWeights) || machine.weights;
-  const rnd = seeded(machine.seed + (fs ? 7 : 0));
+// mode: 'fs' (или true) — ленты бесплатных вращений (machine.fsWeights); 'magnet' — обычные, но знаков
+// «Бонус» в MAGNET_SCATTER раз больше (усилитель «Магнит бонусов»).
+export function buildStrips(machine, mode = false) {
+  const fs = mode === true || mode === 'fs';
+  let weights = (fs && machine.fsWeights) || machine.weights;
+  if (mode === 'magnet') weights = { ...weights, scatter: weights.scatter.map((x) => x * MAGNET_SCATTER) };
+  const rnd = seeded(machine.seed + (fs ? 7 : 0) + (mode === 'magnet' ? 13 : 0));
   const strips = [];
   for (let r = 0; r < REELS; r++) {
     const tokens = [];
@@ -93,6 +96,7 @@ export function fsMultipliers(machine, i) {
   if (fs.mode === 'mult') return { fsMult: fs.mult, wildMult: 1 };
   if (fs.mode === 'wildMult') return { fsMult: 1, wildMult: fs.mult };
   if (fs.mode === 'grow') return { fsMult: Math.min(fs.start + fs.step * i, fs.max || 99), wildMult: 1 };
+  if (fs.mode === 'random') return { fsMult: null, wildMult: 1 }; // выпадает при вращении
   return { fsMult: 1, wildMult: 1 };
 }
 
@@ -155,7 +159,8 @@ export function evaluate(machine, grid, { lineBet, totalBet, mult = 1, wildMult 
 
 // Полный исход вращения.
 // fs — состояние бесплатных вращений ({ i, sticky: ['r,row'] }) или null; streak — выигрышей подряд до этого.
-export function resolveSpin(m, strips, { rnd = fairRandom, stops = null, bet, fs = null, streak = 0, noGift = false, forceGift = false } = {}) {
+// boostMult — усилитель «Двойной выигрыш», giftChance — шанс подарочных WILD (усилитель «Дождь WILD»).
+export function resolveSpin(m, strips, { rnd = fairRandom, stops = null, bet, fs = null, streak = 0, noGift = false, forceGift = false, boostMult = 1, giftChance = GIFT_WILD_CHANCE } = {}) {
   stops ||= spinStops(strips, rnd);
   const raw = windowAt(strips, stops);
   const grid = raw.map((c) => c.slice());
@@ -179,7 +184,7 @@ export function resolveSpin(m, strips, { rnd = fairRandom, stops = null, bet, fs
     fx.newSticky = now.filter((k) => !old.has(k));
   }
   // «Подарок»: на барабаны 2–5 прилетают 2–4 WILD
-  if (!fs && !noGift && (forceGift || rnd() < GIFT_WILD_CHANCE)) {
+  if (!fs && !noGift && (forceGift || rnd() < giftChance)) {
     const cand = shuffle(cellsOf(grid, (s) => REGULAR.includes(s)).filter(([r]) => r > 0), rnd);
     fx.gift = cand.slice(0, 2 + Math.floor(rnd() * 3));
     for (const [r, row] of fx.gift) grid[r][row] = 'wild';
@@ -199,7 +204,8 @@ export function resolveSpin(m, strips, { rnd = fairRandom, stops = null, bet, fs
   const multSum = multCells.reduce((a, [r, row]) => a + m.symbols[grid[r][row]].mult, 0);
   const sMult = fs ? 1 : streakMultiplier(streak);
   const fsm = fs ? fsMultipliers(m, fs.i) : { fsMult: 1, wildMult: 1 };
-  const mult = fsm.fsMult * (multSum || 1) * sMult;
+  if (fsm.fsMult === null) fsm.fsMult = Number(weighted(m.fs.table, rnd)); // случайный множитель вращения
+  const mult = fsm.fsMult * (multSum || 1) * sMult * (fs ? 1 : boostMult);
   const e = evaluate(m, grid, { lineBet: bet / 20, totalBet: bet, mult, wildMult: fsm.wildMult });
 
   // короны → джекпот-игра (5 корон — сразу Гранд)

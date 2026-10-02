@@ -29,23 +29,26 @@ export function push(force = false) {
   const p = player();
   if (!p.name) return Promise.resolve(false);
   const best = state.stats.maxBalance;
-  if (!force && best === lastBest && Date.now() - lastSent < 60000) return Promise.resolve(false);
+  const wealth = state.balance + state.stats.shopSpent;
+  const key = best + ':' + wealth;
+  if (!force && key === lastBest && Date.now() - lastSent < 60000) return Promise.resolve(false);
   const wait = 12000 - (Date.now() - lastSent);
   if (wait > 0) {
     clearTimeout(timer);
     timer = setTimeout(() => push(force), wait);
     return Promise.resolve(false);
   }
-  lastSent = Date.now(); lastBest = best;
+  lastSent = Date.now(); lastBest = key;
   return fetch('api/rating', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: p.id, name: p.name, best, balance: state.balance, spins: state.stats.spins, jackpots: state.stats.jackpots, level: state.level }),
+    body: JSON.stringify({ id: p.id, name: p.name, best, wealth, balance: state.balance, spins: state.stats.spins, jackpots: state.stats.jackpots, level: state.level }),
   }).then((r) => r.ok).catch(() => false);
 }
 
-export function loadTop() {
-  return fetch('api/rating?me=' + encodeURIComponent(player().id), { cache: 'no-store' })
+// by: 'best' — по рекорду, 'wealth' — «Самый богатый» (монеты + покупки)
+export function loadTop(by = 'best') {
+  return fetch(`api/rating?by=${by}&me=` + encodeURIComponent(player().id), { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
 }

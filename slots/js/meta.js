@@ -51,6 +51,7 @@ const TASKS = [
   { id: 'wager', text: 'Поставь в сумме 20 000 монет', goal: 20000, add: (e) => (e.type === 'spin' && !e.fs ? e.bet : 0) },
   { id: 'gift', text: 'Получи подарок WILD', goal: 1, add: (e) => (e.giftWild ? 1 : 0) },
   { id: 'wheel', text: 'Крутани колесо удачи', goal: 1, add: (e) => (e.type === 'wheel' ? 1 : 0) },
+  { id: 'boost', text: 'Купи любой усилитель', goal: 1, add: (e) => (e.type === 'shop' ? 1 : 0) },
 ];
 export const TASK_REWARD = 3000;
 export const TASK_XP = 300;
@@ -122,6 +123,10 @@ export const MEDALS = [
   { id: 'lvl10', name: 'Уровень 10', reward: 10000, test: (s) => s.level >= 10 },
   { id: 'lvl25', name: 'Уровень 25', reward: 25000, test: (s) => s.level >= 25 },
   { id: 'rich', name: 'Миллионер: 1 000 000 на счету', reward: 100000, test: (s) => s.stats.maxBalance >= 1e6 },
+  { id: 'shop1', name: 'Первая покупка в магазине', reward: 1000, test: (s) => s.stats.shopBuys >= 1 },
+  { id: 'boost10', name: '10 усилителей', reward: 5000, test: (s) => s.stats.boostsBought >= 10 },
+  { id: 'unlock1', name: 'Новый автомат', reward: 5000, test: (s) => Object.keys(s.unlocked).length >= 1 },
+  { id: 'unlockAll', name: 'Открыты все автоматы', reward: 50000, test: (s) => MACHINES.every((m) => !m.price || s.unlocked[m.id]) },
 ];
 
 function checkMedals() {

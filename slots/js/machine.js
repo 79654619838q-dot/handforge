@@ -1,5 +1,5 @@
 // Экран автомата: барабаны, ставка, автоигра, помощники, бонус-игры, бесплатные вращения, «Купить бонус».
-import { BETS, JACKPOT_SEED, JACKPOT_SHARE, JACKPOTS, BUY_BONUS, COMMON, asset, GIFT_WILD_CHANCE } from './machines.js';
+import { BETS, JACKPOT_SEED, JACKPOT_SHARE, JACKPOTS, BUY_BONUS, COMMON, asset, GIFT_WILD_CHANCE, BOOSTERS, RAIN_WILD } from './machines.js';
 import { buildStrips, resolveSpin, fsMultipliers, streakMultiplier, LINES, REELS } from './engine.js';
 import { ReelView, LINE_COLORS } from './reels.js';
 import { state, save, betFor } from './state.js';
@@ -24,14 +24,18 @@ const jpValue = (tier, bet) => (tier === 'grand' ? Math.floor(state.jackpot) : J
 export function machineScreen(app, m, { onLevel }) {
   const strips = buildStrips(m);
   const fsStrips = buildStrips(m, true);
+  const magStrips = buildStrips(m, 'magnet'); // под усилителем «Магнит бонусов»
   let bet = betFor(m.id);
   let busy = false;          // крутятся барабаны или открыто окно, которое надо досмотреть
   let auto = 0;              // осталось автовращений (Infinity — без конца)
   let alive = true;
   let cycle = null;          // показ выигрышных линий по очереди
   let pending = null;        // отложенный следующий шаг (авто/бесплатные)
-  let fsHidden = false;      // бесплатные вращения уже выиграны, но барабаны ещё крутятся — не подсказывать
+  let fsHidden = false;
+  let lastRandom = 0;        // случайный множитель последнего бесплатного вращения («Сладкая страна»)      // бесплатные вращения уже выиграны, но барабаны ещё крутятся — не подсказывать
   const F = () => state.fs[m.id];  // бесплатные вращения этого автомата
+  // усилитель действует в обычных вращениях при ставке не выше той, при которой куплен
+  const boostOn = (id, stake = bet) => { const b = state.boosts[id]; return !inFs() && !!b && b.left > 0 && stake <= b.bet; };
   const inFs = () => !!F();
 
   app.innerHTML = `
@@ -46,6 +50,7 @@ export function machineScreen(app, m, { onLevel }) {
       <div class="cabinet">
         <div class="m-head">${logoPic(asset(`${m.id}/title.webp`), m.title)}</div>
         <div class="jp-row">${JACKPOTS.map((j) => `<div class="jp-pill" data-t="${j.id}" style="--c:${j.color}"><b>${j.name}</b><span>0</span></div>`).join('')}</div>
+        <div class="boost-row"></div>
         <div class="fs-banner" hidden></div>
         <div class="reels-wrap"><div class="frame"><canvas class="reels"></canvas></div><div class="fx-layer"></div></div>
         <div class="under">
@@ -56,6 +61,7 @@ export function machineScreen(app, m, { onLevel }) {
     </main>
     <footer class="controls">
       <button class="ctl info" title="Выплаты и правила">i</button>
+      <button class="ctl shop" title="Магазин усилителей">${pic(COMMON.bag, '🛍️', 'buy-ico')}<span>Усилители</span></button>
       <button class="ctl buy" title="Сразу бесплатные вращения">${pic(COMMON.bolt, '⚡', 'buy-ico')}<span>Купить бонус<b class="buy-cost"></b></span></button>
       <div class="bet-box">
         <div class="cap">Ставка</div>
@@ -121,6 +127,57 @@ export function machineScreen(app, m, { onLevel }) {
     wireAll(streakEl);
   }
 
+  const boostRow = $('.boost-row');
+  function refreshBoosts() {
+    const act = BOOSTERS.filter((b) => state.boosts[b.id]?.left > 0);
+    boostRow.innerHTML = act.map((b) => {
+      const st = state.boosts[b.id], on = boostOn(b.id);
+      return `<div class="boost-chip ${on ? '' : 'paused'}" title="${esc(b.text)}${on ? '' : ` — работает при ставке до ${fmt(st.bet)}`}">${pic(COMMON[b.icon], b.emoji, 'bc-ico')}<b>${esc(b.name)}</b><span>${st.left}</span></div>`;
+    }).join('');
+    wireAll(boostRow);
+  }
+
+  function shopModal() {
+    if (busy) return;
+    sfx.click();
+    const row = (b) => {
+      const st = state.boosts[b.id];
+      const cost = b.price * bet;
+      const active = st?.left > 0;
+      const other = active && st.bet !== bet; // уже куплен при другой ставке
+      const can = state.balance >= cost && !other;
+      const status = active ? `<em>Действует: осталось ${st.left} ${plural(st.left, 'вращение', 'вращения', 'вращений')} при ставке до ${fmt(st.bet)}</em>` : '';
+      return `<div class="shop-item ${active ? 'active' : ''}">
+        ${pic(COMMON[b.icon], b.emoji, 'si-ico')}
+        <div class="si-txt"><b>${esc(b.name)}</b><span>${esc(b.text)} — на ${b.spins} ${plural(b.spins, 'вращение', 'вращения', 'вращений')}.</span>${status}</div>
+        <button class="btn-gold si-buy" data-id="${b.id}" ${can ? '' : 'disabled'}>${other ? 'Куплен при другой ставке' : (active ? 'Продлить · ' : '') + fmt(cost)}</button>
+      </div>`;
+    };
+    const { el, close } = modal(`
+      <button class="x">✕</button>
+      <h2>${pic(COMMON.bag, '🛍️', 'h-ico')} Усилители</h2>
+      <p class="sub">Цена — по вашей ставке ${fmt(bet)}. Усилитель работает при этой ставке или меньше и тратится только в обычных вращениях.</p>
+      <div class="shop-list">${BOOSTERS.map(row).join('')}</div>`, { cls: 'shop-modal', closeOnBg: true });
+    el.querySelectorAll('.si-buy').forEach((btn) => btn.addEventListener('click', () => {
+      const b = BOOSTERS.find((x) => x.id === btn.dataset.id);
+      const cost = b.price * bet, st = state.boosts[b.id];
+      if (state.balance < cost || busy || (st?.left > 0 && st.bet !== bet)) return;
+      state.balance -= cost;
+      state.stats.shopSpent += cost; state.stats.shopBuys++; state.stats.boostsBought++;
+      state.boosts[b.id] = { left: (st?.left > 0 ? st.left : 0) + b.spins, bet };
+      save();
+      sfx.coins();
+      hud.bal.set(state.balance, 500);
+      shown = state.balance;
+      track({ type: 'shop', machine: m.id, cost });
+      flush();
+      close();
+      toast(`${pic(COMMON[b.icon], b.emoji, 't-ico')}<div><b>${esc(b.name)}</b><span>Включён на ${state.boosts[b.id].left} вращений при ставке до ${fmt(bet)}</span></div>`, 3000);
+      refreshBoosts();
+      refreshControls();
+    }));
+  }
+
   function refreshControls() {
     const fs = inFs() && !fsHidden;
     $('.bet').textContent = fmt(fs ? F().bet : bet);
@@ -130,6 +187,8 @@ export function machineScreen(app, m, { onLevel }) {
     autoBtn.classList.toggle('on', auto > 0);
     autoBtn.textContent = auto > 0 ? `Стоп ${auto === Infinity ? '∞' : auto}` : 'Авто';
     buyBtn.disabled = fs || busy;
+    $('.shop').disabled = fs || busy;
+    refreshBoosts();
     $('.buy-cost').textContent = fmt(bet * BUY_BONUS);
     spinBtn.classList.toggle('busy', view.spinning);
     spinBtn.classList.toggle('free', fs);
@@ -137,7 +196,7 @@ export function machineScreen(app, m, { onLevel }) {
     if (fs) {
       // пока идёт показ — множитель этого вращения, после — следующего
       const { fsMult } = fsMultipliers(m, Math.max(0, F().i - (busy ? 1 : 0)));
-      const multTxt = (m.fs.mode === 'wildMult' ? `WILD в линии ×${m.fs.mult}` : `×${fsMult}`) + (m.features.sticky ? ` · липких: ${F().sticky.length}` : '');
+      const multTxt = (m.fs.mode === 'wildMult' ? `WILD в линии ×${m.fs.mult}` : m.fs.mode === 'random' ? (busy && lastRandom ? `×${lastRandom}` : 'случайный ×1–×25') : `×${fsMult}`) + (m.features.sticky ? ` · липких: ${F().sticky.length}` : '');
       banner.hidden = false;
       banner.innerHTML = `<b>Бесплатные вращения</b><span>осталось <b>${F().left}</b></span><span class="mult">${multTxt}</span><span>выигрыш <b>${fmt(F().total)}</b></span>`;
     } else banner.hidden = true;
@@ -154,6 +213,7 @@ export function machineScreen(app, m, { onLevel }) {
   $('.plus').addEventListener('click', () => { const i = BETS.indexOf(bet); if (i < BETS.length - 1) setBet(BETS[i + 1]); });
   $('.turbo').addEventListener('click', (e) => { state.turbo = !state.turbo; save(); e.currentTarget.classList.toggle('on', state.turbo); sfx.click(); });
   $('.info').addEventListener('click', () => { sfx.click(); paytable(m, inFs() ? F().bet : bet); });
+  $('.shop').addEventListener('click', shopModal);
 
   autoBtn.addEventListener('click', () => {
     sfx.click();
@@ -394,7 +454,12 @@ export function machineScreen(app, m, { onLevel }) {
     const f = F();
     const stake = fs ? f.bet : bet;
     const streakBefore = state.streak[m.id] || 0;
-    const o = resolveSpin(m, fs ? fsStrips : strips, {
+    const on = Object.fromEntries(BOOSTERS.map((b) => [b.id, boostOn(b.id, stake)]));
+    const stripsNow = fs ? fsStrips : on.magnet ? magStrips : strips;
+    if (view.strips !== stripsNow) view.setStrips(stripsNow);
+    const o = resolveSpin(m, stripsNow, {
+      boostMult: on.x2 ? 2 : 1,
+      giftChance: on.wilds ? GIFT_WILD_CHANCE * RAIN_WILD : GIFT_WILD_CHANCE,
       stops: (TEST && window.slots.force) || null,
       bet: stake,
       fs: fs ? { i: f.i, sticky: f.sticky } : null,
@@ -425,7 +490,13 @@ export function machineScreen(app, m, { onLevel }) {
     const sum = win + pickWin + jpWin;
     state.balance += sum;
     state.stats.won += sum;
-    if (!fs) state.streak[m.id] = sum > 0 ? streakBefore + 1 : 0;
+    // «Горячая рука»: проигрыш серию не сбрасывает
+    if (!fs) state.streak[m.id] = sum > 0 ? streakBefore + 1 : on.hot ? streakBefore : 0;
+    const boostsEnded = [];
+    for (const b of BOOSTERS) {
+      if (!on[b.id]) continue;
+      if (--state.boosts[b.id].left <= 0) { delete state.boosts[b.id]; boostsEnded.push(b.name); }
+    }
     let fsStarted = 0, fsAdded = 0;
     if (fs) {
       f.total += sum;
@@ -495,6 +566,13 @@ export function machineScreen(app, m, { onLevel }) {
       if (o.fx.newSticky.length) { fxBanner(`+${o.fx.newSticky.length} ${plural(o.fx.newSticky.length, 'липкий WILD', 'липких WILD', 'липких WILD')}`, 'sticky'); await sleep(400); }
     }
     if (win && o.mult.sum) { sfx.mult(o.mult.sum); fxBanner(`Множитель <b>×${o.mult.sum}</b>!`, 'mult'); view.showWins(o.mult.cells, [], false); await sleep(600); }
+    if (fs && m.fs.mode === 'random') {
+      lastRandom = o.mult.fs; refreshControls();
+      fxBanner(`Множитель вращения <b>×${o.mult.fs}</b>`, o.mult.fs >= 10 ? 'streak' : 'mult');
+      if (o.mult.fs >= 5) sfx.mult(o.mult.fs);
+      await sleep(o.mult.fs >= 5 ? 500 : 250);
+    }
+    if (win && on.x2) { fxBanner(`${pic(COMMON.boostX2, '💰', 'fx-ico')} Двойной выигрыш <b>×2</b>`, 'mult'); await sleep(250); }
     if (win && o.mult.streak > 1) { sfx.mult(o.mult.streak); fxBanner(`${pic(COMMON.fire, '🔥', 'fx-ico')} Горячая серия <b>×${o.mult.streak}</b>`, 'streak'); await sleep(300); }
 
     await present(o, win, stake, fs);
@@ -530,6 +608,8 @@ export function machineScreen(app, m, { onLevel }) {
     if (fsAdded) { toast(`Ещё +${fsAdded} бесплатных вращений!`); sfx.fanfare(); await sleep(1200); }
     if (fsStarted) { stopCycle(); await fsIntro(fsStarted, false); fsHidden = false; if (alive) startFsReels(); }
 
+    for (const name of boostsEnded) toast(`Усилитель «${esc(name)}» закончился`, 2600);
+    refreshBoosts();
     track({ type: 'spin', machine: m.id, bet: stake, win: sum, mult: sum / stake, fs, streak: state.streak[m.id] || 0, fsWon: !!(fsStarted || fsAdded), pick: !!o.pick, jackpot: !!o.jackpot, multSym: o.mult.sum > 0, giftWild: o.fx.gift.length > 0 });
     flush();
     busy = false;

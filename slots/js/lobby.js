@@ -1,12 +1,15 @@
 // Лобби: джекпот, колесо удачи, задания дня, уровень и медали, рейтинг игроков, выбор автомата.
 import { MACHINES, BETS, COMMON, JACKPOTS, asset } from './machines.js';
-import { state } from './state.js';
+import { state, save } from './state.js';
 import { sfx } from './audio.js';
 import { storageWorks } from './storage.js';
-import { fmt, esc, plural, Counter, pic, symPic, logoPic, wireAll, modal, hud, topRight, wireTop, giftModal } from './ui.js';
-import { levelInfo, tasksToday, TASK_REWARD, TASKS_BONUS, MEDALS, wheelLeft, spinWheel, flush, xpFor, levelReward, wheelMult } from './meta.js';
+import { fmt, esc, plural, Counter, pic, symPic, logoPic, wireAll, modal, hud, topRight, wireTop, giftModal, coinShower, toast } from './ui.js';
+import { levelInfo, tasksToday, TASK_REWARD, TASKS_BONUS, MEDALS, wheelLeft, spinWheel, flush, xpFor, levelReward, wheelMult, track } from './meta.js';
 import { wheelModal } from './bonus.js';
 import { player, setName, push, loadTop } from './rating.js';
+
+export const isLocked = (m) => !!m.price && !state.unlocked[m.id];
+const BY = { best: { name: 'Рекорд', note: 'до скольких монет игрок поднялся со стартовых 10 000' }, wealth: { name: 'Самый богатый', note: 'монеты сейчас плюс всё, что куплено в магазине' } };
 
 const hms = (ms) => {
   const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
@@ -61,7 +64,7 @@ export function lobbyScreen(app, { rerender }) {
       </div>
       <div class="panel rating-card">
         <div class="p-head">${pic(COMMON.pile, '🏆', 'p-ico')}<b>Рейтинг игроков</b></div>
-        <p class="p-note">Кто выше всех поднимется со стартовых 10 000</p>
+        <div class="r-tabs"><button class="r-tab on" data-by="best">Рекорд</button><button class="r-tab" data-by="wealth">Самый богатый</button></div>
         ${me.name ? '' : `<form class="name-form"><input maxlength="24" placeholder="Ваше имя в рейтинге" required><button class="btn-gold">Войти</button></form>`}
         <ol class="top5"><li class="muted">Загружаю…</li></ol>
         <button class="ctl rating-btn">Весь рейтинг</button>
@@ -69,7 +72,7 @@ export function lobbyScreen(app, { rerender }) {
     </section>
 
     <section class="machines">
-      ${MACHINES.map((m) => `
+      ${MACHINES.map((m) => isLocked(m) ? lockedCard(m) : `
         <a class="mcard theme-${m.id}" href="#/m/${m.id}">
           <div class="mcard-art" style="--img:url(${asset(`bg/${m.id}.jpg`)})">
             <img class="mcard-title" src="${asset(`${m.id}/title.webp`)}" alt="" onerror="this.remove()">
@@ -88,6 +91,7 @@ export function lobbyScreen(app, { rerender }) {
     <footer class="stats">
       <span>Вращений: <b>${fmt(state.stats.spins)}</b></span>
       <span>Рекорд счёта: <b>${fmt(state.stats.maxBalance)}</b></span>
+      <span>Богатство: <b>${fmt(state.balance + state.stats.shopSpent)}</b></span>
       <span>Самый крупный выигрыш: <b>${fmt(state.stats.biggest)}</b>${state.stats.biggestMachine ? ` <i>(${esc(state.stats.biggestMachine)})</i>` : ''}</span>
       <span>Джекпотов: <b>${state.stats.jackpots}</b></span>
       ${state.balance < BETS[0] ? '<button class="gift-btn">🎁 Получить подарок</button>' : ''}
@@ -99,7 +103,8 @@ export function lobbyScreen(app, { rerender }) {
   const $ = (s) => app.querySelector(s);
   hud.jp = new Counter($('.jp-value'), state.jackpot);
   $('.gift-btn')?.addEventListener('click', () => giftModal(rerender));
-  app.querySelectorAll('.mcard').forEach((a) => a.addEventListener('click', () => sfx.click()));
+  app.querySelectorAll('a.mcard').forEach((a) => a.addEventListener('click', () => sfx.click()));
+  app.querySelectorAll('.mcard.locked').forEach((c) => c.addEventListener('click', () => unlockModal(MACHINES.find((m) => m.id === c.dataset.id), rerender)));
   $('.medals-btn').addEventListener('click', () => { sfx.click(); medalsModal(); });
 
   // колесо удачи
@@ -129,17 +134,74 @@ export function lobbyScreen(app, { rerender }) {
     rerender();
   });
   const top5 = $('.top5');
-  loadTop().then((d) => {
-    if (!top5.isConnected) return;
-    if (!d) { top5.innerHTML = '<li class="muted">Рейтинг сейчас недоступен</li>'; return; }
-    const rows = d.top.slice(0, 5).map((r) => `<li class="${r.me ? 'me' : ''}"><i>${r.place}</i><span>${esc(r.name)}</span><b>${fmt(r.best)}</b></li>`);
-    if (d.me && d.me.place > 5) rows.push(`<li class="me"><i>${d.me.place}</i><span>${esc(d.me.name)} (вы)</span><b>${fmt(d.me.best)}</b></li>`);
-    top5.innerHTML = rows.join('') || '<li class="muted">Пока никого — будьте первым!</li>';
-  });
-  $('.rating-btn').addEventListener('click', () => { sfx.click(); ratingModal(); });
+  let by = 'best';
+  const showTop = () => {
+    top5.innerHTML = '<li class="muted">Загружаю…</li>';
+    const want = by;
+    loadTop(by).then((d) => {
+      if (!top5.isConnected || want !== by) return;
+      if (!d) { top5.innerHTML = '<li class="muted">Рейтинг сейчас недоступен</li>'; return; }
+      const rows = d.top.slice(0, 5).map((r) => `<li class="${r.me ? 'me' : ''}"><i>${r.place}</i><span>${esc(r.name)}</span><b>${fmt(r[by])}</b></li>`);
+      if (d.me && d.me.place > 5) rows.push(`<li class="me"><i>${d.me.place}</i><span>${esc(d.me.name)} (вы)</span><b>${fmt(d.me[by])}</b></li>`);
+      top5.innerHTML = rows.join('') || '<li class="muted">Пока никого — будьте первым!</li>';
+    });
+  };
+  app.querySelectorAll('.rating-card .r-tab').forEach((t) => t.addEventListener('click', () => {
+    by = t.dataset.by; sfx.click();
+    app.querySelectorAll('.rating-card .r-tab').forEach((x) => x.classList.toggle('on', x === t));
+    showTop();
+  }));
+  showTop();
+  $('.rating-btn').addEventListener('click', () => { sfx.click(); ratingModal(by); });
   push();
 
   return { destroy() { clearInterval(timer); } };
+}
+
+function lockedCard(m) {
+  const can = state.balance >= m.price;
+  return `
+        <div class="mcard locked theme-${m.id}" data-id="${m.id}" role="button" tabindex="0">
+          <div class="mcard-art" style="--img:url(${asset(`bg/${m.id}.jpg`)})">
+            <img class="mcard-title" src="${asset(`${m.id}/title.webp`)}" alt="" onerror="this.remove()">
+            <div class="mcard-syms">${['h1', 'wild', 'scatter'].map((id) => symPic(m, id)).join('')}</div>
+            <div class="lock-veil">${pic(COMMON.lock, '🔒', 'lock-ico')}<b>${fmt(m.price)}</b><span>монет, чтобы открыть</span></div>
+          </div>
+          <div class="mcard-body">
+            <h3>${m.title}</h3>
+            <p>${m.tagline}</p>
+            <p class="feat">★ Щедрее обычных автоматов — отдача выше</p>
+            <p class="feat2">Бесплатные вращения: ${m.fs.text.toLowerCase()}</p>
+            <span class="play ${can ? '' : 'dim'}">${can ? 'Открыть' : `Ещё ${fmt(m.price - state.balance)}`}</span>
+          </div>
+        </div>`;
+}
+
+// открыть автомат за монеты — навсегда
+export function unlockModal(m, after) {
+  sfx.click();
+  const can = state.balance >= m.price;
+  const { el, close } = modal(`
+    <button class="x">✕</button>
+    ${pic(COMMON.lock, '🔒', 'big-pic')}
+    <h2>${esc(m.title)}</h2>
+    <p>${esc(m.tagline)}. Автомат щедрее обычных, у него свои правила бесплатных вращений: ${esc(m.fs.text.toLowerCase())}.</p>
+    <p>Открыть навсегда за <b>${fmt(m.price)}</b> монет${can ? '' : ` — не хватает ${fmt(m.price - state.balance)}`}.</p>
+    <button class="btn-gold yes" ${can ? '' : 'disabled'}>Открыть за ${fmt(m.price)}</button>`, { cls: 'unlock-modal', closeOnBg: true });
+  el.querySelector('.yes').addEventListener('click', () => {
+    if (state.balance < m.price || state.unlocked[m.id]) return;
+    state.balance -= m.price;
+    state.stats.shopSpent += m.price; state.stats.shopBuys++;
+    state.unlocked[m.id] = Date.now();
+    save();
+    track({ type: 'unlock', machine: m.id, cost: m.price });
+    flush();
+    sfx.fanfare();
+    coinShower(2, 40);
+    close();
+    toast(`${pic(COMMON.trophy, '🏆', 't-ico')}<div><b>Открыт автомат «${esc(m.title)}»</b><span>Удачи!</span></div>`, 3500, 'big');
+    after?.();
+  });
 }
 
 export function medalsModal() {
@@ -157,15 +219,23 @@ export function medalsModal() {
     </div>`, { cls: 'medals-modal', closeOnBg: true });
 }
 
-export async function ratingModal() {
+export function ratingModal(start = 'best') {
   const { el } = modal(`
     <button class="x">✕</button>
     <h2>Рейтинг игроков</h2>
-    <p class="sub">Место — по рекорду: до скольких монет игрок поднялся со стартовых 10 000.</p>
-    <table class="rating"><thead><tr><th>#</th><th>Игрок</th><th>Рекорд</th><th>Сейчас</th><th>Ур.</th></tr></thead><tbody><tr><td colspan="5">Загружаю…</td></tr></tbody></table>`, { cls: 'rating-modal', closeOnBg: true });
-  const d = await loadTop();
+    <div class="r-tabs big"><button class="r-tab" data-by="best">Рекорд</button><button class="r-tab" data-by="wealth">Самый богатый</button></div>
+    <p class="sub r-note"></p>
+    <table class="rating"><thead><tr><th>#</th><th>Игрок</th><th>Рекорд</th><th>Богатство</th><th>Сейчас</th><th>Ур.</th></tr></thead><tbody></tbody></table>`, { cls: 'rating-modal', closeOnBg: true });
   const body = el.querySelector('tbody');
-  if (!d) { body.innerHTML = '<tr><td colspan="5">Рейтинг сейчас недоступен</td></tr>'; return; }
-  const row = (r) => `<tr class="${r.me ? 'me' : ''}"><td>${r.place}</td><td>${esc(r.name)}</td><td><b>${fmt(r.best)}</b></td><td>${fmt(r.balance)}</td><td>${r.level}</td></tr>`;
-  body.innerHTML = d.top.map(row).join('') + (d.me && d.me.place > d.top.length ? row({ ...d.me, me: true }) : '') || '<tr><td colspan="5">Пока никого — будьте первым!</td></tr>';
+  const show = async (by) => {
+    el.querySelectorAll('.r-tab').forEach((t) => t.classList.toggle('on', t.dataset.by === by));
+    el.querySelector('.r-note').textContent = `Место — ${BY[by].name.toLowerCase()}: ${BY[by].note}.`;
+    body.innerHTML = '<tr><td colspan="6">Загружаю…</td></tr>';
+    const d = await loadTop(by);
+    if (!d) { body.innerHTML = '<tr><td colspan="6">Рейтинг сейчас недоступен</td></tr>'; return; }
+    const row = (r) => `<tr class="${r.me ? 'me' : ''}"><td>${r.place}</td><td>${esc(r.name)}</td><td class="${by === 'best' ? 'key' : ''}">${fmt(r.best)}</td><td class="${by === 'wealth' ? 'key' : ''}">${fmt(r.wealth)}</td><td>${fmt(r.balance)}</td><td>${r.level}</td></tr>`;
+    body.innerHTML = d.top.map(row).join('') + (d.me && d.me.place > d.top.length ? row({ ...d.me, me: true }) : '') || '<tr><td colspan="6">Пока никого — будьте первым!</td></tr>';
+  };
+  el.querySelectorAll('.r-tab').forEach((t) => t.addEventListener('click', () => { sfx.click(); show(t.dataset.by); }));
+  show(start);
 }
