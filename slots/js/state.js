@@ -1,6 +1,6 @@
 // Кошелёк игрока, джекпот, уровень, задания, медали и настройки — всё в браузере (деньги ненастоящие).
 import { ls } from './storage.js';
-import { START_BALANCE, JACKPOT_SEED, DEFAULT_BET, BETS } from './machines.js';
+import { START_BALANCE, JACKPOT_SEED, DEFAULT_BET, byId, betsOf } from './machines.js';
 
 const KEY = 'slots.state.v1';
 
@@ -11,7 +11,7 @@ function freshStats() {
     picks: 0, buys: 0, wheelSpins: 0, maxStreak: 0, maxBalance: START_BALANCE, giftWilds: 0, multHits: 0,
     bestMult: 0, mult5: 0, taskDays: 0,
     shopSpent: 0,    // потрачено в магазине (усилители, новые автоматы) — для «Самого богатого»
-    shopBuys: 0, boostsBought: 0,
+    shopBuys: 0, boostsBought: 0, luxBuys: 0, luxSells: 0, luxBest: 0,
     jp: { mini: 0, minor: 0, major: 0, grand: 0 },
     played: {},      // в каких автоматах играл
   };
@@ -33,6 +33,7 @@ function fresh() {
     wheelAt: 0,        // когда последний раз крутили колесо удачи
     boosts: {},        // действующие усилители: { x2: { left, bet } }
     unlocked: {},      // открытые за монеты автоматы
+    owned: {},         // магазин роскоши: вещь → за сколько куплена
     stats: freshStats(),
   };
 }
@@ -52,7 +53,7 @@ function load() {
   if (!s.fs || typeof s.fs !== 'object') s.fs = {};
   if (typeof s.fs.machine === 'string') { const { machine, ...rest } = s.fs; s.fs = { [machine]: rest }; } // старая запись
   for (const f of Object.values(s.fs)) f.sticky ||= [];
-  for (const k of ['streak', 'medals', 'bets', 'boosts', 'unlocked']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
+  for (const k of ['streak', 'medals', 'bets', 'boosts', 'unlocked', 'owned']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
   if (!Number.isFinite(s.xp)) s.xp = 0;
   if (!Number.isFinite(s.level) || s.level < 1) s.level = 1;
   return s;
@@ -66,8 +67,13 @@ export function save() {
 
 export function betFor(id) {
   const b = state.bets[id];
-  return BETS.includes(b) ? b : DEFAULT_BET;
+  return betsOf(byId(id)).includes(b) ? b : DEFAULT_BET;
 }
+
+// стоимость купленного в магазине роскоши (продаётся за ту же цену)
+export const ownedValue = () => Object.values(state.owned).reduce((a, b) => a + b, 0);
+// «Самый богатый»: монеты + потраченное на усилители и автоматы + стоимость владений
+export const wealth = () => state.balance + state.stats.shopSpent + ownedValue();
 
 export function resetAll() {
   Object.assign(state, fresh());

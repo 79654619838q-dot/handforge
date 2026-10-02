@@ -6,6 +6,9 @@ import { fairRandom, seeded } from './engine.js';
 import { toast, fmt, hud, pic, esc } from './ui.js';
 import { sfx } from './audio.js';
 import { push } from './rating.js';
+import { LUX_CATS, LUX_ITEMS } from './luxury.js';
+const luxOwned = (s) => Object.keys(s.owned);
+const luxVal = (s) => Object.values(s.owned).reduce((a, b) => a + b, 0);
 
 const notes = [];
 
@@ -52,6 +55,7 @@ const TASKS = [
   { id: 'gift', text: 'Получи подарок WILD', goal: 1, add: (e) => (e.giftWild ? 1 : 0) },
   { id: 'wheel', text: 'Крутани колесо удачи', goal: 1, add: (e) => (e.type === 'wheel' ? 1 : 0) },
   { id: 'boost', text: 'Купи любой усилитель', goal: 1, add: (e) => (e.type === 'shop' ? 1 : 0) },
+  { id: 'lux', text: 'Купи что-нибудь в магазине роскоши', goal: 1, add: (e) => (e.type === 'lux' ? 1 : 0) },
 ];
 export const TASK_REWARD = 3000;
 export const TASK_XP = 300;
@@ -127,6 +131,15 @@ export const MEDALS = [
   { id: 'boost10', name: '10 усилителей', reward: 5000, test: (s) => s.stats.boostsBought >= 10 },
   { id: 'unlock1', name: 'Новый автомат', reward: 5000, test: (s) => Object.keys(s.unlocked).length >= 1 },
   { id: 'unlockAll', name: 'Открыты все автоматы', reward: 50000, test: (s) => MACHINES.every((m) => !m.price || s.unlocked[m.id]) },
+  { id: 'lux1', name: 'Первая покупка в магазине роскоши', reward: 2000, test: (s) => luxOwned(s).length >= 1 },
+  { id: 'luxCar', name: 'Своя машина', reward: 3000, test: (s) => luxOwned(s).some((id) => id.startsWith('car_')) },
+  { id: 'luxHouse', name: 'Свой дом', reward: 10000, test: (s) => luxOwned(s).some((id) => id.startsWith('house_')) },
+  { id: 'luxYacht', name: 'Капитан яхты', reward: 20000, test: (s) => luxOwned(s).some((id) => id.startsWith('boat_')) },
+  { id: 'luxIsland', name: 'Свой остров', reward: 500000, test: (s) => luxOwned(s).some((id) => id.startsWith('island_')) },
+  { id: 'luxCat', name: 'Полная коллекция раздела', reward: 50000, test: (s) => LUX_CATS.some((c) => c.items.every((it) => s.owned[it.id] !== undefined)) },
+  { id: 'luxAll', name: 'Есть всё!', reward: 10000000, test: (s) => LUX_ITEMS.every((it) => s.owned[it.id] !== undefined) },
+  { id: 'lux10m', name: 'Владения на 10 000 000', reward: 100000, test: (s) => luxVal(s) >= 1e7 },
+  { id: 'lux1b', name: 'Миллиардер: владения на 1 000 000 000', reward: 5000000, test: (s) => luxVal(s) >= 1e9 },
 ];
 
 function checkMedals() {

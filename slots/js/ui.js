@@ -160,6 +160,7 @@ export const hud = { bal: null, jp: null, level: null };
 export function topRight() {
   return `
     <button class="lvl-badge" title="Уровень игрока">${pic(COMMON.star, '⭐', 'lvl-star')}<b class="lvl-n">${state.level}</b><i class="lvl-bar"><s></s></i></button>
+    <a class="icon-btn lux-btn" href="#/lux" title="Магазин роскоши">${pic(COMMON.wealth, '💎', 'lb-ico')}</a>
     <div class="wallet" title="Ваши монеты (ненастоящие)">${pic(COMMON.coin, '🪙', 'coin')}<span class="bal">${fmt(state.balance)}</span></div>
     <button class="icon-btn sound" title="Звук">${state.sound ? '🔊' : '🔇'}</button>`;
 }

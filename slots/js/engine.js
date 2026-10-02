@@ -97,6 +97,7 @@ export function fsMultipliers(machine, i) {
   if (fs.mode === 'wildMult') return { fsMult: 1, wildMult: fs.mult };
   if (fs.mode === 'grow') return { fsMult: Math.min(fs.start + fs.step * i, fs.max || 99), wildMult: 1 };
   if (fs.mode === 'random') return { fsMult: null, wildMult: 1 }; // выпадает при вращении
+  if (fs.mode === 'collect') return { fsMult: null, wildMult: 1 }; // копится зайчиками, считается при вращении
   return { fsMult: 1, wildMult: 1 };
 }
 
@@ -204,6 +205,11 @@ export function resolveSpin(m, strips, { rnd = fairRandom, stops = null, bet, fs
   const multSum = multCells.reduce((a, [r, row]) => a + m.symbols[grid[r][row]].mult, 0);
   const sMult = fs ? 1 : streakMultiplier(streak);
   const fsm = fs ? fsMultipliers(m, fs.i) : { fsMult: 1, wildMult: 1 };
+  if (fs && m.fs.mode === 'collect') {
+    // новые WILD этого вращения (липкие считаются один раз — когда прилипли)
+    fx.collected = m.features.sticky ? fx.newSticky.length : cellsOf(raw, (s) => s === 'wild').length;
+    fsm.fsMult = Math.min(m.fs.max, 1 + (fs.collected || 0) + fx.collected);
+  }
   if (fsm.fsMult === null) fsm.fsMult = Number(weighted(m.fs.table, rnd)); // случайный множитель вращения
   const mult = fsm.fsMult * (multSum || 1) * sMult * (fs ? 1 : boostMult);
   const e = evaluate(m, grid, { lineBet: bet / 20, totalBet: bet, mult, wildMult: fsm.wildMult });

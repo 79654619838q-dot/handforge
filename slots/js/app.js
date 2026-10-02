@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { layer } from './ui.js';
 import { lobbyScreen, medalsModal, isLocked, unlockModal } from './lobby.js';
 import { machineScreen } from './machine.js';
+import { luxScreen } from './luxshop.js';
 
 const app = document.getElementById('app');
 window.slots = { state, force: null };
@@ -16,6 +17,7 @@ function route() {
   const mm = location.hash.match(/^#\/m\/(\w+)/);
   const m = mm && byId(mm[1]);
   if (m && isLocked(m)) { askUnlock = m; location.replace('#/'); return; }
+  if (location.hash.startsWith('#/lux')) { current = luxScreen(app, { onLevel: medalsModal }); scrollTo(0, 0); return; }
   current = m ? machineScreen(app, m, { onLevel: medalsModal }) : lobbyScreen(app, { rerender: route });
   if (!m && askUnlock) { const u = askUnlock; askUnlock = null; unlockModal(u, () => { location.hash = '#/m/' + u.id; }); }
   scrollTo(0, 0);

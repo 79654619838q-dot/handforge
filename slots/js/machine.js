@@ -1,5 +1,5 @@
 // Экран автомата: барабаны, ставка, автоигра, помощники, бонус-игры, бесплатные вращения, «Купить бонус».
-import { BETS, JACKPOT_SEED, JACKPOT_SHARE, JACKPOTS, BUY_BONUS, COMMON, asset, GIFT_WILD_CHANCE, BOOSTERS, RAIN_WILD } from './machines.js';
+import { betsOf, JACKPOT_SEED, JACKPOT_SHARE, JACKPOTS, BUY_BONUS, COMMON, asset, GIFT_WILD_CHANCE, BOOSTERS, RAIN_WILD, GRAND_MIN } from './machines.js';
 import { buildStrips, resolveSpin, fsMultipliers, streakMultiplier, LINES, REELS } from './engine.js';
 import { ReelView, LINE_COLORS } from './reels.js';
 import { state, save, betFor } from './state.js';
@@ -19,12 +19,14 @@ function loadFrames() {
 }
 
 const JP = Object.fromEntries(JACKPOTS.map((j) => [j.id, j]));
-const jpValue = (tier, bet) => (tier === 'grand' ? Math.floor(state.jackpot) : JP[tier].bet * bet);
+// Гранд — общий котёл, но не меньше GRAND_MIN ставок
+const jpValue = (tier, bet) => (tier === 'grand' ? Math.max(Math.floor(state.jackpot), GRAND_MIN * bet) : JP[tier].bet * bet);
 
 export function machineScreen(app, m, { onLevel }) {
   const strips = buildStrips(m);
   const fsStrips = buildStrips(m, true);
   const magStrips = buildStrips(m, 'magnet'); // под усилителем «Магнит бонусов»
+  const BETS = betsOf(m);
   let bet = betFor(m.id);
   let busy = false;          // крутятся барабаны или открыто окно, которое надо досмотреть
   let auto = 0;              // осталось автовращений (Infinity — без конца)
@@ -196,7 +198,8 @@ export function machineScreen(app, m, { onLevel }) {
     if (fs) {
       // пока идёт показ — множитель этого вращения, после — следующего
       const { fsMult } = fsMultipliers(m, Math.max(0, F().i - (busy ? 1 : 0)));
-      const multTxt = (m.fs.mode === 'wildMult' ? `WILD в линии ×${m.fs.mult}` : m.fs.mode === 'random' ? (busy && lastRandom ? `×${lastRandom}` : 'случайный ×1–×25') : `×${fsMult}`) + (m.features.sticky ? ` · липких: ${F().sticky.length}` : '');
+      const multTxt = (m.fs.mode === 'wildMult' ? `WILD в линии ×${m.fs.mult}` : m.fs.mode === 'random' ? (busy && lastRandom ? `×${lastRandom}` : 'случайный ×1–×25')
+        : m.fs.mode === 'collect' ? `×${Math.min(m.fs.max, 1 + (F().collected || 0))}` : `×${fsMult}`) + (m.features.sticky ? ` · липких: ${F().sticky.length}` : '');
       banner.hidden = false;
       banner.innerHTML = `<b>Бесплатные вращения</b><span>осталось <b>${F().left}</b></span><span class="mult">${multTxt}</span><span>выигрыш <b>${fmt(F().total)}</b></span>`;
     } else banner.hidden = true;
@@ -482,7 +485,7 @@ export function machineScreen(app, m, { onLevel }) {
       state.jackpot += stake * JACKPOT_SHARE;
       state.stats.spins++; state.stats.wagered += stake;
       if (auto > 0 && auto !== Infinity) auto--;
-    } else { f.left--; f.i++; f.sticky = o.fx.sticky; }
+    } else { f.left--; f.i++; f.sticky = o.fx.sticky; f.collected = (f.collected || 0) + (o.fx.collected || 0); }
     if (tier) { state.stats.jp[tier]++; state.stats.jackpots++; if (tier === 'grand') state.jackpot = JACKPOT_SEED; }
     if (o.pick) state.stats.picks++;
     if (o.fx.gift.length) state.stats.giftWilds++;
@@ -566,6 +569,11 @@ export function machineScreen(app, m, { onLevel }) {
       if (o.fx.newSticky.length) { fxBanner(`+${o.fx.newSticky.length} ${plural(o.fx.newSticky.length, 'липкий WILD', 'липких WILD', 'липких WILD')}`, 'sticky'); await sleep(400); }
     }
     if (win && o.mult.sum) { sfx.mult(o.mult.sum); fxBanner(`Множитель <b>×${o.mult.sum}</b>!`, 'mult'); view.showWins(o.mult.cells, [], false); await sleep(600); }
+    if (fs && m.fs.mode === 'collect' && o.fx.collected) {
+      sfx.mult(o.mult.fs);
+      fxBanner(`+${o.fx.collected} ${plural(o.fx.collected, 'зайчик', 'зайчика', 'зайчиков')} · множитель <b>×${o.mult.fs}</b>`, 'mult');
+      await sleep(450);
+    }
     if (fs && m.fs.mode === 'random') {
       lastRandom = o.mult.fs; refreshControls();
       fxBanner(`Множитель вращения <b>×${o.mult.fs}</b>`, o.mult.fs >= 10 ? 'streak' : 'mult');
@@ -583,7 +591,7 @@ export function machineScreen(app, m, { onLevel }) {
       stopCycle();
       view.showWins(o.crowns, [], true);
       await sleep(700);
-      const values = Object.fromEntries(JACKPOTS.map((j) => [j.id, j.id === 'grand' ? (tier === 'grand' ? jpWin : Math.floor(state.jackpot)) : j.bet * stake]));
+      const values = Object.fromEntries(JACKPOTS.map((j) => [j.id, j.id === 'grand' && tier === 'grand' ? jpWin : jpValue(j.id, stake)]));
       if (o.jackpot.crowns < 5) await jackpotGame({ board: o.jackpot.board, values, crowns: o.jackpot.crowns, auto: auto > 0 });
       if (!alive) return;
       await jackpotWin(tier, jpWin);
@@ -686,7 +694,7 @@ function paytable(m, bet) {
     <div class="pt-specials">
       ${item(symPic(m, 'wild'), `${esc(m.symbols.wild.name)} — WILD`, 'Заменяет любой обычный символ. Бывает на барабанах 2–5.')}
       ${item(symPic(m, 'scatter'), `${esc(m.symbols.scatter.name)} — БОНУС`, `3, 4 или 5 в любом месте: ${fs[3]}, ${fs[4]} или ${fs[5]} бесплатных вращений и ${fmt(sp[3] * bet)} / ${fmt(sp[4] * bet)} / ${fmt(sp[5] * bet)} монет сразу. ${esc(m.fs.text)}. В бесплатных вращениях можно выиграть ещё вращения.`)}
-      ${item(symPic(m, 'jackpot'), 'Корона — ДЖЕКПОТЫ', `3 или 4 короны в любом месте открывают джекпот-игру: Мини (${fmt(3 * bet)}), Малый (${fmt(10 * bet)}), Большой (${fmt(50 * bet)}) или Гранд (сейчас ${fmt(state.jackpot)}). Чем больше корон, тем выше шанс на крупный. Пять корон — сразу Гранд. Гранд общий для всех автоматов и растёт на ${Math.round(JACKPOT_SHARE * 100)}% каждой ставки.`)}
+      ${item(symPic(m, 'jackpot'), 'Корона — ДЖЕКПОТЫ', `3 или 4 короны в любом месте открывают джекпот-игру: Мини (${fmt(3 * bet)}), Малый (${fmt(10 * bet)}), Большой (${fmt(50 * bet)}) или Гранд (сейчас ${fmt(Math.max(state.jackpot, GRAND_MIN * bet))}). Чем больше корон, тем выше шанс на крупный. Пять корон — сразу Гранд. Гранд общий для всех автоматов, растёт на ${Math.round(JACKPOT_SHARE * 100)}% каждой ставки и всегда не меньше ${GRAND_MIN} ставок.`)}
       ${item(symPic(m, 'pick'), 'Сундук — «Выбери сундук»', 'Три сундука на барабанах 1, 3 и 5 открывают игру: выбирайте сундуки, внутри монеты и «×2 ко всему», пока не попадётся «Забрать».')}
       ${item(symPic(m, 'x3'), 'Множители ×2, ×3, ×5', 'Умножают весь выигрыш вращения. Несколько множителей складываются: ×2 и ×3 дают ×5.')}
     </div>

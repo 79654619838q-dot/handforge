@@ -1,7 +1,7 @@
 // Общий рейтинг игроков на сайте: кто выше всех поднялся со стартовых 10 000 (рекорд счёта).
 // Игрок — случайный номер в браузере + имя, которое он ввёл сам.
 import { ls } from './storage.js';
-import { state } from './state.js';
+import { state, wealth as wealthNow } from './state.js';
 
 const KEY = 'slots.player';
 
@@ -29,7 +29,7 @@ export function push(force = false) {
   const p = player();
   if (!p.name) return Promise.resolve(false);
   const best = state.stats.maxBalance;
-  const wealth = state.balance + state.stats.shopSpent;
+  const wealth = wealthNow();
   const key = best + ':' + wealth;
   if (!force && key === lastBest && Date.now() - lastSent < 60000) return Promise.resolve(false);
   const wait = 12000 - (Date.now() - lastSent);

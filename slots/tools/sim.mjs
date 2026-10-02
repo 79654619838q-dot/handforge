@@ -34,7 +34,7 @@ for (const m of MACHINES) {
     while (left > 0) {
       left--;
       const o = resolveSpin(m, fsStrips, { rnd, bet: BET, fs });
-      fs.i++; fs.sticky = o.fx.sticky;
+      fs.i++; fs.sticky = o.fx.sticky; fs.collected = (fs.collected || 0) + (o.fx.collected || 0);
       total += o.total + extras(o, rec);
       left += o.scatter.fs;
       if (rec) S.fsSpins++;

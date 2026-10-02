@@ -1,6 +1,7 @@
 // Лобби: джекпот, колесо удачи, задания дня, уровень и медали, рейтинг игроков, выбор автомата.
 import { MACHINES, BETS, COMMON, JACKPOTS, asset } from './machines.js';
-import { state, save } from './state.js';
+import { state, save, ownedValue } from './state.js';
+import { LUX_ITEMS } from './luxury.js';
 import { sfx } from './audio.js';
 import { storageWorks } from './storage.js';
 import { fmt, esc, plural, Counter, pic, symPic, logoPic, wireAll, modal, hud, topRight, wireTop, giftModal, coinShower, toast } from './ui.js';
@@ -9,7 +10,7 @@ import { wheelModal } from './bonus.js';
 import { player, setName, push, loadTop } from './rating.js';
 
 export const isLocked = (m) => !!m.price && !state.unlocked[m.id];
-const BY = { best: { name: 'Рекорд', note: 'до скольких монет игрок поднялся со стартовых 10 000' }, wealth: { name: 'Самый богатый', note: 'монеты сейчас плюс всё, что куплено в магазине' } };
+const BY = { best: { name: 'Рекорд', note: 'до скольких монет игрок поднялся со стартовых 10 000' }, wealth: { name: 'Самый богатый', note: 'монеты сейчас плюс всё купленное: владения из магазина роскоши, усилители и автоматы' } };
 
 const hms = (ms) => {
   const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
@@ -35,7 +36,7 @@ export function lobbyScreen(app, { rerender }) {
       <div>
         <div class="jp-label">Джекпот «Гранд»</div>
         <div class="jp-value">${fmt(state.jackpot)}</div>
-        <div class="jp-hint">Общий для всех автоматов и растёт с каждой ставкой. Короны на барабанах открывают джекпот-игру: ${JACKPOTS.map((j) => j.name).join(', ')}.</div>
+        <div class="jp-hint">Общий для всех автоматов, растёт с каждой ставкой и всегда не меньше 500 ставок. Короны на барабанах открывают джекпот-игру: ${JACKPOTS.map((j) => j.name).join(', ')}.</div>
       </div>
     </section>
 
@@ -71,6 +72,12 @@ export function lobbyScreen(app, { rerender }) {
       </div>
     </section>
 
+    <a class="lux-banner" href="#/lux">
+      <div class="lb-left">${pic(COMMON.wealth, '💎', 'lb-big')}<div><b>Магазин роскоши</b><span>Машины, дома, яхты, вертолёты, самолёты, острова, животные и вещи — ${LUX_ITEMS.length} покупок. Продать можно за полную цену.</span></div></div>
+      <div class="lb-own">${luxShowcase()}</div>
+      <span class="play">Открыть</span>
+    </a>
+
     <section class="machines">
       ${MACHINES.map((m) => isLocked(m) ? lockedCard(m) : `
         <a class="mcard theme-${m.id}" href="#/m/${m.id}">
@@ -91,7 +98,7 @@ export function lobbyScreen(app, { rerender }) {
     <footer class="stats">
       <span>Вращений: <b>${fmt(state.stats.spins)}</b></span>
       <span>Рекорд счёта: <b>${fmt(state.stats.maxBalance)}</b></span>
-      <span>Богатство: <b>${fmt(state.balance + state.stats.shopSpent)}</b></span>
+      <span>Богатство: <b>${fmt(state.balance + state.stats.shopSpent + ownedValue())}</b></span>
       <span>Самый крупный выигрыш: <b>${fmt(state.stats.biggest)}</b>${state.stats.biggestMachine ? ` <i>(${esc(state.stats.biggestMachine)})</i>` : ''}</span>
       <span>Джекпотов: <b>${state.stats.jackpots}</b></span>
       ${state.balance < BETS[0] ? '<button class="gift-btn">🎁 Получить подарок</button>' : ''}
@@ -156,6 +163,14 @@ export function lobbyScreen(app, { rerender }) {
   push();
 
   return { destroy() { clearInterval(timer); } };
+}
+
+// три самые дорогие покупки игрока
+function luxShowcase() {
+  const mine = LUX_ITEMS.filter((it) => state.owned[it.id] !== undefined).sort((a, b) => b.price - a.price);
+  if (!mine.length) return '<em>Пока ничего не куплено</em>';
+  return mine.slice(0, 3).map((it) => `<span class="lb-item" title="${esc(it.name)}">${pic(it.img, '⭐')}</span>`).join('') +
+    `<em>${mine.length} ${plural(mine.length, 'покупка', 'покупки', 'покупок')} · ${fmt(ownedValue())}</em>`;
 }
 
 function lockedCard(m) {

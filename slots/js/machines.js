@@ -16,7 +16,7 @@
 //   «Магнит» 74–90%, «Горячая рука» 76–90%, «Дождь WILD» 71–88% — ни один не окупается полностью.
 
 // Номер версии картинок: картинки кэшируются браузером на неделю — после замены файлов увеличить
-export const V = '?v=3';
+export const V = '?v=4';
 export const asset = (path) => 'assets/' + path + V;
 
 // Общие для всех автоматов значки
@@ -74,6 +74,7 @@ const PAY = {
 const EGYPT_K = 1.15, PIRATE_K = 1.28, SPACE_K = 1.15;
 // новые автоматы чем дороже, тем щедрее
 const CANDY_K = 1.15, VIKING_K = 1.25, AZTEC_K = 1.4;
+const BUNNY_K = 1.15;
 
 export const MACHINES = [
   {
@@ -156,12 +157,41 @@ export const MACHINES = [
       l4: { name: 'Кристалл', emoji: '💎', color: '#8e44ad' },
     },
   },
+  {
+    id: 'bunny',
+    title: 'Весёлые зайчики',
+    tagline: 'Морковки, пасхальные яйца и весенняя поляна',
+    seed: 7707,
+    weights: w({ wild: [0, 1, 1, 1, 0], mystery: [3, 3, 3, 3, 3] }),
+    fsWeights: w({ wild: [0, 2, 2, 2, 0], mystery: [3, 3, 3, 3, 3] }),
+    pay: scale(PAY, BUNNY_K),
+    scatterPay: [0, 0, 0, 2, 10, 50],
+    freeSpins: [0, 0, 0, 9, 11, 13],
+    features: { expand: true, sticky: true, mystery: true },
+    stacks: { mystery: 3 },
+    feature: 'WILD на весь барабан, липкие WILD в бесплатных вращениях и таинственный «?»',
+    // каждый новый зайчик-WILD в бесплатных вращениях добавляет +1 к множителю до конца раунда
+    fs: { mode: 'collect', max: 10, text: 'Каждый новый зайчик-король добавляет +1 к множителю до конца раунда (до ×10), WILD прилипают' },
+    symbols: {
+      wild:    { name: 'Зайчик-король', emoji: '🐰', color: '#f5f5f5', label: 'WILD' },
+      scatter: { name: 'Норка', emoji: '🕳️', color: '#7cb342', label: 'БОНУС' },
+      h1: { name: 'Зайка с цветком', emoji: '🐇', color: '#f48fb1' },
+      h2: { name: 'Зайка с морковкой', emoji: '🐇', color: '#a1887f' },
+      h3: { name: 'Морковка', emoji: '🥕', color: '#ff9800' },
+      l1: { name: 'Пасхальное яйцо', emoji: '🥚', color: '#ab47bc' },
+      l2: { name: 'Корзинка', emoji: '🧺', color: '#8d6e63' },
+      l3: { name: 'Клубника', emoji: '🍓', color: '#e53935' },
+      l4: { name: 'Тюльпан', emoji: '🌷', color: '#fdd835' },
+    },
+  },
+
   // ===== открываются за монеты (price) =====
   {
     id: 'candy',
     title: 'Сладкая страна',
     tagline: 'Леденцы, кексы и мармеладные мишки',
     price: 50000,
+    bets: [20, 40, 100, 200, 500, 1000, 2000, 5000, 10000],
     seed: 4404,
     weights: w({ wild: [0, 1, 1, 1, 0], mystery: [3, 3, 3, 3, 3] }),
     fsWeights: w({ wild: [0, 2, 2, 2, 0], mystery: [3, 3, 3, 3, 3] }),
@@ -190,6 +220,7 @@ export const MACHINES = [
     title: 'Сага викингов',
     tagline: 'Драккары, молот Тора и северное сияние',
     price: 150000,
+    bets: [20, 40, 100, 200, 500, 1000, 2000, 5000, 10000, 20000],
     seed: 5505,
     weights: w({ wild: [0, 1, 1, 1, 0], mystery: [3, 3, 3, 3, 3] }),
     fsWeights: w({ wild: [0, 2, 2, 2, 0], mystery: [3, 3, 3, 3, 3] }),
@@ -217,6 +248,7 @@ export const MACHINES = [
     title: 'Золото ацтеков',
     tagline: 'Храмы джунглей, ягуары и пернатый змей',
     price: 500000,
+    bets: [20, 40, 100, 200, 500, 1000, 2000, 5000, 10000, 25000, 50000],
     seed: 6606,
     weights: w({ wild: [0, 1, 1, 1, 0], mystery: [3, 3, 3, 3, 3] }),
     fsWeights: w({ wild: [0, 2, 2, 2, 0], mystery: [6, 6, 6, 6, 6] }),
@@ -261,6 +293,7 @@ export const RAIN_WILD = 5;        // во сколько раз чаще под
 
 // Ставки (всего за вращение, 20 линий) и стартовые деньги
 export const BETS = [20, 40, 100, 200, 500, 1000, 2000];
+export const betsOf = (m) => (m && m.bets) || BETS; // у новых автоматов ставки крупнее
 export const DEFAULT_BET = 100;
 export const START_BALANCE = 10000;
 export const GIFT = 10000;
@@ -283,6 +316,8 @@ export const JACKPOT_ODDS = {
   4: { mini: 0.20, minor: 0.40, major: 0.30, grand: 0.10 },
 };
 export const JACKPOT_SEED = 50000;
+// Гранд не меньше стольких ставок — иначе при крупной ставке он был бы меньше «Мини»
+export const GRAND_MIN = 500;
 export const JACKPOT_SHARE = 0.02;
 
 // «Выбери сундук»: 12 сундуков, внутри призы (в ставках), «×2 ко всему» и два «Забрать»

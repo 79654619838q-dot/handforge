@@ -561,6 +561,7 @@ table.rating tr.me td { background: rgba(242,193,78,.15); }
   /* на телефоне сначала автоматы, потом колесо, задания и рейтинг */
   .lobby { display: flex; flex-direction: column; }
   .lobby .machines { order: 1; }
+  .lobby .lux-banner { order: 1; margin-bottom: 14px; }
   .lobby .panels { order: 2; margin-bottom: 10px; }
   .lobby .stats, .lobby .warn { order: 3; }
   .panels { grid-template-columns: 1fr; }
@@ -630,4 +631,83 @@ table.rating td.key { font-family: var(--display); color: var(--gold-hi); }
   .shop-item { flex-wrap: wrap; }
   .si-buy { width: 100%; }
   table.rating th:nth-child(5), table.rating td:nth-child(5) { display: none; }
+}
+
+/* ================= магазин роскоши ================= */
+.lux-btn { width: 42px; height: 42px; }
+.lux-btn .lb-ico { width: 30px; height: 30px; font-size: 22px; }
+.lux { overflow-y: auto; display: block; }
+.lux > .bg { position: fixed; }
+.lux .top { position: sticky; top: 0; }
+.lux-title { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-size: 22px; color: var(--gold-hi); text-shadow: 0 0 16px rgba(242,193,78,.5); }
+.lux-title .lt-ico { width: 40px; height: 40px; font-size: 30px; }
+.lux-sum {
+  max-width: 1180px; margin: 18px auto 0; padding: 14px 20px; width: calc(100% - 32px);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 34px; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(40,26,8,.9), rgba(14,9,3,.92)); box-shadow: inset 0 0 0 1.5px rgba(242,193,78,.6), 0 0 30px rgba(242,193,78,.18);
+}
+.lux-sum > div { display: flex; flex-direction: column; }
+.lux-sum span { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--mute); }
+.lux-sum b { font-family: var(--display); font-weight: 400; font-size: 26px; color: var(--gold-hi); }
+.lux-sum p { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--mute); }
+.lux-tabs {
+  position: sticky; top: 62px; z-index: 2; max-width: 1180px; margin: 14px auto 0; padding: 8px 16px;
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin;
+}
+.lux-tab { flex: none; padding: 9px 14px; border-radius: 22px; font-size: 14px; font-weight: 600; white-space: nowrap;
+  background: rgba(10,6,16,.85); box-shadow: inset 0 0 0 1.5px rgba(242,193,78,.4); }
+.lux-tab i { font-style: normal; font-size: 12px; color: var(--mute); margin-left: 4px; }
+.lux-tab.on { background: linear-gradient(180deg, #f5cd5b, #b57b12); color: #2a1600; box-shadow: 0 0 16px rgba(242,193,78,.5); }
+.lux-tab.on i { color: #4a2c00; }
+.lux-grid { max-width: 1180px; margin: 10px auto 40px; padding: 0 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.lux-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 12px 14px; border-radius: 18px; text-align: center;
+  background: linear-gradient(180deg, rgba(30,22,40,.94), rgba(12,8,20,.96)); box-shadow: inset 0 0 0 1.5px rgba(242,193,78,.25), 0 14px 30px -18px #000;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.lux-card:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 2px rgba(242,193,78,.6), 0 0 26px -6px rgba(242,193,78,.5); }
+.lux-card.mine { background: linear-gradient(180deg, rgba(60,44,8,.95), rgba(24,16,4,.96)); box-shadow: inset 0 0 0 2px var(--gold), 0 0 26px -6px rgba(242,193,78,.6); }
+.lux-pic { width: 100%; height: 150px; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 60%, rgba(255,220,140,.16), transparent 70%); }
+.lux-pic .pic { width: 92%; height: 138px; font-size: 72px; filter: drop-shadow(0 10px 14px rgba(0,0,0,.6)); }
+.lux-pic .pic img { max-height: 138px; }
+.lux-card b { font-size: 15px; line-height: 1.25; min-height: 2.5em; display: flex; align-items: center; }
+.lux-price { display: flex; align-items: center; gap: 6px; font-family: var(--display); font-size: 19px; color: var(--gold-hi); }
+.lp-coin { width: 22px; height: 22px; font-size: 16px; }
+.lux-card .btn-gold, .lux-card .ctl { width: 100%; margin-top: 4px; padding: 9px 10px; font-size: 14px; height: auto; }
+.lux-card .btn-gold:disabled { filter: grayscale(.85); opacity: .6; font-size: 12px; }
+.lux-card .ctl.sell { border-radius: 24px; color: #ffd0c0; box-shadow: inset 0 0 0 1.5px rgba(255,140,110,.6); }
+.own-badge { position: absolute; top: 10px; left: 10px; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 800;
+  background: linear-gradient(180deg, #8dff9a, #2e9e45); color: #06240c; box-shadow: 0 0 12px rgba(120,255,150,.5); }
+.lux-empty { grid-column: 1 / -1; text-align: center; color: var(--mute); padding: 40px 0; }
+
+/* витрина в лобби */
+.lux-banner {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap; text-decoration: none;
+  max-width: 1180px; width: calc(100% - 32px); margin: 22px auto 0; padding: 14px 22px; border-radius: 20px;
+  background: linear-gradient(100deg, rgba(60,40,6,.95), rgba(20,12,30,.95)); box-shadow: inset 0 0 0 2px rgba(242,193,78,.7), 0 0 36px rgba(242,193,78,.25);
+  transition: transform .12s ease;
+}
+.lux-banner:hover { transform: translateY(-2px); }
+.lb-left { display: flex; align-items: center; gap: 14px; flex: 1 1 380px; }
+.lb-left b { display: block; font-family: var(--display); font-weight: 400; font-size: 24px; color: var(--gold-hi); }
+.lb-left span { font-size: 14px; color: var(--mute); }
+.lb-big { width: 70px; height: 70px; font-size: 50px; flex: none; animation: bob 3s ease-in-out infinite; }
+.lb-own { display: flex; align-items: center; gap: 8px; }
+.lb-own em { font-style: normal; font-size: 13px; color: var(--gold-hi); white-space: nowrap; }
+.lb-item { width: 64px; height: 52px; border-radius: 10px; background: rgba(255,255,255,.06); display: inline-flex; align-items: center; justify-content: center; }
+.lb-item .pic { width: 92%; height: 92%; font-size: 30px; }
+.lux-banner .play { margin: 0; }
+@media (max-width: 760px) {
+  .lux-title span { display: none; }
+  .lux-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 10px; }
+  .lux-card { padding: 10px 8px; }
+  .lux-card b { font-size: 13px; }
+  .lux-pic { height: 110px; }
+  .lux-pic .pic { height: 100px; }
+  .lux-pic .pic img { max-height: 100px; }
+  .lux-price { font-size: 16px; }
+  .lux-sum b { font-size: 20px; }
+  .lux-tabs { top: 54px; }
+  .lux .lvl-badge { display: none; }
 }

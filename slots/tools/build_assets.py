@@ -5,12 +5,13 @@
 #   assets/bg/<имя>.jpg — фоны;
 #   assets/<автомат>/frame.webp + assets/frames.json — рамка барабанов и где в ней окно;
 #   assets/common/logo.webp, assets/<автомат>/title.webp — надписи-логотипы.
-# python slots/tools/build_assets.py   (чего нет в raw — пропускается)
-import base64, io, json, os
+# python slots/tools/build_assets.py [имена листов…]   (чего нет в raw — пропускается; с именами — только они)
+import base64, io, json, os, sys
 import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+ONLY = set(sys.argv[1:])
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW = os.path.join(os.path.dirname(ROOT), 'slots-art', 'raw')
 OUT = os.path.join(ROOT, 'assets')
@@ -26,18 +27,33 @@ SHEETS = {
     'viking_symbols': ('viking', 3, SYM),
     'aztec_symbols': ('aztec', 3, SYM),
     'shop_icons': ('common', 3, ['boost_x2', 'magnet', 'hot', 'rain_wild', 'lock', 'bag', 'wealth', 'hourglass', 'trophy']),
+    'bunny_symbols': ('bunny', 3, SYM),
+    # магазин роскоши (порядок клеток — как в запросе ChatGPT)
+    'lux_cars': ('lux', 3, ['car_rusty', 'car_city', 'car_sedan', 'car_suv', 'car_muscle', 'car_limo', 'car_coupe', 'car_super', 'car_hyper']),
+    'lux_houses': ('lux', 3, ['house_cabin', 'house_cottage', 'house_family', 'house_glass', 'house_sea', 'house_penthouse', 'house_mansion', 'house_palace', 'house_castle']),
+    'lux_things': ('lux', 3, ['thing_sneakers', 'thing_phone', 'thing_watch', 'thing_bag', 'thing_chain', 'thing_ring', 'thing_painting', 'thing_crown', 'thing_diamond']),
+    'lux_animals_green': ('lux', 3, ['pet_puppy', 'pet_cat', 'pet_parrot', 'pet_chihuahua', 'pet_horse', 'pet_tiger', 'pet_elephant', 'pet_unicorn', 'pet_dragon']),
+    'lux_animals': ('lux', 3, ['pet_puppy', 'pet_cat', 'pet_parrot', 'pet_chihuahua', 'pet_horse', 'pet_tiger', 'pet_elephant', 'pet_unicorn', 'pet_dragon']),
+    'lux_yachts_heli': ('lux', 3, ['boat_rubber', 'boat_speed', 'boat_sail', 'boat_yacht', 'boat_super', 'heli_black', 'heli_light', 'heli_vip', 'heli_gold']),
+    'lux_planes_islands': ('lux', 3, ['plane_prop', 'plane_sea', 'plane_jet', 'plane_liner', 'plane_super', 'plane_space', 'island_palm', 'island_lagoon', 'island_paradise']),
+    'lux_moto': ('lux', 3, ['moto_bike', 'moto_moped', 'moto_scooter', 'moto_dirt', 'moto_cruiser', 'moto_touring', 'moto_sport', 'moto_chopper', 'moto_future']),
 }
 # символы с замкнутыми белыми «окнами» (петля анха, просвет у скарабея) — окна тоже фон
 HOLES = {'egypt/l1', 'egypt/l2'}
+# белые пушистые символы: белое лицо касается белого фона и «вытекало» — закрываем щели и заливаем
+FILL = {'bunny/wild': 10, 'bunny/h1': 6}
 # символы с сиянием вокруг: прозрачность по «белизне» по всей картинке, а не только по краю
 SOFT = {'egypt/scatter'}
+# у вещей магазина роскоши ChatGPT рисует тени на белом — мягкий вырез превращает их в настоящую тень
+SOFT_FOLDERS = {'lux'}
 # надписи, где белое внутри — часть рисунка (белые полоски леденцов), а не дырки букв
-LOGO_KEEP_WHITE = {'title_candy'}
-FRAME_KEEP_WHITE = {'frame_candy'}  # белые полоски леденцовых тростей
-BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby', 'bg_candy': 'candy', 'bg_viking': 'viking', 'bg_aztec': 'aztec'}
-FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space', 'frame_candy': 'candy', 'frame_viking': 'viking', 'frame_aztec': 'aztec'}
+LOGO_KEEP_WHITE = {'title_candy', 'title_bunny'}
+FRAME_KEEP_WHITE = {'frame_candy', 'frame_bunny'}  # белые полоски леденцовых тростей
+FRAME_FILL = {'frame_bunny': 8}  # белые мордочки зайцев касаются фона — закрыть щели
+BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby', 'bg_candy': 'candy', 'bg_viking': 'viking', 'bg_aztec': 'aztec', 'bg_bunny': 'bunny', 'bg_lux': 'lux'}
+FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space', 'frame_candy': 'candy', 'frame_viking': 'viking', 'frame_aztec': 'aztec', 'frame_bunny': 'bunny'}
 LOGOS = {'logo': 'common/logo', 'title_egypt': 'egypt/title', 'title_pirate': 'pirate/title', 'title_space': 'space/title',
-         'title_candy': 'candy/title', 'title_viking': 'viking/title', 'title_aztec': 'aztec/title'}
+         'title_candy': 'candy/title', 'title_viking': 'viking/title', 'title_aztec': 'aztec/title', 'title_bunny': 'bunny/title'}
 
 
 def load(name):
@@ -99,8 +115,27 @@ def soft_rgba(a, mask):
     return Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), 'RGBA')
 
 
-def cutout(a, mask, soft=False):
-    im = soft_rgba(a, mask) if soft else rgba(a, mask)
+def shadow_rgba(a, mask):
+    """Вырез для вещей магазина: серая тень на белом у края — полупрозрачная тёмная тень,
+    а белое и цветное самой вещи остаётся непрозрачным (белые кроссовки и паруса не просвечивают)."""
+    m = a.min(axis=2).astype(np.float32)
+    sat = (a.max(axis=2) - a.min(axis=2)).astype(np.float32)
+    edge = mask & ndimage.binary_dilation(~mask, iterations=22)
+    gray = edge & (sat < 22) & (m < 228)
+    alpha = mask.astype(np.float32)
+    alpha[gray] = np.clip((255 - m[gray]) / 90.0, 0, 1)
+    # кайма в 2 px по-прежнему мягкая
+    band = mask & ndimage.binary_dilation(~mask, iterations=2)
+    alpha[band] = np.minimum(alpha[band], np.clip((255 - m[band]) / 70.0, 0, 1))
+    rgb = a.astype(np.float32)
+    k = np.maximum(alpha, 0.05)[..., None]
+    dec = np.clip((rgb - 255 * (1 - k)) / k, 0, 255)
+    rgb = np.where((alpha < 1)[..., None], dec, rgb)
+    return Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), 'RGBA')
+
+
+def cutout(a, mask, soft=False, shadow=False):
+    im = shadow_rgba(a, mask) if shadow else soft_rgba(a, mask) if soft else rgba(a, mask)
     box = im.getchannel('A').point(lambda v: 255 if v > 24 else 0).getbbox()
     im = im.crop(box)
     pad = int(max(im.size) * 0.03)
@@ -109,13 +144,34 @@ def cutout(a, mask, soft=False):
     return canvas
 
 
-def split(img, n, names, folder, size=420):
+# листы, где соседние предметы слиплись (фон небоскрёба касается виллы) — режем строго по клеткам
+GRID_CUT = {'lux_houses'}
+# листы на зелёном фоне (белые животные на белом сливались) — вырез по зелёному
+GREEN = {'lux_animals_green'}
+
+
+def green_split_rgba(a):
+    """Зелёный фон → прозрачный: мягкая кайма по «зелёности», зелёный отсвет на шерсти убран."""
+    r, g, b = [a[..., i].astype(np.float32) for i in range(3)]
+    greenness = g - np.maximum(r, b)              # у чистого фона ~255, у предмета ≤ 0
+    alpha = np.clip(1 - (greenness - 30) / 90.0, 0, 1)
+    g2 = np.minimum(g, np.maximum(r, b) + 12)     # убрать зелёный отсвет
+    rgb = np.dstack([r, g2, b])
+    return rgb, alpha
+
+
+def split(img, n, names, folder, size=420, grid_cut=False):
     """Лист n×n: каждый кусок предмета относится к клетке, где лежит его центр (предмет может
     чуть вылезать за границу клетки — не режем его пополам)."""
     os.makedirs(os.path.join(OUT, folder), exist_ok=True)
     a = np.asarray(img).astype(np.int16)
     H, W = a.shape[:2]
-    fg = ~background(a)
+    green = grid_cut == 'green'
+    if green:
+        grgb, galpha = green_split_rgba(a)
+        fg = galpha > 0.5
+    else:
+        fg = ~background(a)
     lab, k = ndimage.label(fg)
     idx = range(1, k + 1)
     sizes = ndimage.sum(fg, lab, idx)
@@ -128,30 +184,59 @@ def split(img, n, names, folder, size=420):
         cells.setdefault(r * n + c, []).append(i)
     for j, name in enumerate(names):
         comps = cells.get(j)
-        if not comps:
+        if grid_cut is True:
+            r, c = divmod(j, n)
+            mask = np.zeros_like(fg)
+            mask[r * H // n:(r + 1) * H // n, c * W // n:(c + 1) * W // n] = True
+            mask &= fg
+            # в клетку заходят кусочки соседей — оставить крупное
+            l2, k2 = ndimage.label(mask)
+            if k2 > 1:
+                sz = ndimage.sum(mask, l2, range(1, k2 + 1))
+                mask = np.isin(l2, [i + 1 for i, v in enumerate(sz) if v >= sz.max() * 0.2])
+        elif not comps:
             print(f'  {folder}/{name}: клетка пустая!')
             continue
-        mask = np.isin(lab, comps)
+        else:
+            mask = np.isin(lab, comps)
         key = f'{folder}/{name}'
+        if green:
+            near = ndimage.binary_dilation(mask, iterations=3)
+            al = np.where(near, galpha, 0)
+            im = Image.fromarray(np.dstack([grgb, al * 255]).clip(0, 255).astype(np.uint8), 'RGBA')
+            box = im.getchannel('A').point(lambda v: 255 if v > 24 else 0).getbbox()
+            im = im.crop(box)
+            pad = int(max(im.size) * 0.03)
+            cv = Image.new('RGBA', (im.width + 2 * pad, im.height + 2 * pad), (0, 0, 0, 0)); cv.paste(im, (pad, pad)); im = cv
+            im.thumbnail((size, size), Image.LANCZOS)
+            im.save(os.path.join(OUT, folder, name + '.webp'), quality=90, method=6)
+            print(f'  {folder}/{name}.webp {im.size}')
+            continue
         if key in HOLES:
             mask &= ~holes_too(a, ~mask, 0.0002)
-        im = cutout(a, mask, soft=key in SOFT)
+        if key in FILL:
+            mask = ndimage.binary_fill_holes(ndimage.binary_closing(mask, iterations=FILL[key]))
+        im = cutout(a, mask, soft=key in SOFT, shadow=folder in SOFT_FOLDERS)
         im.thumbnail((size, size), Image.LANCZOS)
         im.save(os.path.join(OUT, folder, name + '.webp'), quality=90, method=6)
         print(f'  {folder}/{name}.webp {im.size}')
 
 
 for raw, (folder, n, names) in SHEETS.items():
+    if ONLY and raw not in ONLY:
+        continue
     img = load(raw)
     if img is None:
         print(f'{raw}: нет файла — пропуск')
         continue
     print(raw, img.size)
-    split(img, n, names, folder, size=520 if folder == 'common' else 420)
+    split(img, n, names, folder, size=520 if folder == 'common' else 420, grid_cut='green' if raw in GREEN else raw in GRID_CUT)
 
 meta_path = os.path.join(OUT, 'frames.json')
 meta = json.load(open(meta_path, encoding='utf-8')) if os.path.exists(meta_path) else {}
 for raw, mid in FRAMES.items():
+    if ONLY and raw not in ONLY:
+        continue
     img = load(raw)
     if img is None:
         print(f'{raw}: нет файла — пропуск')
@@ -165,6 +250,8 @@ for raw, mid in FRAMES.items():
         continue
     win = lab == win_lab
     bg = (background(a) | win) if raw in FRAME_KEEP_WHITE else holes_too(a, background(a) | win)
+    if raw in FRAME_FILL:
+        bg = ~(ndimage.binary_fill_holes(ndimage.binary_closing(~bg, iterations=FRAME_FILL[raw])) & ~win)
     im = rgba(a, ~bg)
     ys, xs = np.where(win)
     x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
@@ -186,6 +273,8 @@ if meta:
     json.dump(meta, open(meta_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 
 for raw, out in LOGOS.items():
+    if ONLY and raw not in ONLY:
+        continue
     img = load(raw)
     if img is None:
         print(f'{raw}: нет файла — пропуск')
@@ -200,6 +289,8 @@ for raw, out in LOGOS.items():
 
 os.makedirs(os.path.join(OUT, 'bg'), exist_ok=True)
 for raw, name in BGS.items():
+    if ONLY and raw not in ONLY:
+        continue
     img = load(raw)
     if img is None:
         print(f'{raw}: нет файла — пропуск')
