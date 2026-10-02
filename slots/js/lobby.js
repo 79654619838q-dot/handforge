@@ -2,7 +2,7 @@
 import { MACHINES, BETS, COMMON, JACKPOTS, asset } from './machines.js';
 import { state, save, ownedValue } from './state.js';
 import { LUX_ITEMS } from './luxury.js';
-import { estateHtml, showcaseOf, chooseAvatar, estateModal } from './estate.js';
+import { estateModal, avatarById } from './estate.js';
 import { sfx } from './audio.js';
 import { storageWorks } from './storage.js';
 import { fmt, esc, plural, Counter, pic, symPic, logoPic, wireAll, modal, hud, topRight, wireTop, giftModal, coinShower, toast } from './ui.js';
@@ -32,12 +32,15 @@ export function lobbyScreen(app, { rerender }) {
       <div class="top-right">${topRight()}</div>
     </header>
     <h1 class="hero">${logoPic(COMMON.logo, 'Золотые <b>барабаны</b>', 'hero-logo')}</h1>
-    <section class="estate-box">
-      ${estateHtml({ avatar: state.avatar, showcase: showcaseOf(state.owned), name: me.name || 'Моё поместье', subtitle: `Уровень ${li.level} · богатство ${fmt(state.balance + state.stats.shopSpent + ownedValue())}`, mine: true })}
-      <div class="es-actions">
-        <button class="ctl es-av">${state.avatar ? 'Сменить аватар' : 'Выбрать аватар'}</button>
-        <a class="btn-gold es-shop" href="#/lux">${pic(COMMON.wealth, '💎', 'btn-ico')} Магазин роскоши · ${Object.keys(state.owned).length} из ${LUX_ITEMS.length}</a>
-      </div>
+    <section class="estate-enter">
+      <a class="ee-card ee-estate" href="#/estate">
+        ${avatarById(state.avatar) ? pic(avatarById(state.avatar).img, '🧑', 'ee-av') : pic(COMMON.trophy, '🏆', 'ee-av')}
+        <div><b>Моё поместье</b><span>Вы и всё купленное одной картинкой: купили дом — стоите на его фоне</span></div>
+      </a>
+      <a class="ee-card ee-shop" href="#/lux">
+        ${pic(COMMON.wealth, '💎', 'ee-av')}
+        <div><b>Магазин роскоши</b><span>Куплено ${Object.keys(state.owned).length} из ${LUX_ITEMS.length} · на ${fmt(ownedValue())}</span></div>
+      </a>
     </section>
     <section class="jp-banner">
       ${pic(COMMON.crown, '👑', 'jp-crown')}
@@ -116,8 +119,6 @@ export function lobbyScreen(app, { rerender }) {
   app.querySelectorAll('a.mcard').forEach((a) => a.addEventListener('click', () => sfx.click()));
   app.querySelectorAll('.mcard.locked').forEach((c) => c.addEventListener('click', () => unlockModal(MACHINES.find((m) => m.id === c.dataset.id), rerender)));
   $('.medals-btn').addEventListener('click', () => { sfx.click(); medalsModal(); });
-  $('.es-av').addEventListener('click', () => chooseAvatar(() => { push(true); rerender(); }));
-  app.querySelector('.estate .es-noav')?.addEventListener('click', () => chooseAvatar(() => { push(true); rerender(); }));
 
   // колесо удачи
   const whState = $('.wh-state'), whGo = $('.wh-go');

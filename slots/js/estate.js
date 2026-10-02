@@ -1,9 +1,10 @@
-// «Моё поместье»: одна картинка — аватар игрока и лучшее из купленного в магазине роскоши.
-// Из каждого раздела сама встаёт самая дорогая вещь. Та же картинка показывается чужим игрокам из рейтинга.
-import { asset, COMMON } from './machines.js';
+// «Моё поместье»: картинка только из купленного. Купил дом — стоишь на его фоне; купил остров дороже дома —
+// стоишь на острове; машина, мотоцикл, яхта, самолёт, вертолёт, питомец и драгоценность добавляются поверх.
+// Ничего не куплено — только аватар в пустом тёмном зале. Из каждого раздела встаёт самая дорогая вещь.
+import { asset } from './machines.js';
 import { state, save } from './state.js';
 import { LUX_CATS, luxById } from './luxury.js';
-import { modal, pic, esc, fmt, wireAll } from './ui.js';
+import { modal, pic, esc, wireAll } from './ui.js';
 import { sfx } from './audio.js';
 
 export const AVATARS = [
@@ -13,17 +14,17 @@ export const AVATARS = [
 ].map((a) => ({ ...a, img: asset(`avatars/${a.id}.webp`) }));
 export const avatarById = (id) => AVATARS.find((a) => a.id === id);
 
-// Где на картинке стоит вещь каждого раздела (в процентах от сцены 3:2).
-// z — что ближе к зрителю; bottom считаем от низа, вещь стоит «на земле» нижним краем.
+const PLACES = ['houses', 'islands']; // эти разделы — фон картинки
+
+// Где стоит вещь каждого раздела (в процентах от сцены 3:2). Сцены домов и островов нарисованы так,
+// что нижняя треть — пустая площадка, справа посередине вода, вверху чистое небо.
 const SLOTS = {
-  planes:  { left: 3, top: 5, w: 26, h: 22, z: 1 },
-  heli:    { right: 5, top: 3, w: 17, h: 18, z: 1 },
-  islands: { left: 3, bottom: 45, w: 19, h: 12, z: 1 },   // на горизонте (фон: горизонт на половине высоты)
-  yachts:  { right: 3, bottom: 33, w: 29, h: 20, z: 2 },   // на море
-  houses:  { left: 27, bottom: 28, w: 40, h: 42, z: 3 },   // на газоне
+  planes:  { left: 3, top: 4, w: 25, h: 21, z: 1 },
+  heli:    { right: 4, top: 3, w: 17, h: 18, z: 1 },
+  yachts:  { right: 2, bottom: 34, w: 27, h: 19, z: 2 },
   cars:    { left: 2, bottom: 3, w: 31, h: 26, z: 4 },
-  moto:    { left: 28, bottom: 5, w: 17, h: 19, z: 5 },
-  animals: { right: 21, bottom: 3, w: 14, h: 22, z: 6 },
+  moto:    { left: 29, bottom: 4, w: 16, h: 19, z: 5 },
+  animals: { right: 20, bottom: 3, w: 14, h: 22, z: 6 },
 };
 const CAT_EMOJI = Object.fromEntries(LUX_CATS.map((c) => [c.id, c.emoji]));
 
@@ -37,17 +38,24 @@ export function showcaseOf(owned) {
   return out;
 }
 
+// фон — самое дорогое из купленных домов и островов
+function placeOf(items) {
+  return items.filter((it) => PLACES.includes(it.cat)).sort((a, b) => b.price - a.price)[0] || null;
+}
+
 // сцена: avatar — id аватара, showcase — список id вещей, name/subtitle — подпись
 export function estateHtml({ avatar, showcase = [], name = '', subtitle = '', mine = false }) {
   const items = showcase.map(luxById).filter(Boolean);
-  const byCat = Object.fromEntries(items.map((it) => [it.cat, it]));
+  const place = placeOf(items);
+  const byCat = Object.fromEntries(items.filter((it) => !PLACES.includes(it.cat)).map((it) => [it.cat, it]));
   const pos = (s) => Object.entries(s).filter(([k]) => ['left', 'right', 'top', 'bottom'].includes(k)).map(([k, v]) => `${k}:${v}%`).join(';');
   const objs = Object.entries(SLOTS).filter(([cat]) => byCat[cat]).map(([cat, s]) =>
     `<div class="es-obj es-${cat}" style="${pos(s)};width:${s.w}%;height:${s.h}%;z-index:${s.z}" title="${esc(byCat[cat].name)}">${pic(byCat[cat].img, CAT_EMOJI[cat])}</div>`).join('');
   const thing = byCat.things;
   const av = avatarById(avatar);
+  const bg = place ? `style="--img:url(${place.scene})"` : '';
   return `
-    <div class="estate ${mine ? 'mine' : ''}" style="--img:url(${asset('bg/estate.jpg')})">
+    <div class="estate ${place ? '' : 'studio'} ${mine ? 'mine' : ''}" ${bg}>
       ${objs}
       <div class="es-avatar" style="z-index:5">${av ? pic(av.img, '🧑') : `<span class="es-noav">${mine ? 'Выберите аватар' : ''}</span>`}</div>
       ${thing ? `<div class="es-thing" title="${esc(thing.name)}">${pic(thing.img, '💎')}</div>` : ''}
@@ -55,7 +63,7 @@ export function estateHtml({ avatar, showcase = [], name = '', subtitle = '', mi
         <b>${esc(name || 'Моё поместье')}</b>
         <span>${subtitle}</span>
       </div>
-      ${mine && !items.length ? '<div class="es-hint">Купите что-нибудь в магазине роскоши — дом, машину, яхту… — и это появится здесь</div>' : ''}
+      ${mine && !place ? `<div class="es-hint">${items.length ? 'Купите дом или остров — и вы будете стоять на его фоне' : 'Пока здесь только вы. Купите дом, машину, яхту… — и всё появится на картинке'}</div>` : ''}
     </div>`;
 }
 
@@ -75,11 +83,16 @@ export function chooseAvatar(after) {
   }));
 }
 
+// список того, что стоит на картинке
+export function showcaseList(showcase) {
+  return (showcase || []).map(luxById).filter(Boolean)
+    .map((it) => `<span>${pic(it.thumb || it.img, CAT_EMOJI[it.cat], 'el-ico')}${esc(it.name)}</span>`).join('');
+}
+
 // чужое (или своё) поместье во весь экран
 export function estateModal(p) {
   const { el } = modal(`<button class="x">✕</button>${estateHtml(p)}
-    <div class="es-list">${(p.showcase || []).map(luxById).filter(Boolean).map((it) => `<span>${pic(it.img, CAT_EMOJI[it.cat], 'el-ico')}${esc(it.name)}</span>`).join('') || '<em>Пока ничего не куплено</em>'}</div>`,
+    <div class="es-list">${showcaseList(p.showcase) || '<em>Пока ничего не куплено</em>'}</div>`,
     { cls: 'estate-modal', closeOnBg: true });
   wireAll(el);
 }
-

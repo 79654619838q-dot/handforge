@@ -4,6 +4,8 @@
 import { asset } from './machines.js';
 
 const I = (id, name, price) => ({ id, name, price, img: asset(`lux/${id}.webp`) });
+// дома и острова — ещё и сцена во весь фон поместья (scenes/<id>.jpg) и её уменьшенная копия для магазина
+const SCENE_CATS = ['houses', 'islands'];
 
 export const LUX_CATS = [
   { id: 'cars', name: 'Машины', emoji: '🚗', items: [
@@ -50,7 +52,10 @@ export const LUX_CATS = [
   ] },
 ];
 
-for (const c of LUX_CATS) c.items.sort((a, b) => a.price - b.price);
+for (const c of LUX_CATS) {
+  c.items.sort((a, b) => a.price - b.price);
+  if (SCENE_CATS.includes(c.id)) for (const it of c.items) { it.scene = asset(`scenes/${it.id}.jpg`); it.thumb = asset(`scenes/${it.id}_t.jpg`); }
+}
 
 export const LUX_ITEMS = LUX_CATS.flatMap((c) => c.items.map((it) => ({ ...it, cat: c.id })));
 export const luxById = (id) => LUX_ITEMS.find((x) => x.id === id);

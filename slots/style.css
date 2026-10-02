@@ -741,7 +741,8 @@ table.rating td.key { font-family: var(--display); color: var(--gold-hi); }
   background: rgba(10,6,16,.72); box-shadow: inset 0 0 0 1.5px rgba(242,193,78,.6); backdrop-filter: blur(3px); }
 .es-plate b { font-family: var(--display); font-weight: 400; font-size: clamp(16px, 2vw, 26px); color: var(--gold-hi); }
 .es-plate span { font-size: clamp(11px, 1.1vw, 14px); color: #f3ecd9; }
-.estate .es-planes ~ .es-plate { top: auto; bottom: 3%; } /* самолёт слева вверху — подпись вниз */
+/* подпись — наверху по центру, в небе: внизу стоят машина и питомец, по углам неба — самолёт и вертолёт */
+.estate .es-plate { left: 50%; transform: translateX(-50%); top: 2.5%; align-items: center; text-align: center; white-space: nowrap; }
 .es-hint { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); z-index: 10; padding: 8px 16px; border-radius: 14px; font-size: 14px; text-align: center; max-width: 80%;
   background: rgba(10,6,16,.75); color: #fff; }
 .es-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
@@ -780,3 +781,41 @@ table.rating td.r-name { display: flex; align-items: center; gap: 8px; }
   .hero { margin-top: 10px; }
   .hero .logo-pic img { max-height: 110px; }
 }
+
+/* ================= раздел «Моё поместье» ================= */
+.estate-screen { overflow-y: auto; display: block; }
+.estate-screen > .bg { position: fixed; }
+.estate-screen .top { position: sticky; top: 0; }
+.estate-screen .estate-box { margin-top: 18px; }
+.estate-screen .estate { max-height: 74vh; }
+.es-info { max-width: 1180px; width: calc(100% - 32px); margin: 14px auto 40px; padding: 14px 18px; border-radius: 18px; text-align: center;
+  background: rgba(14,9,20,.85); box-shadow: inset 0 0 0 1.5px rgba(242,193,78,.35); }
+.es-info p { margin: 0 0 8px; color: var(--mute); font-size: 14px; }
+.es-info p b { color: var(--gold-hi); }
+/* ничего не куплено: пустой тёмный зал с прожектором */
+.estate.studio { background-color: #0d0914; background-image:
+  radial-gradient(ellipse 40% 55% at 50% 30%, rgba(255,230,160,.22), transparent 70%),
+  linear-gradient(180deg, #150e22 0%, #120b1c 62%, #2a1d10 62.2%, #1a1209 100%); }
+.estate.studio::before { content: ""; position: absolute; left: 30%; right: 30%; bottom: 2%; height: 8%; border-radius: 50%; background: radial-gradient(ellipse, rgba(255,220,140,.35), transparent 70%); }
+.estate.studio .es-yachts { bottom: 4%; right: 3%; }
+/* вход в раздел из лобби */
+.estate-enter { max-width: 1180px; width: calc(100% - 32px); margin: 20px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ee-card { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-radius: 20px; text-decoration: none; transition: transform .12s ease;
+  background: linear-gradient(100deg, rgba(60,40,6,.95), rgba(20,12,30,.95)); box-shadow: inset 0 0 0 2px rgba(242,193,78,.7), 0 0 30px rgba(242,193,78,.2); }
+.ee-card:hover { transform: translateY(-2px); }
+.ee-card b { display: block; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--gold-hi); }
+.ee-card span { font-size: 14px; color: var(--mute); }
+.ee-av { width: 64px; height: 86px; font-size: 46px; flex: none; }
+.ee-shop .ee-av { height: 64px; }
+/* в магазине дома и острова — их сцена */
+.lux-pic.scene .pic { width: 100%; height: 138px; }
+.lux-pic.scene .pic img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 0 0 1.5px rgba(242,193,78,.4); }
+.lux-sum .lux-to-estate { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; text-decoration: none; font-size: 14px; }
+@media (max-width: 760px) {
+  .estate-enter { grid-template-columns: 1fr; }
+  .ee-card { padding: 10px 14px; }
+  .ee-card b { font-size: 18px; }
+  .lux-pic.scene .pic { height: 100px; }
+}
+.top5 li span.r-av { flex: none; width: 24px; height: 28px; }
+.top5 li span.r-av.none { width: 24px; }

@@ -51,6 +51,9 @@ SOFT_FOLDERS = {'lux'}
 LOGO_KEEP_WHITE = {'title_candy', 'title_bunny'}
 FRAME_KEEP_WHITE = {'frame_candy', 'frame_bunny'}  # белые полоски леденцовых тростей
 FRAME_FILL = {'frame_bunny': 8}  # белые мордочки зайцев касаются фона — закрыть щели
+# сцены домов и островов — фон поместья: scenes/<id>.jpg и уменьшенная scenes/<id>_t.jpg для магазина
+SCENES = {f'scene_{k}': k for k in ['house_cabin', 'house_cottage', 'house_family', 'house_glass', 'house_sea', 'house_penthouse',
+                                     'house_mansion', 'house_palace', 'house_castle', 'island_palm', 'island_lagoon', 'island_paradise']}
 BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby', 'bg_candy': 'candy', 'bg_viking': 'viking', 'bg_aztec': 'aztec', 'bg_bunny': 'bunny', 'bg_lux': 'lux', 'bg_estate': 'estate'}
 FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space', 'frame_candy': 'candy', 'frame_viking': 'viking', 'frame_aztec': 'aztec', 'frame_bunny': 'bunny'}
 LOGOS = {'logo': 'common/logo', 'title_egypt': 'egypt/title', 'title_pirate': 'pirate/title', 'title_space': 'space/title',
@@ -287,6 +290,19 @@ for raw, out in LOGOS.items():
     os.makedirs(os.path.dirname(os.path.join(OUT, out)), exist_ok=True)
     im.save(os.path.join(OUT, out + '.webp'), quality=90, method=6)
     print(f'  {out}.webp {im.size}')
+
+os.makedirs(os.path.join(OUT, 'scenes'), exist_ok=True)
+for raw, sid in SCENES.items():
+    if ONLY and raw not in ONLY:
+        continue
+    img = load(raw)
+    if img is None:
+        continue
+    big = img.copy(); big.thumbnail((1920, 1920), Image.LANCZOS)
+    big.save(os.path.join(OUT, 'scenes', sid + '.jpg'), quality=84, optimize=True, progressive=True)
+    small = img.copy(); small.thumbnail((480, 480), Image.LANCZOS)
+    small.save(os.path.join(OUT, 'scenes', sid + '_t.jpg'), quality=80, optimize=True)
+    print(f'  scenes/{sid}.jpg {big.size}')
 
 os.makedirs(os.path.join(OUT, 'bg'), exist_ok=True)
 for raw, name in BGS.items():
