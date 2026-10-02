@@ -2,6 +2,7 @@
 // Игрок — случайный номер в браузере + имя, которое он ввёл сам.
 import { ls } from './storage.js';
 import { state, wealth as wealthNow } from './state.js';
+import { showcaseOf } from './estate.js';
 
 const KEY = 'slots.player';
 
@@ -30,7 +31,8 @@ export function push(force = false) {
   if (!p.name) return Promise.resolve(false);
   const best = state.stats.maxBalance;
   const wealth = wealthNow();
-  const key = best + ':' + wealth;
+  const showcase = showcaseOf(state.owned);
+  const key = best + ':' + wealth + ':' + state.avatar + ':' + showcase.join(',');
   if (!force && key === lastBest && Date.now() - lastSent < 60000) return Promise.resolve(false);
   const wait = 12000 - (Date.now() - lastSent);
   if (wait > 0) {
@@ -42,7 +44,7 @@ export function push(force = false) {
   return fetch('api/rating', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: p.id, name: p.name, best, wealth, balance: state.balance, spins: state.stats.spins, jackpots: state.stats.jackpots, level: state.level }),
+    body: JSON.stringify({ id: p.id, name: p.name, best, wealth, balance: state.balance, spins: state.stats.spins, jackpots: state.stats.jackpots, level: state.level, avatar: state.avatar, showcase }),
   }).then((r) => r.ok).catch(() => false);
 }
 

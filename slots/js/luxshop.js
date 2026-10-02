@@ -5,7 +5,8 @@ import { sfx } from './audio.js';
 import { fmt, esc, pic, wireAll, hud, topRight, wireTop, toast, coinShower } from './ui.js';
 import { LUX_CATS, LUX_ITEMS } from './luxury.js';
 import { levelInfo, track, flush } from './meta.js';
-import { push } from './rating.js';
+import { push, player } from './rating.js';
+import { estateHtml, showcaseOf, chooseAvatar } from './estate.js';
 
 const owns = (id) => state.owned[id] !== undefined;
 
@@ -19,6 +20,7 @@ export function luxScreen(app, { onLevel }) {
       <div class="lux-title">${pic(COMMON.wealth, '💎', 'lt-ico')}<span>Магазин роскоши</span></div>
       <div class="top-right">${topRight()}</div>
     </header>
+    <section class="estate-box lux-estate"></section>
     <section class="lux-sum"></section>
     <nav class="lux-tabs"></nav>
     <section class="lux-grid"></section>
@@ -27,6 +29,13 @@ export function luxScreen(app, { onLevel }) {
   wireTop(app, { levelInfo, onLevel });
   const $ = (s) => app.querySelector(s);
   const sum = $('.lux-sum'), tabs = $('.lux-tabs'), grid = $('.lux-grid');
+
+  const estate = $('.lux-estate');
+  function renderEstate() {
+    estate.innerHTML = estateHtml({ avatar: state.avatar, showcase: showcaseOf(state.owned), name: player().name || 'Моё поместье', subtitle: `Владения на ${fmt(ownedValue())}`, mine: true });
+    wireAll(estate);
+    estate.querySelector('.es-noav')?.addEventListener('click', () => chooseAvatar(() => { push(true); renderEstate(); }));
+  }
 
   function renderSum() {
     const n = Object.keys(state.owned).length;
@@ -73,7 +82,7 @@ export function luxScreen(app, { onLevel }) {
     grid.querySelectorAll('.sell').forEach((b) => b.addEventListener('click', () => sell(b.dataset.id)));
   }
 
-  function refresh() { renderSum(); renderTabs(); renderGrid(); hud.bal.set(state.balance, 500); push(); }
+  function refresh() { renderEstate(); renderSum(); renderTabs(); renderGrid(); hud.bal.set(state.balance, 500); push(); }
 
   function buy(id) {
     const it = LUX_ITEMS.find((x) => x.id === id);

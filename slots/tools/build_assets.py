@@ -32,6 +32,7 @@ SHEETS = {
     'lux_cars': ('lux', 3, ['car_rusty', 'car_city', 'car_sedan', 'car_suv', 'car_muscle', 'car_limo', 'car_coupe', 'car_super', 'car_hyper']),
     'lux_houses': ('lux', 3, ['house_cabin', 'house_cottage', 'house_family', 'house_glass', 'house_sea', 'house_penthouse', 'house_mansion', 'house_palace', 'house_castle']),
     'lux_things': ('lux', 3, ['thing_sneakers', 'thing_phone', 'thing_watch', 'thing_bag', 'thing_chain', 'thing_ring', 'thing_painting', 'thing_crown', 'thing_diamond']),
+    'avatars_green': ('avatars', 3, ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9']),
     'lux_animals_green': ('lux', 3, ['pet_puppy', 'pet_cat', 'pet_parrot', 'pet_chihuahua', 'pet_horse', 'pet_tiger', 'pet_elephant', 'pet_unicorn', 'pet_dragon']),
     'lux_animals': ('lux', 3, ['pet_puppy', 'pet_cat', 'pet_parrot', 'pet_chihuahua', 'pet_horse', 'pet_tiger', 'pet_elephant', 'pet_unicorn', 'pet_dragon']),
     'lux_yachts_heli': ('lux', 3, ['boat_rubber', 'boat_speed', 'boat_sail', 'boat_yacht', 'boat_super', 'heli_black', 'heli_light', 'heli_vip', 'heli_gold']),
@@ -50,7 +51,7 @@ SOFT_FOLDERS = {'lux'}
 LOGO_KEEP_WHITE = {'title_candy', 'title_bunny'}
 FRAME_KEEP_WHITE = {'frame_candy', 'frame_bunny'}  # белые полоски леденцовых тростей
 FRAME_FILL = {'frame_bunny': 8}  # белые мордочки зайцев касаются фона — закрыть щели
-BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby', 'bg_candy': 'candy', 'bg_viking': 'viking', 'bg_aztec': 'aztec', 'bg_bunny': 'bunny', 'bg_lux': 'lux'}
+BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby', 'bg_candy': 'candy', 'bg_viking': 'viking', 'bg_aztec': 'aztec', 'bg_bunny': 'bunny', 'bg_lux': 'lux', 'bg_estate': 'estate'}
 FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space', 'frame_candy': 'candy', 'frame_viking': 'viking', 'frame_aztec': 'aztec', 'frame_bunny': 'bunny'}
 LOGOS = {'logo': 'common/logo', 'title_egypt': 'egypt/title', 'title_pirate': 'pirate/title', 'title_space': 'space/title',
          'title_candy': 'candy/title', 'title_viking': 'viking/title', 'title_aztec': 'aztec/title', 'title_bunny': 'bunny/title'}
@@ -147,7 +148,7 @@ def cutout(a, mask, soft=False, shadow=False):
 # листы, где соседние предметы слиплись (фон небоскрёба касается виллы) — режем строго по клеткам
 GRID_CUT = {'lux_houses'}
 # листы на зелёном фоне (белые животные на белом сливались) — вырез по зелёному
-GREEN = {'lux_animals_green'}
+GREEN = {'lux_animals_green', 'avatars_green'}
 
 
 def green_split_rgba(a):

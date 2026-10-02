@@ -2,6 +2,7 @@
 import { MACHINES, BETS, COMMON, JACKPOTS, asset } from './machines.js';
 import { state, save, ownedValue } from './state.js';
 import { LUX_ITEMS } from './luxury.js';
+import { estateHtml, showcaseOf, chooseAvatar, estateModal } from './estate.js';
 import { sfx } from './audio.js';
 import { storageWorks } from './storage.js';
 import { fmt, esc, plural, Counter, pic, symPic, logoPic, wireAll, modal, hud, topRight, wireTop, giftModal, coinShower, toast } from './ui.js';
@@ -31,6 +32,13 @@ export function lobbyScreen(app, { rerender }) {
       <div class="top-right">${topRight()}</div>
     </header>
     <h1 class="hero">${logoPic(COMMON.logo, 'Золотые <b>барабаны</b>', 'hero-logo')}</h1>
+    <section class="estate-box">
+      ${estateHtml({ avatar: state.avatar, showcase: showcaseOf(state.owned), name: me.name || 'Моё поместье', subtitle: `Уровень ${li.level} · богатство ${fmt(state.balance + state.stats.shopSpent + ownedValue())}`, mine: true })}
+      <div class="es-actions">
+        <button class="ctl es-av">${state.avatar ? 'Сменить аватар' : 'Выбрать аватар'}</button>
+        <a class="btn-gold es-shop" href="#/lux">${pic(COMMON.wealth, '💎', 'btn-ico')} Магазин роскоши · ${Object.keys(state.owned).length} из ${LUX_ITEMS.length}</a>
+      </div>
+    </section>
     <section class="jp-banner">
       ${pic(COMMON.crown, '👑', 'jp-crown')}
       <div>
@@ -72,11 +80,6 @@ export function lobbyScreen(app, { rerender }) {
       </div>
     </section>
 
-    <a class="lux-banner" href="#/lux">
-      <div class="lb-left">${pic(COMMON.wealth, '💎', 'lb-big')}<div><b>Магазин роскоши</b><span>Машины, дома, яхты, вертолёты, самолёты, острова, животные и вещи — ${LUX_ITEMS.length} покупок. Продать можно за полную цену.</span></div></div>
-      <div class="lb-own">${luxShowcase()}</div>
-      <span class="play">Открыть</span>
-    </a>
 
     <section class="machines">
       ${MACHINES.map((m) => isLocked(m) ? lockedCard(m) : `
@@ -113,6 +116,8 @@ export function lobbyScreen(app, { rerender }) {
   app.querySelectorAll('a.mcard').forEach((a) => a.addEventListener('click', () => sfx.click()));
   app.querySelectorAll('.mcard.locked').forEach((c) => c.addEventListener('click', () => unlockModal(MACHINES.find((m) => m.id === c.dataset.id), rerender)));
   $('.medals-btn').addEventListener('click', () => { sfx.click(); medalsModal(); });
+  $('.es-av').addEventListener('click', () => chooseAvatar(() => { push(true); rerender(); }));
+  app.querySelector('.estate .es-noav')?.addEventListener('click', () => chooseAvatar(() => { push(true); rerender(); }));
 
   // колесо удачи
   const whState = $('.wh-state'), whGo = $('.wh-go');
@@ -148,9 +153,11 @@ export function lobbyScreen(app, { rerender }) {
     loadTop(by).then((d) => {
       if (!top5.isConnected || want !== by) return;
       if (!d) { top5.innerHTML = '<li class="muted">Рейтинг сейчас недоступен</li>'; return; }
-      const rows = d.top.slice(0, 5).map((r) => `<li class="${r.me ? 'me' : ''}"><i>${r.place}</i><span>${esc(r.name)}</span><b>${fmt(r[by])}</b></li>`);
-      if (d.me && d.me.place > 5) rows.push(`<li class="me"><i>${d.me.place}</i><span>${esc(d.me.name)} (вы)</span><b>${fmt(d.me[by])}</b></li>`);
-      top5.innerHTML = rows.join('') || '<li class="muted">Пока никого — будьте первым!</li>';
+      const list = d.top.slice(0, 5);
+      if (d.me && d.me.place > 5) list.push({ ...d.me, me: true, you: true });
+      top5.innerHTML = list.map((r, i) => `<li class="${r.me ? 'me' : ''}" data-i="${i}" title="Посмотреть поместье"><i>${r.place}</i>${avMini(r.avatar)}<span>${esc(r.name)}${r.you ? ' (вы)' : ''}</span><b>${fmt(r[by])}</b></li>`).join('') || '<li class="muted">Пока никого — будьте первым!</li>';
+      wireAll(top5);
+      top5.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => { sfx.click(); showEstateOf(list[li.dataset.i]); }));
     });
   };
   app.querySelectorAll('.rating-card .r-tab').forEach((t) => t.addEventListener('click', () => {
@@ -163,14 +170,6 @@ export function lobbyScreen(app, { rerender }) {
   push();
 
   return { destroy() { clearInterval(timer); } };
-}
-
-// три самые дорогие покупки игрока
-function luxShowcase() {
-  const mine = LUX_ITEMS.filter((it) => state.owned[it.id] !== undefined).sort((a, b) => b.price - a.price);
-  if (!mine.length) return '<em>Пока ничего не куплено</em>';
-  return mine.slice(0, 3).map((it) => `<span class="lb-item" title="${esc(it.name)}">${pic(it.img, '⭐')}</span>`).join('') +
-    `<em>${mine.length} ${plural(mine.length, 'покупка', 'покупки', 'покупок')} · ${fmt(ownedValue())}</em>`;
 }
 
 function lockedCard(m) {
@@ -219,6 +218,11 @@ export function unlockModal(m, after) {
   });
 }
 
+const avMini = (id) => (id ? pic(asset(`avatars/${id}.webp`), '🧑', 'r-av') : '<span class="r-av none"></span>');
+function showEstateOf(r) {
+  estateModal({ avatar: r.avatar, showcase: r.showcase || [], name: r.name, subtitle: `Место ${r.place} · рекорд ${fmt(r.best)} · богатство ${fmt(r.wealth)}` });
+}
+
 export function medalsModal() {
   const li = levelInfo();
   const levels = [];
@@ -240,6 +244,7 @@ export function ratingModal(start = 'best') {
     <h2>Рейтинг игроков</h2>
     <div class="r-tabs big"><button class="r-tab" data-by="best">Рекорд</button><button class="r-tab" data-by="wealth">Самый богатый</button></div>
     <p class="sub r-note"></p>
+    <p class="sub">Нажмите на игрока — откроется его поместье.</p>
     <table class="rating"><thead><tr><th>#</th><th>Игрок</th><th>Рекорд</th><th>Богатство</th><th>Сейчас</th><th>Ур.</th></tr></thead><tbody></tbody></table>`, { cls: 'rating-modal', closeOnBg: true });
   const body = el.querySelector('tbody');
   const show = async (by) => {
@@ -248,8 +253,11 @@ export function ratingModal(start = 'best') {
     body.innerHTML = '<tr><td colspan="6">Загружаю…</td></tr>';
     const d = await loadTop(by);
     if (!d) { body.innerHTML = '<tr><td colspan="6">Рейтинг сейчас недоступен</td></tr>'; return; }
-    const row = (r) => `<tr class="${r.me ? 'me' : ''}"><td>${r.place}</td><td>${esc(r.name)}</td><td class="${by === 'best' ? 'key' : ''}">${fmt(r.best)}</td><td class="${by === 'wealth' ? 'key' : ''}">${fmt(r.wealth)}</td><td>${fmt(r.balance)}</td><td>${r.level}</td></tr>`;
-    body.innerHTML = d.top.map(row).join('') + (d.me && d.me.place > d.top.length ? row({ ...d.me, me: true }) : '') || '<tr><td colspan="6">Пока никого — будьте первым!</td></tr>';
+    const row = (r) => `<tr class="${r.me ? 'me' : ''}" data-p="${r.place}"><td>${r.place}</td><td class="r-name">${avMini(r.avatar)}${esc(r.name)}</td><td class="${by === 'best' ? 'key' : ''}">${fmt(r.best)}</td><td class="${by === 'wealth' ? 'key' : ''}">${fmt(r.wealth)}</td><td>${fmt(r.balance)}</td><td>${r.level}</td></tr>`;
+    const all = d.top.concat(d.me && d.me.place > d.top.length ? [{ ...d.me, me: true }] : []);
+    body.innerHTML = all.map(row).join('') || '<tr><td colspan="6">Пока никого — будьте первым!</td></tr>';
+    wireAll(body);
+    body.querySelectorAll('tr[data-p]').forEach((tr) => tr.addEventListener('click', () => { sfx.click(); showEstateOf(all.find((x) => String(x.place) === tr.dataset.p)); }));
   };
   el.querySelectorAll('.r-tab').forEach((t) => t.addEventListener('click', () => { sfx.click(); show(t.dataset.by); }));
   show(start);

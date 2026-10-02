@@ -711,3 +711,72 @@ table.rating td.key { font-family: var(--display); color: var(--gold-hi); }
   .lux-tabs { top: 54px; }
   .lux .lvl-badge { display: none; }
 }
+
+/* ================= «Моё поместье»: аватар и лучшие покупки одной картинкой ================= */
+.estate-box { max-width: 1180px; width: calc(100% - 32px); margin: 20px auto 0; }
+.estate {
+  position: relative; width: 100%; aspect-ratio: 3 / 2; max-height: 70vh; margin: 0 auto; overflow: hidden; border-radius: 22px;
+  background-color: #6fb6e8; background-image: var(--img, none), linear-gradient(#7cc4f0 0 48%, #2a9fd0 48% 62%, #5aa945 62%);
+  background-size: cover; background-position: center;
+  box-shadow: inset 0 0 0 2px rgba(242,193,78,.75), 0 0 40px rgba(242,193,78,.25), 0 24px 50px -24px #000;
+}
+.estate::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 9;
+  background: radial-gradient(ellipse at 50% 55%, transparent 60%, rgba(0,0,0,.35)); }
+.es-obj { position: absolute; display: flex; align-items: flex-end; justify-content: center; }
+.es-obj .pic { width: 100%; height: 100%; font-size: 3.2vw; }
+.es-obj .pic img { object-position: center bottom; filter: drop-shadow(0 10px 12px rgba(0,0,0,.45)); }
+.es-planes .pic img, .es-heli .pic img { object-position: center center; filter: drop-shadow(0 18px 16px rgba(0,0,0,.25)); animation: es-fly 6s ease-in-out infinite; }
+.es-heli .pic img { animation-duration: 4s; }
+.es-yachts .pic img { animation: es-float 4s ease-in-out infinite; }
+@keyframes es-fly { 50% { transform: translateY(-6%) translateX(2%); } }
+@keyframes es-float { 50% { transform: translateY(3%) rotate(-1deg); } }
+.es-avatar { position: absolute; left: 44%; bottom: 2%; width: 17%; height: 62%; display: flex; align-items: flex-end; justify-content: center; }
+.es-avatar .pic { width: 100%; height: 100%; font-size: 6vw; }
+.es-avatar .pic img { object-position: center bottom; filter: drop-shadow(0 12px 14px rgba(0,0,0,.5)); }
+.es-noav { cursor: pointer; margin-bottom: 30%; padding: 10px 16px; border-radius: 16px; font-weight: 800; font-size: 15px; text-align: center;
+  background: rgba(10,6,16,.8); box-shadow: inset 0 0 0 2px var(--gold); color: var(--gold-hi); animation: hot 1.2s ease-in-out infinite alternate; }
+.es-thing { position: absolute; left: 59%; bottom: 40%; width: 9%; height: 14%; z-index: 7; animation: es-fly 3s ease-in-out infinite; }
+.es-thing .pic { width: 100%; height: 100%; font-size: 3vw; filter: drop-shadow(0 0 12px rgba(255,230,120,.9)); }
+.es-plate { position: absolute; left: 2%; top: 3%; z-index: 10; padding: 8px 16px; border-radius: 14px; display: flex; flex-direction: column;
+  background: rgba(10,6,16,.72); box-shadow: inset 0 0 0 1.5px rgba(242,193,78,.6); backdrop-filter: blur(3px); }
+.es-plate b { font-family: var(--display); font-weight: 400; font-size: clamp(16px, 2vw, 26px); color: var(--gold-hi); }
+.es-plate span { font-size: clamp(11px, 1.1vw, 14px); color: #f3ecd9; }
+.estate .es-planes ~ .es-plate { top: auto; bottom: 3%; } /* самолёт слева вверху — подпись вниз */
+.es-hint { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); z-index: 10; padding: 8px 16px; border-radius: 14px; font-size: 14px; text-align: center; max-width: 80%;
+  background: rgba(10,6,16,.75); color: #fff; }
+.es-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.es-actions .btn-gold { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 15px; }
+.es-actions .ctl { height: 46px; }
+.lux .estate-box { margin-top: 16px; }
+.lux .estate { max-height: 46vh; }
+
+.avatar-modal .modal-box { max-width: 760px; }
+.av-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+.av-pick { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px; border-radius: 16px; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1.5px rgba(242,193,78,.25); }
+.av-pick:hover { box-shadow: inset 0 0 0 2px var(--gold), 0 0 18px rgba(242,193,78,.35); }
+.av-pick.on { background: rgba(242,193,78,.16); box-shadow: inset 0 0 0 2.5px var(--gold); }
+.av-pick .pic { width: 100%; height: 170px; font-size: 70px; }
+.av-pick b { font-size: 14px; }
+.estate-modal .modal-box { max-width: 1100px; padding: 18px; }
+.estate-modal .estate { max-height: 72vh; }
+.es-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
+.es-list span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 14px; font-size: 13px; background: rgba(255,255,255,.06); }
+.el-ico { width: 34px; height: 28px; font-size: 20px; }
+.r-av { width: 26px; height: 30px; font-size: 18px; flex: none; }
+.r-av.none { display: inline-block; }
+.top5 li[data-i], table.rating tr[data-p] { cursor: pointer; }
+.top5 li[data-i]:hover { background: rgba(242,193,78,.12); }
+table.rating td.r-name { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 760px) {
+  .estate { border-radius: 14px; }
+  .es-plate { padding: 4px 8px; }
+  .es-noav { font-size: 11px; padding: 6px 8px; }
+  .es-hint { font-size: 11px; }
+  .av-grid { gap: 6px; }
+  .av-pick .pic { height: 110px; }
+  .lobby .estate-box { order: 0; }
+}
+@media (max-width: 760px) {
+  .hero { margin-top: 10px; }
+  .hero .logo-pic img { max-height: 110px; }
+}
