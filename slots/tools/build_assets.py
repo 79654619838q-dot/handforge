@@ -32,6 +32,10 @@ SHEETS = {
     'lux_cars': ('lux', 3, ['car_rusty', 'car_city', 'car_sedan', 'car_suv', 'car_muscle', 'car_limo', 'car_coupe', 'car_super', 'car_hyper']),
     'lux_houses': ('lux', 3, ['house_cabin', 'house_cottage', 'house_family', 'house_glass', 'house_sea', 'house_penthouse', 'house_mansion', 'house_palace', 'house_castle']),
     'lux_things': ('lux', 3, ['thing_sneakers', 'thing_phone', 'thing_watch', 'thing_bag', 'thing_chain', 'thing_ring', 'thing_painting', 'thing_crown', 'thing_diamond']),
+    'acc_shoes': ('lux', 3, ['shoes_canvas', 'shoes_run', 'shoes_boots', 'shoes_loafers', 'shoes_oxford', 'shoes_designer', 'shoes_heels', 'shoes_gold', 'shoes_diamond']),
+    'acc_watch_chain': ('lux', 3, ['watch_digital', 'watch_sport', 'watch_steel', 'watch_gold', 'watch_diamond', 'chain_silver', 'chain_gold', 'chain_ruby', 'chain_diamond']),
+    'acc_phone_glasses': ('lux', 3, ['phone_button', 'phone_smart', 'phone_fold', 'phone_gold', 'phone_platinum', 'glasses_black', 'glasses_aviator', 'glasses_gold', 'glasses_diamond']),
+    'acc_hats': ('lux', 3, ['hat_cap', 'hat_beanie', 'hat_straw', 'hat_cowboy', 'hat_fedora', 'hat_captain', 'hat_top', 'hat_laurel', 'hat_crown']),
     'avatars_green': ('avatars', 3, ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9']),
     'lux_animals_green': ('lux', 3, ['pet_puppy', 'pet_cat', 'pet_parrot', 'pet_chihuahua', 'pet_horse', 'pet_tiger', 'pet_elephant', 'pet_unicorn', 'pet_dragon']),
     'lux_animals': ('lux', 3, ['pet_puppy', 'pet_cat', 'pet_parrot', 'pet_chihuahua', 'pet_horse', 'pet_tiger', 'pet_elephant', 'pet_unicorn', 'pet_dragon']),
@@ -151,7 +155,7 @@ def cutout(a, mask, soft=False, shadow=False):
 # листы, где соседние предметы слиплись (фон небоскрёба касается виллы) — режем строго по клеткам
 GRID_CUT = {'lux_houses'}
 # листы на зелёном фоне (белые животные на белом сливались) — вырез по зелёному
-GREEN = {'lux_animals_green', 'avatars_green'}
+GREEN = {'lux_animals_green', 'avatars_green', 'acc_shoes', 'acc_watch_chain', 'acc_phone_glasses', 'acc_hats'}
 
 
 def green_split_rgba(a):
@@ -290,6 +294,61 @@ for raw, out in LOGOS.items():
     os.makedirs(os.path.dirname(os.path.join(OUT, out)), exist_ok=True)
     im.save(os.path.join(OUT, out + '.webp'), quality=90, method=6)
     print(f'  {out}.webp {im.size}')
+
+# ---- куклы поместья: основа b1…b4 и костюмы o1…o6 на зелёном; рамка НЕ обрезается (точки надевания —
+# в пикселях основы 1024×1536), костюм подгоняется к основе по макушке, подошвам и середине ----
+def green_full(img):
+    a = np.asarray(img.convert('RGB')).astype(np.float32)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    gr = g - np.maximum(r, b)
+    al = np.clip(1 - (gr - 30) / 90.0, 0, 1)
+    al = ndimage.binary_opening(al > 0.5, iterations=1) * al  # точки-пылинки
+    g2 = np.minimum(g, np.maximum(r, b) + 12)
+    return np.dstack([r, g2, b, al * 255]).clip(0, 255).astype(np.uint8)
+
+
+def body_box(rgba):
+    m = rgba[..., 3] > 128
+    lab, k = ndimage.label(m)
+    if k > 1:  # самый крупный кусок — человек
+        sz = ndimage.sum(m, lab, range(1, k + 1)); m = lab == (int(np.argmax(sz)) + 1)
+    ys, xs = np.where(m)
+    return ys.min(), ys.max(), xs.mean()
+
+
+doll_have = {}
+os.makedirs(os.path.join(OUT, 'doll'), exist_ok=True)
+for b in ['b1', 'b2', 'b3', 'b4']:
+    if ONLY and not any(x.startswith(f'doll_{b}') for x in ONLY):
+        continue
+    base = load(f'doll_{b}')
+    if base is None:
+        continue
+    base = base.resize((1024, 1536), Image.LANCZOS)
+    brgba = green_full(base)
+    t0, b0, c0 = body_box(brgba)
+    Image.fromarray(brgba, 'RGBA').resize((512, 768), Image.LANCZOS).save(os.path.join(OUT, 'doll', f'{b}.webp'), quality=90, method=6)
+    have = []
+    for o in ['o1', 'o2', 'o3', 'o4', 'o5', 'o6']:
+        img = load(f'doll_{b}_{o}')
+        if img is None:
+            continue
+        rgba = green_full(img.resize((1024, 1536), Image.LANCZOS))
+        t, bt, c = body_box(rgba)
+        k = (b0 - t0) / max(1, (bt - t))
+        im = Image.fromarray(rgba, 'RGBA')
+        im = im.resize((round(1024 * k), round(1536 * k)), Image.LANCZOS)
+        canvas = Image.new('RGBA', (1024, 1536), (0, 0, 0, 0))
+        canvas.paste(im, (round(c0 - c * k), round(t0 - t * k)), im)
+        canvas.resize((512, 768), Image.LANCZOS).save(os.path.join(OUT, 'doll', f'{b}_{o}.webp'), quality=90, method=6)
+        have.append(o)
+        print(f'  doll/{b}_{o}.webp  масштаб {k:.3f}, сдвиг {c0 - c * k:+.0f},{t0 - t * k:+.0f}')
+    doll_have[b] = have
+if doll_have:
+    p = os.path.join(OUT, 'doll', 'doll.json')
+    old = json.load(open(p, encoding='utf-8')) if os.path.exists(p) else {}
+    old.update(doll_have)
+    json.dump(old, open(p, 'w', encoding='utf-8'))
 
 os.makedirs(os.path.join(OUT, 'scenes'), exist_ok=True)
 for raw, sid in SCENES.items():

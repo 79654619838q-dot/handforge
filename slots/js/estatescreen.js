@@ -37,7 +37,7 @@ export function estateScreen(app, { onLevel }) {
     const n = Object.keys(state.owned).length;
     $('.es-info').innerHTML = `
       <p>Куплено <b>${n} из ${LUX_ITEMS.length}</b> на <b>${fmt(ownedValue())}</b>. На картинке — самое дорогое из каждого раздела: дом или остров становится фоном, остальное встаёт рядом с вами.</p>
-      <div class="es-list">${showcaseList(show) || '<em>Пока ничего не куплено</em>'}</div>`;
+      <div class="es-list">${showcaseList(show, state.avatar) || '<em>Пока ничего не куплено</em>'}</div>`;
     wireAll(app);
     app.querySelector('.estate .es-noav')?.addEventListener('click', pick);
   }

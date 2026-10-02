@@ -43,9 +43,9 @@ function writeFile(d) { try { fs.writeFileSync(FILE, JSON.stringify(d)); } catch
 export async function recordScore(b) {
   const id = clean(b.id, 64), name = clean(b.name, 24) || "Игрок";
   if (!id) return;
-  // аватар — av1…av9, витрина — до 12 названий вещей из магазина (только буквы и _)
-  const avatar = /^av[1-9]$/.test(b.avatar) ? b.avatar : null;
-  const showcase = (Array.isArray(b.showcase) ? b.showcase : []).filter((x) => typeof x === "string" && /^[a-z_]{3,24}$/.test(x)).slice(0, 12).join(",");
+  // аватар — основа b1…b4 (раньше av1…av9), витрина — до 24 названий вещей из магазина
+  const avatar = /^(av[1-9]|b[1-4])$/.test(b.avatar) ? b.avatar : null;
+  const showcase = (Array.isArray(b.showcase) ? b.showcase : []).filter((x) => typeof x === "string" && /^[a-z0-9_]{3,24}$/.test(x)).slice(0, 24).join(",");
   const row = { best: num(b.best), wealth: num(b.wealth ?? b.balance), balance: num(b.balance), spins: Math.min(2e9, num(b.spins)), jackpots: Math.min(1e6, num(b.jackpots)), level: Math.max(1, Math.min(9999, num(b.level))) };
   const p = await db();
   if (p) {

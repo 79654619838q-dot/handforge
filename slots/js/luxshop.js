@@ -4,6 +4,7 @@ import { state, save, ownedValue, wealth } from './state.js';
 import { sfx } from './audio.js';
 import { fmt, esc, pic, wireAll, hud, topRight, wireTop, toast, coinShower } from './ui.js';
 import { LUX_CATS, LUX_ITEMS } from './luxury.js';
+import { dollImg, baseOf } from './estate.js';
 import { levelInfo, track, flush } from './meta.js';
 import { push, player } from './rating.js';
 
@@ -42,7 +43,10 @@ export function luxScreen(app, { onLevel }) {
   function renderTabs() {
     const cnt = (c) => c.items.filter((it) => owns(it.id)).length;
     tabs.innerHTML = [`<button class="lux-tab ${tab === 'mine' ? 'on' : ''}" data-t="mine">⭐ Мои <i>${Object.keys(state.owned).length}</i></button>`]
-      .concat(LUX_CATS.map((c) => `<button class="lux-tab ${tab === c.id ? 'on' : ''}" data-t="${c.id}">${c.emoji} ${c.name} <i>${cnt(c)}/${c.items.length}</i></button>`)).join('');
+      .concat(LUX_CATS.flatMap((c, i) => [
+        c.wear && !LUX_CATS[i - 1].wear ? '<span class="lux-group">Гардероб</span>' : '',
+        `<button class="lux-tab ${c.wear ? 'wear' : ''} ${tab === c.id ? 'on' : ''}" data-t="${c.id}">${c.emoji} ${c.name} <i>${cnt(c)}/${c.items.length}</i></button>`,
+      ])).join('');
     tabs.querySelectorAll('.lux-tab').forEach((b) => b.addEventListener('click', () => {
       tab = b.dataset.t; sfx.click(); sessionTab(tab);
       renderTabs(); renderGrid();
@@ -58,7 +62,7 @@ export function luxScreen(app, { onLevel }) {
       : `<button class="btn-gold buy-lux" data-id="${it.id}" ${can ? '' : 'disabled'}>${can ? 'Купить' : `Не хватает ${fmt(it.price - state.balance)}`}</button>`;
     return `<div class="lux-card ${mine ? 'mine' : ''}">
       ${mine ? '<span class="own-badge">Ваше</span>' : ''}
-      <div class="lux-pic ${it.thumb ? 'scene' : ''}">${pic(it.thumb || it.img, LUX_CATS.find((c) => c.id === it.cat).emoji)}</div>
+      <div class="lux-pic ${it.thumb ? 'scene' : ''} ${it.cat === 'outfits' ? 'outfit' : ''}">${pic(it.cat === 'outfits' ? dollImg(baseOf(state.avatar) || 'b1', it.id) : it.thumb || it.img, LUX_CATS.find((c) => c.id === it.cat).emoji)}</div>
       <b>${esc(it.name)}</b>
       <span class="lux-price">${pic(COMMON.coin, '🪙', 'lp-coin')}${fmt(it.price)}</span>
       ${btn}

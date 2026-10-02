@@ -819,3 +819,35 @@ table.rating td.r-name { display: flex; align-items: center; gap: 8px; }
 }
 .top5 li span.r-av { flex: none; width: 24px; height: 28px; }
 .top5 li span.r-av.none { width: 24px; }
+
+/* ================= поместье: человек с гардеробом и вещи в настоящем размере ================= */
+.es-man { position: absolute; left: 50%; transform: translateX(-50%); aspect-ratio: 2 / 3; }
+.es-man.es-noman { height: 60%; bottom: 3%; display: flex; align-items: flex-end; justify-content: center; }
+.doll { position: relative; display: block; width: 100%; height: 100%; filter: drop-shadow(0 12px 14px rgba(0,0,0,.45)); }
+.doll .dl-body { position: absolute; inset: 0; width: 100%; height: 100%; }
+.doll .dl { position: absolute; display: block; overflow: hidden; line-height: 0; }
+.doll .dl img { display: block; width: 100%; height: auto; }
+.doll .dl-chains, .doll .dl-hats, .doll .dl-glasses, .doll .dl-watches, .doll .dl-phones { overflow: visible; }
+.es-real { position: absolute; line-height: 0; }
+.es-real img { height: 100%; width: auto; display: block; filter: drop-shadow(0 10px 12px rgba(0,0,0,.45)); }
+.es-moto img, .es-cars img { filter: drop-shadow(0 14px 10px rgba(0,0,0,.4)); }
+.es-pedestal { position: absolute; width: 4.2%; border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(90deg, #6b4a12, #f3d27a 45%, #a8740f 70%, #5a3a08);
+  box-shadow: 0 -4px 0 #ffe9a8 inset, 0 10px 14px rgba(0,0,0,.45); }
+.es-real.es-things { transform: translateX(calc(-50% + 2.1%)); }
+/* магазин: костюм на кукле — во весь рост */
+.lux-pic.outfit .pic { height: 150px; }
+.lux-pic.outfit .pic img { object-fit: contain; }
+.lux-group { flex: none; align-self: center; padding: 0 6px 0 14px; font-family: var(--display); font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: .08em; border-left: 1.5px solid rgba(242,193,78,.4); margin-left: 6px; }
+.lux-tab.wear { box-shadow: inset 0 0 0 1.5px rgba(200,160,255,.55); }
+.lux-tab.wear.on { box-shadow: 0 0 16px rgba(242,193,78,.5); }
+.av-pick .pic { height: 210px; }
+@media (max-width: 760px) { .av-pick .pic { height: 140px; } .lux-pic.outfit .pic { height: 110px; } }
+
+.doll .dl-shoes img { object-fit: fill; max-width: none; }
+.estate .es-hint { bottom: auto; top: 16%; }
+@media (min-width: 761px) {
+  .lux-tabs { flex-wrap: wrap; overflow: visible; }
+  .lux-tabs .lux-group { flex-basis: 100%; border-left: 0; margin: 4px 0 0; padding: 0 2px; }
+}
+@media (max-width: 760px) { .estate .es-hint { display: none; } }

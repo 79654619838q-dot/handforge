@@ -1,6 +1,7 @@
 // Кошелёк игрока, джекпот, уровень, задания, медали и настройки — всё в браузере (деньги ненастоящие).
 import { ls } from './storage.js';
 import { START_BALANCE, JACKPOT_SEED, DEFAULT_BET, byId, betsOf } from './machines.js';
+import { LUX_RENAMED } from './luxury.js';
 
 const KEY = 'slots.state.v1';
 
@@ -55,6 +56,13 @@ function load() {
   if (typeof s.fs.machine === 'string') { const { machine, ...rest } = s.fs; s.fs = { [machine]: rest }; } // старая запись
   for (const f of Object.values(s.fs)) f.sticky ||= [];
   for (const k of ['streak', 'medals', 'bets', 'boosts', 'unlocked', 'owned']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
+  // часы, телефон, цепь, кроссовки и корона переехали в гардероб — купленное переносим с той же ценой
+  for (const [old, now] of Object.entries(LUX_RENAMED)) {
+    if (s.owned[old] === undefined) continue;
+    if (s.owned[now] === undefined) s.owned[now] = s.owned[old];
+    else s.balance += s.owned[old]; // уже есть такое — возвращаем деньги
+    delete s.owned[old];
+  }
   if (!Number.isFinite(s.xp)) s.xp = 0;
   if (!Number.isFinite(s.level) || s.level < 1) s.level = 1;
   return s;

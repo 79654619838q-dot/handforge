@@ -3,6 +3,7 @@ import { MACHINES, BETS, COMMON, JACKPOTS, asset } from './machines.js';
 import { state, save, ownedValue } from './state.js';
 import { LUX_ITEMS } from './luxury.js';
 import { estateModal, avatarById } from './estate.js';
+const avImg = (id) => avatarById(id)?.img;
 import { sfx } from './audio.js';
 import { storageWorks } from './storage.js';
 import { fmt, esc, plural, Counter, pic, symPic, logoPic, wireAll, modal, hud, topRight, wireTop, giftModal, coinShower, toast } from './ui.js';
@@ -219,7 +220,7 @@ export function unlockModal(m, after) {
   });
 }
 
-const avMini = (id) => (id ? pic(asset(`avatars/${id}.webp`), '🧑', 'r-av') : '<span class="r-av none"></span>');
+const avMini = (id) => (avImg(id) ? pic(avImg(id), '🧑', 'r-av') : '<span class="r-av none"></span>');
 function showEstateOf(r) {
   estateModal({ avatar: r.avatar, showcase: r.showcase || [], name: r.name, subtitle: `Место ${r.place} · рекорд ${fmt(r.best)} · богатство ${fmt(r.wealth)}` });
 }
