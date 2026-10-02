@@ -3,8 +3,8 @@ import { asset, COMMON } from './machines.js';
 import { state, save, ownedValue, wealth } from './state.js';
 import { sfx } from './audio.js';
 import { fmt, esc, pic, wireAll, hud, topRight, wireTop, toast, coinShower } from './ui.js';
-import { LUX_CATS, LUX_ITEMS } from './luxury.js';
-import { dollImg, baseOf } from './estate.js';
+import { LUX_CATS, LUX_ITEMS, sexOfBase, fitsSex, luxName } from './luxury.js';
+import { dollImg, baseOf, chooseAvatar } from './estate.js';
 import { levelInfo, track, flush } from './meta.js';
 import { push, player } from './rating.js';
 
@@ -40,12 +40,15 @@ export function luxScreen(app, { onLevel }) {
       <p>Всё купленное можно продать обратно за ту же цену. Владения считаются в рейтинге «Самый богатый». Купленный дом или остров становится фоном вашего поместья.</p>`;
   }
 
+  // мужское / женское — по выбранному человеку; пока не выбран — видно всё
+  const sexNow = () => sexOfBase(baseOf(state.avatar));
+  const visible = (c) => c.items.filter((it) => fitsSex(it, sexNow()));
   function renderTabs() {
-    const cnt = (c) => c.items.filter((it) => owns(it.id)).length;
+    const cnt = (c) => visible(c).filter((it) => owns(it.id)).length;
     tabs.innerHTML = [`<button class="lux-tab ${tab === 'mine' ? 'on' : ''}" data-t="mine">⭐ Мои <i>${Object.keys(state.owned).length}</i></button>`]
       .concat(LUX_CATS.flatMap((c, i) => [
-        c.wear && !LUX_CATS[i - 1].wear ? '<span class="lux-group">Гардероб</span>' : '',
-        `<button class="lux-tab ${c.wear ? 'wear' : ''} ${tab === c.id ? 'on' : ''}" data-t="${c.id}">${c.emoji} ${c.name} <i>${cnt(c)}/${c.items.length}</i></button>`,
+        c.wear && !LUX_CATS[i - 1].wear ? `<span class="lux-group">${{ m: 'Мужской гардероб', f: 'Женский гардероб' }[sexNow()] || 'Гардероб'}</span>` : '',
+        `<button class="lux-tab ${c.wear ? 'wear' : ''} ${tab === c.id ? 'on' : ''}" data-t="${c.id}">${c.emoji} ${c.name} <i>${cnt(c)}/${visible(c).length}</i></button>`,
       ])).join('');
     tabs.querySelectorAll('.lux-tab').forEach((b) => b.addEventListener('click', () => {
       tab = b.dataset.t; sfx.click(); sessionTab(tab);
@@ -60,10 +63,12 @@ export function luxScreen(app, { onLevel }) {
     const btn = mine
       ? `<button class="ctl sell" data-id="${it.id}">Продать за ${fmt(state.owned[it.id])}</button>`
       : `<button class="btn-gold buy-lux" data-id="${it.id}" ${can ? '' : 'disabled'}>${can ? 'Купить' : `Не хватает ${fmt(it.price - state.balance)}`}</button>`;
-    return `<div class="lux-card ${mine ? 'mine' : ''}">
+    const other = !fitsSex(it, sexNow());
+    return `<div class="lux-card ${mine ? 'mine' : ''} ${other ? 'other-sex' : ''}">
       ${mine ? '<span class="own-badge">Ваше</span>' : ''}
+      ${other ? `<span class="sex-badge">${it.sex === 'f' ? 'женское' : 'мужское'} — не надето</span>` : ''}
       <div class="lux-pic ${it.thumb ? 'scene' : ''} ${it.cat === 'outfits' ? 'outfit' : ''}">${pic(it.cat === 'outfits' ? dollImg(baseOf(state.avatar) || 'b1', it.id) : it.thumb || it.img, LUX_CATS.find((c) => c.id === it.cat).emoji)}</div>
-      <b>${esc(it.name)}</b>
+      <b>${esc(luxName(it, sexNow()))}</b>
       <span class="lux-price">${pic(COMMON.coin, '🪙', 'lp-coin')}${fmt(it.price)}</span>
       ${btn}
     </div>`;
@@ -72,8 +77,11 @@ export function luxScreen(app, { onLevel }) {
   function renderGrid() {
     const list = tab === 'mine'
       ? LUX_ITEMS.filter((it) => owns(it.id)).sort((a, b) => b.price - a.price)
-      : LUX_CATS.find((c) => c.id === tab).items.map((it) => LUX_ITEMS.find((x) => x.id === it.id));
-    grid.innerHTML = list.length ? list.map(card).join('') : '<p class="lux-empty">Пока ничего нет — загляните в разделы и купите первую вещь.</p>';
+      : visible(LUX_CATS.find((c) => c.id === tab)).map((it) => LUX_ITEMS.find((x) => x.id === it.id));
+    const wear = LUX_CATS.find((c) => c.id === tab)?.wear;
+    const note = wear && !sexNow() ? '<p class="lux-note">Выберите себя — мужчину или женщину, и в гардеробе останутся подходящие вещи. <button class="ctl pick-me">Выбрать</button></p>' : '';
+    grid.innerHTML = note + (list.length ? list.map(card).join('') : '<p class="lux-empty">Пока ничего нет — загляните в разделы и купите первую вещь.</p>');
+    grid.querySelector('.pick-me')?.addEventListener('click', () => chooseAvatar(() => { push(true); refresh(); }));
     wireAll(grid);
     grid.querySelectorAll('.buy-lux').forEach((b) => b.addEventListener('click', () => buy(b.dataset.id)));
     grid.querySelectorAll('.sell').forEach((b) => b.addEventListener('click', () => sell(b.dataset.id)));
@@ -91,7 +99,7 @@ export function luxScreen(app, { onLevel }) {
     save();
     sfx.coins();
     if (it.price >= 1e6) coinShower(1.5, 30);
-    toast(`${pic(it.img, '🛍️', 't-ico')}<div><b>Куплено: ${esc(it.name)}</b><span>за ${fmt(it.price)} монет</span></div>`, 2800);
+    toast(`${pic(it.img, '🛍️', 't-ico')}<div><b>Куплено: ${esc(luxName(it, sexNow()))}</b><span>за ${fmt(it.price)} монет</span></div>`, 2800);
     track({ type: 'lux', cost: it.price });
     flush();
     refresh();

@@ -4,7 +4,8 @@
 // обувь, цепь, часы, телефон, очки и шляпа — поверх по точкам основы. Из каждого раздела — самая дорогая вещь.
 import { asset } from './machines.js';
 import { state, save } from './state.js';
-import { LUX_CATS, luxById } from './luxury.js';
+import { LUX_CATS, luxById, sexOfBase, fitsSex, luxName } from './luxury.js';
+import { LAYOUTS } from './layouts.js';
 import { modal, pic, esc, wireAll } from './ui.js';
 import { sfx } from './audio.js';
 
@@ -39,30 +40,22 @@ export const avatarById = (id) => { const b = baseOf(id); return b ? AVATARS.fin
 
 const PLACES = ['houses', 'islands']; // эти разделы — фон картинки
 
-// Сцена 3:2. Человек — 60% высоты кадра = 1,8 м. Остальное стоит на своей «глубине»: k — во сколько раз
-// дальше/ближе человека (меньше — дальше), bottom — где низ вещи, x — где её левый (left) или правый (right) край.
-const MAN_H = 60, MAN_BOTTOM = 3;
-const PER_M = MAN_H / 1.8; // % высоты кадра на метр рядом с человеком
-const DEPTH = {
-  cars:    { k: 0.82, bottom: 9, left: 1, z: 4 },
-  moto:    { k: 0.72, bottom: 13, right: 3, z: 3 },
-  animals: { k: 1.0, bottom: 2.5, left: 62, z: 7 },
-  things:  { k: 1.0, bottom: 2.5, left: 31, z: 6 },   // на витрине-тумбе высотой 0,9 м
-};
-// далёкое — размер просто по месту в кадре
-const FAR = {
-  planes:  { left: 3, top: 4, w: 25, h: 21, z: 1 },
-  heli:    { right: 4, top: 3, w: 17, h: 18, z: 1 },
-  yachts:  { right: 2, bottom: 34, w: 27, h: 19, z: 2 },
-};
-const PEDESTAL_M = 0.9;
+// Перспектива. Сцены нарисованы с камеры на высоте человека (cam, м) и с горизонтом на высоте hz (доля кадра
+// сверху). Тогда вещь высотой h метров, стоящая на земле в точке y (доля кадра сверху), занимает по высоте
+// (y − hz)·h/cam кадра: чем дальше (ближе к горизонту), тем меньше — как на настоящей фотографии.
+// Места вещей в каждой сцене — js/layouts.js (подписаны по картинкам: где гараж, причал, вертолётная площадка).
+// Без купленного дома — пустой зал (STUDIO): там нет воды и площадки, яхта и вертолёт не показываются.
+const STUDIO = { hz: 0.40, cam: 1.6, man: [0.5, 0.965], cars: [0.22, 0.72], moto: [0.8, 0.8], animals: [0.64, 0.975], things: [0.36, 0.975] };
+const PEDESTAL_M = 0.75;
+const NEED_PLACE = { water: ['yachts', 'у причала'], heli: ['heli', 'на вертолётной площадке'] };
 const CAT_EMOJI = Object.fromEntries(LUX_CATS.map((c) => [c.id, c.emoji]));
 
-// лучшее из купленного: самая дорогая вещь каждого раздела
-export function showcaseOf(owned) {
+// лучшее из купленного: самая дорогая вещь каждого раздела, подходящая человеку (мужское / женское)
+export function showcaseOf(owned, avatar = state.avatar) {
+  const sex = sexOfBase(baseOf(avatar));
   const out = [];
   for (const c of LUX_CATS) {
-    const best = c.items.filter((it) => owned[it.id] !== undefined).sort((a, b) => b.price - a.price)[0];
+    const best = c.items.filter((it) => owned[it.id] !== undefined && fitsSex(it, sex)).sort((a, b) => b.price - a.price)[0];
     if (best) out.push(best.id);
   }
   return out;
@@ -80,12 +73,12 @@ export function dollHtml(baseId, worn = {}, cls = '') {
   if (!d) return '';
   const X = (x) => pct(x / W0), Y = (y) => pct(y / H0), WD = (w) => pct(w / W0);
   const layers = [];
-  const one = (it, style, extra = '') => it && layers.push(`<span class="dl dl-${it.cat}" style="${style}" title="${esc(it.name)}">${extra || `<img src="${it.img}" alt="">`}</span>`);
+  const one = (it, style, extra = '') => it && layers.push(`<span class="dl dl-${it.cat}" style="${style}" title="${esc(luxName(it, sexOfBase(d.id)))}">${extra || `<img src="${it.img}" alt="">`}</span>`);
   // обувь: каждой ступне — своя половина картинки пары
   // обувь: каждой ступне — своя половина картинки пары; по высоте закрывает носок с запасом
   if (worn.shoes) for (const [i, [x0, x1]] of d.feet.entries()) {
     // туфли на каблуке открытые — выше, чтобы закрыть носок
-    const tall = { shoes_heels: 1.8, shoes_diamond: 1.8 }[worn.shoes.id] || 1.3;
+    const tall = { shoes_heels: 1.8, shoes_diamond: 1.8, shoes_pumps: 1.7, shoes_sandals: 1.8, shoes_cowboy: 1.9 }[worn.shoes.id] || 1.3;
     const w = (x1 - x0) * 1.22, cx = (x0 + x1) / 2, h = (d.bot - d.feetTop) * tall;
     one(worn.shoes, `left:${X(cx - w / 2)};width:${WD(w)};height:${Y(h)};bottom:${pct(1 - (d.bot + 6) / H0)}`,
       `<img src="${worn.shoes.img}" alt="" style="width:200%;height:100%;${i ? 'margin-left:-100%' : ''}">`);
@@ -94,7 +87,8 @@ export function dollHtml(baseId, worn = {}, cls = '') {
   if (worn.watches) one(worn.watches, `left:${X(d.wrist[0] - 27)};width:${WD(54)};top:${Y(d.wrist[1] - 72)}`);
   if (worn.glasses) one(worn.glasses, `left:${X(d.cx - d.faceW * 0.5)};width:${WD(d.faceW)};top:${Y(d.eyeY - d.faceW * 0.19)}`);
   if (worn.hats) {
-    const k = { hat_straw: 1.5, hat_cowboy: 1.55, hat_fedora: 1.25, hat_crown: 0.85, hat_laurel: 1.05 }[worn.hats.id] || 1.1;
+    const k = { hat_straw: 1.5, hat_cowboy: 1.55, hat_fedora: 1.25, hat_crown: 0.85, hat_laurel: 1.05, hat_tiara: 0.8, hat_sun: 1.75,
+      hat_panama: 1.3, hat_bowler: 1.12, hat_flatcap: 1.08, hat_beret: 1.1 }[worn.hats.id] || 1.1;
     const w = d.hatW * k;
     one(worn.hats, `left:${X(d.cx - w / 2)};width:${WD(w)};bottom:${pct(1 - (d.hatY + 12) / H0)}`);
   }
@@ -106,38 +100,70 @@ export function dollHtml(baseId, worn = {}, cls = '') {
 
 // сцена: avatar — id основы, showcase — список id вещей, name/subtitle — подпись
 export function estateHtml({ avatar, showcase = [], name = '', subtitle = '', mine = false }) {
-  const items = showcase.map(luxById).filter(Boolean);
+  const base = baseOf(avatar), sex = sexOfBase(base);
+  const items = showcase.map(luxById).filter(Boolean).filter((it) => fitsSex(it, sex));
   const place = placeOf(items);
-  const byCat = Object.fromEntries(items.filter((it) => !PLACES.includes(it.cat)).map((it) => [it.cat, it]));
-  const side = (s) => ['left', 'right', 'top', 'bottom'].filter((k) => s[k] !== undefined).map((k) => `${k}:${s[k]}%`).join(';');
+  const L = (place && LAYOUTS[place.id]) || STUDIO;
+  const byCat = Object.fromEntries(items.filter((it) => !PLACES.includes(it.cat) && !it.wear).map((it) => [it.cat, it]));
   const objs = [];
-  for (const [cat, s] of Object.entries(FAR)) if (byCat[cat])
-    objs.push(`<div class="es-obj es-${cat}" style="${side(s)};width:${s.w}%;height:${s.h}%;z-index:${s.z}" title="${esc(byCat[cat].name)}">${pic(byCat[cat].img, CAT_EMOJI[cat])}</div>`);
-  // крупное животное справа закрыло бы мотоцикл — тогда мотоцикл встаёт слева, перед машиной
-  const depth = { ...DEPTH };
-  if (byCat.moto && byCat.animals && (byCat.animals.h || 0) >= 1) depth.moto = { k: 0.78, bottom: 6, left: 24, z: 5 };
-  for (const [cat, s] of Object.entries(depth)) {
-    const it = byCat[cat];
-    if (!it) continue;
-    const per = PER_M * s.k;
-    if (cat === 'things') {
-      const ph = PEDESTAL_M * per;
-      objs.push(`<div class="es-pedestal" style="${side({ ...s, bottom: s.bottom })};height:${ph.toFixed(2)}%;z-index:${s.z}"></div>`);
-      objs.push(`<div class="es-real es-things" style="left:${s.left}%;bottom:${(s.bottom + ph).toFixed(2)}%;height:${((it.h || 0.3) * per * 1.06).toFixed(2)}%;z-index:${s.z}" title="${esc(it.name)}"><img src="${it.img}" alt=""></div>`);
-      continue;
-    }
-    objs.push(`<div class="es-real es-${cat}" style="${side(s)};height:${((it.h || 1) * per * 1.06).toFixed(2)}%;z-index:${s.z}" title="${esc(it.name)}"><img src="${it.img}" alt=""></div>`);
+  const height = (y, h) => Math.max(0.5, (y - L.hz) * h / L.cam * 100); // % высоты кадра
+  // вещь на земле в точке [x, y]; img снизу с прозрачной кромкой 3% — чуть опускаем и увеличиваем
+  // sink — какая доля высоты уходит под землю/воду (у лодок — подводная часть корпуса)
+  const ground = (cat, it, [x, y], h, extraCls = '', sink = 0.035) => {
+    const H = height(y, h);
+    objs.push(`<div class="es-g es-${cat} ${extraCls}" style="left:${(x * 100).toFixed(2)}%;bottom:${((1 - y) * 100 - H * sink).toFixed(2)}%;height:${(H * 1.07).toFixed(2)}%;z-index:${Math.round(y * 100)}" title="${esc(luxName(it, sex))}"><img src="${it.img}" alt=""></div>`);
+  };
+  // самолёт — в небе
+  if (byCat.planes) objs.push(`<div class="es-obj es-planes" style="left:3%;top:4%;width:24%;height:20%;z-index:1" title="${esc(byCat.planes.name)}">${pic(byCat.planes.img, '✈️')}</div>`);
+  // яхта у причала, вертолёт на площадке — только если в сцене есть эти места
+  // яхта: маленькая лодка — у самого причала, большая — дальше на воде (иначе закрыла бы полкартинки),
+  // как в жизни: суперъяхта стоит на рейде, а не у мостков. water: { x, near — у причала, far — у горизонта }
+  if (byCat.yachts && L.water) {
+    const h = byCat.yachts.h || 5, w = L.water;
+    // большая яхта может стоять почти у горизонта (корпус на линии воды, надстройка — на фоне неба)
+    const y = Math.min(w.near, Math.max(L.hz + 0.012, L.hz + 0.2 * L.cam / h));
+    const H = height(y, h) / 100, x = Math.min(w.x, 0.99 - H * 2.3 * (2 / 3) / 2);
+    ground('yachts', byCat.yachts, [x, y], h, 'es-float', 0.13);
   }
-  const base = baseOf(avatar);
+  // вертолёт на площадке: по перспективе, но не шире самой площадки (heli[2] — её ширина в долях кадра)
+  if (byCat.heli && L.heli) {
+    const [x, y, padW] = L.heli, h = byCat.heli.h || 3.5;
+    const cap = padW ? padW * 1.2 * 1.5 / 1.75 : 1;           // высота вертолёта такой ширины, доля кадра
+    const k = Math.min(1, cap * 100 / height(y, h));
+    ground('heli', byCat.heli, [x, y], h * k);
+  }
+  // машина у гаража, мотоцикл рядом с ней
+  if (byCat.cars) ground('cars', byCat.cars, L.cars, byCat.cars.h || 1.45);
+  if (byCat.moto) ground('moto', byCat.moto, byCat.cars ? L.moto : L.cars, byCat.moto.h || 1.1);
+  // питомец рядом с человеком, драгоценность — на тумбе с другой стороны.
+  // Высокое животное (лошадь, слон, единорог) выше камеры: справа от человека оно закрыло бы вертолёт целиком.
+  // Тогда оно стоит чуть позади человека, как на фото «хозяин с лошадью»: человек впереди, животное за плечом.
+  let [mx, my] = L.man, things = L.things;
+  const ah = byCat.animals && (byCat.animals.h || 0.5);
+  if (ah >= 1.25) {
+    mx -= 0.04; things = [things[0] - 0.04, things[1]];
+    ground('animals', byCat.animals, [mx + 0.11, my - 0.2 * (my - L.hz)], ah);
+  } else if (byCat.animals) ground('animals', byCat.animals, L.animals, ah);
+  if (byCat.things) {
+    const [x, y] = things, ph = height(y, PEDESTAL_M);
+    objs.push(`<div class="es-pedestal" style="left:${(x * 100).toFixed(2)}%;bottom:${((1 - y) * 100).toFixed(2)}%;height:${ph.toFixed(2)}%;z-index:${Math.round(y * 100)}"></div>`);
+    const H = height(y, byCat.things.h || 0.3);
+    objs.push(`<div class="es-g es-things" style="left:${(x * 100).toFixed(2)}%;bottom:${((1 - y) * 100 + ph).toFixed(2)}%;height:${(H * 1.07).toFixed(2)}%;z-index:${Math.round(y * 100) + 1}" title="${esc(luxName(byCat.things, sex))}"><img src="${byCat.things.img}" alt=""></div>`);
+  }
   const worn = Object.fromEntries(items.filter((it) => it.wear).map((it) => [it.cat, it]));
   let man = '';
   if (base) {
     const d = dollById(base);
+    const manH = height(my, 1.8);
     const fh = (d.bot - d.top) / H0;                 // доля фигуры в рамке куклы
-    const boxH = MAN_H / fh;                          // высота рамки в % кадра
-    const bottom = MAN_BOTTOM - (1 - d.bot / H0) * boxH;
-    man = `<div class="es-man" style="height:${boxH.toFixed(2)}%;bottom:${bottom.toFixed(2)}%;z-index:5">${dollHtml(base, worn)}</div>`;
-  } else man = `<div class="es-man es-noman" style="z-index:5"><span class="es-noav">${mine ? 'Выберите аватар' : ''}</span></div>`;
+    const boxH = manH / fh;                           // высота рамки в % кадра
+    const bottom = (1 - my) * 100 - (1 - d.bot / H0) * boxH;
+    man = `<div class="es-man" style="left:${(mx * 100).toFixed(2)}%;height:${boxH.toFixed(2)}%;bottom:${bottom.toFixed(2)}%;z-index:${Math.round(my * 100) + 2}">${dollHtml(base, worn)}</div>`;
+  } else man = `<div class="es-man es-noman" style="z-index:99"><span class="es-noav">${mine ? 'Выберите аватар' : ''}</span></div>`;
+  const waiting = Object.entries(NEED_PLACE).filter(([spot, [c]]) => byCat[c] && !L[spot]).map(([, [c, where]]) => `${byCat[c].name.toLowerCase()} встанет ${where}`);
+  const hint = !mine ? '' : !place
+    ? (items.length ? `Купите дом или остров — и вы будете стоять на его фоне${waiting.length ? '; ' + waiting.join(', ') : ''}` : 'Пока здесь только вы. Купите дом, машину, костюм, часы… — и всё появится на картинке')
+    : '';
   const bg = place ? `style="--img:url(${place.scene})"` : '';
   return `
     <div class="estate ${place ? '' : 'studio'} ${mine ? 'mine' : ''}" ${bg}>
@@ -147,7 +173,7 @@ export function estateHtml({ avatar, showcase = [], name = '', subtitle = '', mi
         <b>${esc(name || 'Моё поместье')}</b>
         <span>${subtitle}</span>
       </div>
-      ${mine && !place ? `<div class="es-hint">${items.length ? 'Купите дом или остров — и вы будете стоять на его фоне' : 'Пока здесь только вы. Купите дом, машину, костюм, часы… — и всё появится на картинке'}</div>` : ''}
+      ${hint ? `<div class="es-hint">${hint}</div>` : ''}
     </div>`;
 }
 
@@ -168,8 +194,9 @@ export function chooseAvatar(after) {
 }
 
 export function showcaseList(showcase, avatar) {
-  return (showcase || []).map(luxById).filter(Boolean)
-    .map((it) => `<span>${pic(it.cat === 'outfits' ? dollImg(baseOf(avatar) || 'b1', it.id) : it.thumb || it.img, CAT_EMOJI[it.cat], 'el-ico')}${esc(it.name)}</span>`).join('');
+  const sex = sexOfBase(baseOf(avatar));
+  return (showcase || []).map(luxById).filter(Boolean).filter((it) => fitsSex(it, sex))
+    .map((it) => `<span>${pic(it.cat === 'outfits' ? dollImg(baseOf(avatar) || 'b1', it.id) : it.thumb || it.img, CAT_EMOJI[it.cat], 'el-ico')}${esc(luxName(it, sex))}</span>`).join('');
 }
 
 export function estateModal(p) {

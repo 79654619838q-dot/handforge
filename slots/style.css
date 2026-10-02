@@ -851,3 +851,27 @@ table.rating td.r-name { display: flex; align-items: center; gap: 8px; }
   .lux-tabs .lux-group { flex-basis: 100%; border-left: 0; margin: 4px 0 0; padding: 0 2px; }
 }
 @media (max-width: 760px) { .estate .es-hint { display: none; } }
+
+.lux-card.other-sex { opacity: .7; }
+.sex-badge { position: absolute; top: 10px; right: 10px; padding: 3px 8px; border-radius: 10px; font-size: 11px; background: rgba(120,60,160,.85); }
+.lux-note { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 0; padding: 10px; border-radius: 14px; background: rgba(14,9,20,.85); color: var(--mute); }
+/* поместье: вещи на земле в перспективе — своя тень у основания */
+.es-g { position: absolute; transform: translateX(-50%); line-height: 0; }
+.es-g img { height: 100%; width: auto; display: block; filter: drop-shadow(0 6px 6px rgba(0,0,0,.35)); }
+.es-g::after { content: ""; position: absolute; left: 8%; right: 8%; bottom: 2%; height: 9%; border-radius: 50%; z-index: -1;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.45), rgba(0,0,0,0) 70%); }
+.es-g.es-yachts::after { display: none; }
+.es-g.es-float img { animation: es-float 4s ease-in-out infinite; }
+.es-man { transform: translateX(-50%); }
+.es-man::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: 1.2%; height: 3%; border-radius: 50%; z-index: -1;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.45), rgba(0,0,0,0) 70%); }
+.es-pedestal { transform: translateX(-50%); width: 4.2%; }
+
+/* витрина для драгоценности: мраморная тумба с золотой крышкой */
+.estate .es-pedestal { width: auto; aspect-ratio: 0.5 / 1; border-radius: 1px;
+  background: linear-gradient(90deg, #8f877c, #d8d1c6 18%, #f7f3ec 42%, #e4ddd2 62%, #a39b8f 88%, #7e766b);
+  box-shadow: 0 8px 12px rgba(0,0,0,.4); }
+/* золотая крышка и широкое основание тумбы */
+.estate .es-pedestal::before, .estate .es-pedestal::after { content: ''; position: absolute; left: -9%; right: -9%; border-radius: 1px; }
+.estate .es-pedestal::before { top: -4%; height: 6%; background: linear-gradient(90deg, #6b4a12, #e9c46a 35%, #fff0b5 50%, #c99a2e 70%, #6b4a12); }
+.estate .es-pedestal::after { bottom: 0; height: 9%; left: -12%; right: -12%; background: linear-gradient(90deg, #7a7266, #d3ccc1 35%, #ebe5db 55%, #9c9488 85%, #6f675c); }

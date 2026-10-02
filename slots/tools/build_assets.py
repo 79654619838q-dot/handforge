@@ -36,6 +36,9 @@ SHEETS = {
     'acc_watch_chain': ('lux', 3, ['watch_digital', 'watch_sport', 'watch_steel', 'watch_gold', 'watch_diamond', 'chain_silver', 'chain_gold', 'chain_ruby', 'chain_diamond']),
     'acc_phone_glasses': ('lux', 3, ['phone_button', 'phone_smart', 'phone_fold', 'phone_gold', 'phone_platinum', 'glasses_black', 'glasses_aviator', 'glasses_gold', 'glasses_diamond']),
     'acc_hats': ('lux', 3, ['hat_cap', 'hat_beanie', 'hat_straw', 'hat_cowboy', 'hat_fedora', 'hat_captain', 'hat_top', 'hat_laurel', 'hat_crown']),
+    'acc2_shoes': ('lux', 3, ['shoes_flats', 'shoes_pumps', 'shoes_sandals', 'shoes_pink', 'shoes_chelsea', 'shoes_croc', 'shoes_moccasins', 'shoes_velvet', 'shoes_cowboy']),
+    'acc2_jewel': ('lux', 3, ['watch_chrono', 'watch_lady', 'watch_rose', 'chain_platinum', 'chain_lion', 'chain_pearl', 'chain_heart', 'glasses_sport', 'glasses_heart']),
+    'acc2_hats': ('lux', 3, ['hat_tiara', 'hat_beret', 'hat_sun', 'hat_flatcap', 'hat_panama', 'hat_bowler', 'thing_briefcase', 'thing_handbag', 'thing_pen']),
     'avatars_green': ('avatars', 3, ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9']),
     'lux_animals_green': ('lux', 3, ['pet_puppy', 'pet_cat', 'pet_parrot', 'pet_chihuahua', 'pet_horse', 'pet_tiger', 'pet_elephant', 'pet_unicorn', 'pet_dragon']),
     'lux_animals': ('lux', 3, ['pet_puppy', 'pet_cat', 'pet_parrot', 'pet_chihuahua', 'pet_horse', 'pet_tiger', 'pet_elephant', 'pet_unicorn', 'pet_dragon']),
@@ -155,7 +158,7 @@ def cutout(a, mask, soft=False, shadow=False):
 # листы, где соседние предметы слиплись (фон небоскрёба касается виллы) — режем строго по клеткам
 GRID_CUT = {'lux_houses'}
 # листы на зелёном фоне (белые животные на белом сливались) — вырез по зелёному
-GREEN = {'lux_animals_green', 'avatars_green', 'acc_shoes', 'acc_watch_chain', 'acc_phone_glasses', 'acc_hats'}
+GREEN = {'lux_animals_green', 'avatars_green', 'acc_shoes', 'acc_watch_chain', 'acc_phone_glasses', 'acc_hats', 'acc2_shoes', 'acc2_jewel', 'acc2_hats'}
 
 
 def green_split_rgba(a):
@@ -352,9 +355,10 @@ if doll_have:
 
 os.makedirs(os.path.join(OUT, 'scenes'), exist_ok=True)
 for raw, sid in SCENES.items():
-    if ONLY and raw not in ONLY:
+    if ONLY and not ({raw, raw.replace('scene_', 'scene2_'), raw.replace('scene_', 'scene3_')} & ONLY):
         continue
-    img = load(raw)
+    # сцена по плану «гараж — дом — вертолётная площадка — вода» (scene3_*) важнее прежних
+    img = load(raw.replace('scene_', 'scene3_')) or load(raw.replace('scene_', 'scene2_')) or load(raw)
     if img is None:
         continue
     big = img.copy(); big.thumbnail((1920, 1920), Image.LANCZOS)
