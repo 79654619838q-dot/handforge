@@ -28,6 +28,11 @@ SHEETS = {
     'aztec_symbols': ('aztec', 3, SYM),
     'shop_icons': ('common', 3, ['boost_x2', 'magnet', 'hot', 'rain_wild', 'lock', 'bag', 'wealth', 'hourglass', 'trophy']),
     'bunny_symbols': ('bunny', 3, SYM),
+    # «Королевский покер»: карты с мастью <ранг><масть> (h2 туз, h3 король, l1 дама, l2 валет, l3 десятка, l4 девятка;
+    # s пики, h червы, d бубны, c трефы), h1 — фишки, wild — Джокер, scatter — золотая фишка
+    'poker_cards1': ('poker', 3, ['h2s', 'h2h', 'h2d', 'h2c', 'h3s', 'h3h', 'h3d', 'h3c', 'l1s']),
+    'poker_cards2': ('poker', 3, ['l1h', 'l1d', 'l1c', 'l2s', 'l2h', 'l2d', 'l2c', 'l3s', 'l3h']),
+    'poker_cards3': ('poker', 3, ['l3d', 'l3c', 'l4s', 'l4h', 'l4d', 'l4c', 'wild', 'h1', 'scatter']),
     # магазин роскоши (порядок клеток — как в запросе ChatGPT)
     'lux_cars': ('lux', 3, ['car_rusty', 'car_city', 'car_sedan', 'car_suv', 'car_muscle', 'car_limo', 'car_coupe', 'car_super', 'car_hyper']),
     'lux_houses': ('lux', 3, ['house_cabin', 'house_cottage', 'house_family', 'house_glass', 'house_sea', 'house_penthouse', 'house_mansion', 'house_palace', 'house_castle']),
@@ -61,10 +66,10 @@ FRAME_FILL = {'frame_bunny': 8}  # белые мордочки зайцев ка
 # сцены домов и островов — фон поместья: scenes/<id>.jpg и уменьшенная scenes/<id>_t.jpg для магазина
 SCENES = {f'scene_{k}': k for k in ['house_cabin', 'house_cottage', 'house_family', 'house_glass', 'house_sea', 'house_penthouse',
                                      'house_mansion', 'house_palace', 'house_castle', 'island_palm', 'island_lagoon', 'island_paradise']}
-BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby', 'bg_candy': 'candy', 'bg_viking': 'viking', 'bg_aztec': 'aztec', 'bg_bunny': 'bunny', 'bg_lux': 'lux', 'bg_estate': 'estate'}
-FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space', 'frame_candy': 'candy', 'frame_viking': 'viking', 'frame_aztec': 'aztec', 'frame_bunny': 'bunny'}
+BGS = {'bg_egypt': 'egypt', 'bg_pirate': 'pirate', 'bg_space': 'space', 'bg_lobby': 'lobby', 'bg_candy': 'candy', 'bg_viking': 'viking', 'bg_aztec': 'aztec', 'bg_bunny': 'bunny', 'bg_lux': 'lux', 'bg_estate': 'estate', 'bg_poker': 'poker'}
+FRAMES = {'frame_egypt': 'egypt', 'frame_pirate': 'pirate', 'frame_space': 'space', 'frame_candy': 'candy', 'frame_viking': 'viking', 'frame_aztec': 'aztec', 'frame_bunny': 'bunny', 'frame_poker': 'poker'}
 LOGOS = {'logo': 'common/logo', 'title_egypt': 'egypt/title', 'title_pirate': 'pirate/title', 'title_space': 'space/title',
-         'title_candy': 'candy/title', 'title_viking': 'viking/title', 'title_aztec': 'aztec/title', 'title_bunny': 'bunny/title'}
+         'title_candy': 'candy/title', 'title_viking': 'viking/title', 'title_aztec': 'aztec/title', 'title_bunny': 'bunny/title', 'title_poker': 'poker/title'}
 
 
 def load(name):
@@ -158,7 +163,8 @@ def cutout(a, mask, soft=False, shadow=False):
 # листы, где соседние предметы слиплись (фон небоскрёба касается виллы) — режем строго по клеткам
 GRID_CUT = {'lux_houses'}
 # листы на зелёном фоне (белые животные на белом сливались) — вырез по зелёному
-GREEN = {'lux_animals_green', 'avatars_green', 'acc_shoes', 'acc_watch_chain', 'acc_phone_glasses', 'acc_hats', 'acc2_shoes', 'acc2_jewel', 'acc2_hats'}
+GREEN = {'lux_animals_green', 'avatars_green', 'acc_shoes', 'acc_watch_chain', 'acc_phone_glasses', 'acc_hats', 'acc2_shoes', 'acc2_jewel', 'acc2_hats',
+         'poker_cards1', 'poker_cards2', 'poker_cards3'}
 
 
 def green_split_rgba(a):

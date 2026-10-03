@@ -1,5 +1,5 @@
 // Лобби: джекпот, колесо удачи, задания дня, уровень и медали, рейтинг игроков, выбор автомата.
-import { MACHINES, BETS, COMMON, JACKPOTS, asset } from './machines.js';
+import { MACHINES, BETS, COMMON, JACKPOTS, asset, betsOf } from './machines.js';
 import { state, save, ownedValue } from './state.js';
 import { LUX_ITEMS } from './luxury.js';
 import { estateModal, avatarById } from './estate.js';
@@ -186,7 +186,7 @@ function lockedCard(m) {
           <div class="mcard-body">
             <h3>${m.title}</h3>
             <p>${m.tagline}</p>
-            <p class="feat">★ Щедрее обычных автоматов — отдача выше</p>
+            <p class="feat">★ ${m.mega ? `${m.feature}, ставки до ${fmt(betsOf(m).at(-1))}` : 'Щедрее обычных автоматов — отдача выше'}</p>
             <p class="feat2">Бесплатные вращения: ${m.fs.text.toLowerCase()}</p>
             <span class="play ${can ? '' : 'dim'}">${can ? 'Открыть' : `Ещё ${fmt(m.price - state.balance)}`}</span>
           </div>

@@ -875,3 +875,12 @@ table.rating td.r-name { display: flex; align-items: center; gap: 8px; }
 .estate .es-pedestal::before, .estate .es-pedestal::after { content: ''; position: absolute; left: -9%; right: -9%; border-radius: 1px; }
 .estate .es-pedestal::before { top: -4%; height: 6%; background: linear-gradient(90deg, #6b4a12, #e9c46a 35%, #fff0b5 50%, #c99a2e 70%, #6b4a12); }
 .estate .es-pedestal::after { bottom: 0; height: 9%; left: -12%; right: -12%; background: linear-gradient(90deg, #7a7266, #d3ccc1 35%, #ebe5db 55%, #9c9488 85%, #6f675c); }
+
+/* «Королевский покер»: VIP-зал, чёрное с золотом и красным; счётчик способов над барабанами */
+.theme-poker { --a1: #f2c14e; --a2: #c8102e; --fallback: radial-gradient(ellipse at 50% 20%, #5a1a1a, #14100c 55%, #070504); }
+.theme-poker .frame { background: linear-gradient(145deg, #f3d08a, #9a6a1a 20%, #1a1210 42%, #3a0a0e 60%, #120c0a 80%, #d9a441); }
+.ways-row { display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 3px 18px; border-radius: 20px;
+  background: linear-gradient(180deg, rgba(30,8,10,.85), rgba(10,4,4,.85)); box-shadow: inset 0 0 0 1.5px rgba(242,193,78,.55); font-size: 14px; color: #f3e2b0; }
+.ways-row b { font-family: var(--display); font-weight: 400; font-size: 20px; color: var(--gold-hi); min-width: 4.5em; text-align: right; }
+.ways-row.max b { color: #fff3a0; text-shadow: 0 0 12px #ffd040; }
+@media (max-width: 700px) { .ways-row { font-size: 12px; } .ways-row b { font-size: 16px; } }

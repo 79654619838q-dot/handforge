@@ -1,7 +1,9 @@
 // Проверка отдачи автоматов: node slots/tools/sim.mjs [вращений=2000000] [автомат]
 // Гоняет тот же код, что и игра (engine.js + machines.js), со всеми помощниками и бонус-играми.
 import { MACHINES, JACKPOTS, JACKPOT_SEED, JACKPOT_SHARE, BUY_BONUS, BOOSTERS, GIFT_WILD_CHANCE, RAIN_WILD } from '../js/machines.js';
-import { buildStrips, resolveSpin, seeded } from '../js/engine.js';
+import * as CLASSIC from '../js/engine.js';
+import * as MEGA from '../js/mega.js';
+const { seeded } = CLASSIC;
 
 const N = Number(process.argv[2] || 2e6);
 const only = process.argv.slice(3).find((a) => !a.startsWith('--'));
@@ -11,9 +13,10 @@ const JP_BET = Object.fromEntries(JACKPOTS.map((j) => [j.id, j.bet]));
 
 for (const m of MACHINES) {
   if (only && m.id !== only) continue;
+  const { buildStrips, resolveSpin } = m.mega ? MEGA : CLASSIC; // «Королевский покер» — свой движок
   const strips = buildStrips(m), fsStrips = buildStrips(m, true);
   const rnd = seeded(777 + m.seed);
-  const S = { lines: 0, fs: 0, pick: 0, jp: 0, hits: 0, fsTrig: 0, fsSpins: 0, pickTrig: 0, jpTrig: 0, grand: 0, gift: 0, expand: 0, mystery: 0, multHit: 0, streak2: 0, big15: 0, big40: 0, big100: 0, max: 0 };
+  const S = { royal: 0, cascades: 0, lines: 0, fs: 0, pick: 0, jp: 0, hits: 0, fsTrig: 0, fsSpins: 0, pickTrig: 0, jpTrig: 0, grand: 0, gift: 0, expand: 0, mystery: 0, multHit: 0, streak2: 0, big15: 0, big40: 0, big100: 0, max: 0 };
   const jpCount = { mini: 0, minor: 0, major: 0, grand: 0 };
 
   // деньги за бонус-игры одного вращения (Гранд считаем отдельно — он зависит от общего котла)
@@ -29,12 +32,13 @@ for (const m of MACHINES) {
     return x;
   };
   const runFs = (count, rec = true) => {
-    const fs = { i: 0, sticky: [] };
+    const fs = { i: 0, sticky: [], mult: 1 };
     let left = count, total = 0;
     while (left > 0) {
       left--;
       const o = resolveSpin(m, fsStrips, { rnd, bet: BET, fs });
       fs.i++; fs.sticky = o.fx.sticky; fs.collected = (fs.collected || 0) + (o.fx.collected || 0);
+      if (o.fsMultEnd) fs.mult = o.fsMultEnd;
       total += o.total + extras(o, rec);
       left += o.scatter.fs;
       if (rec) S.fsSpins++;
@@ -50,10 +54,14 @@ for (const m of MACHINES) {
     if (o.fx.mystery) S.mystery++;
     if (o.mult.sum) S.multHit++;
     if (o.mult.streak > 1) S.streak2++;
+    if (o.royal) S.royal++;
+    if (o.steps) S.cascades += Math.max(0, o.steps.length - 1);
     let win = o.total + extras(o, true);
     S.lines += o.total;
     if (o.scatter.fs) { S.fsTrig++; const f = runFs(o.scatter.fs); S.fs += f; win += f; }
-    if (win > 0 || o.jackpot) { S.hits++; streak++; } else streak = 0;
+    if (win > 0 || o.jackpot) S.hits++;
+    // у «Королевского покера» выигрыши почти в каждом вращении — серию продолжает только выигрыш не меньше ставки
+    if ((m.mega ? win >= BET : win > 0) || o.jackpot) streak++; else streak = 0;
     S.max = Math.max(S.max, win);
     if (win >= 15 * BET) S.big15++;
     if (win >= 40 * BET) S.big40++;
@@ -75,6 +83,7 @@ for (const m of MACHINES) {
   console.log(`  бесплатные ${every(S.fsTrig)} (${(S.fsSpins / S.fsTrig).toFixed(1)} вращ., ${(S.fs / S.fsTrig / BET).toFixed(1)}×); «Купить бонус» отдаёт в среднем ${(buyTotal / BUYN / BET).toFixed(1)}× при цене ${BUY_BONUS}×`);
   console.log(`  сундуки ${every(S.pickTrig)} (${(S.pick / Math.max(1, S.pickTrig) / BET).toFixed(1)}×); джекпот-игра ${every(S.jpTrig)}: мини ${every(jpCount.mini)}, малый ${every(jpCount.minor)}, большой ${every(jpCount.major)}, гранд ${every(jpCount.grand)}`);
   console.log(`  подарок ${every(S.gift)}, растущий WILD ${every(S.expand)}, «?» ${every(S.mystery)}, множитель на барабанах ${every(S.multHit)}, горячая серия ${every(S.streak2)}`);
+  if (m.mega) console.log(`  роял-флеш ${every(S.royal)}, каскадов на вращение ${(S.cascades / N).toFixed(2)}`);
   console.log(`  ≥15× ${every(S.big15)}, ≥40× ${every(S.big40)}, ≥100× ${every(S.big100)}; рекорд ${(S.max / BET).toFixed(0)}×`);
 
   if (BOOST) {
@@ -88,7 +97,7 @@ for (const m of MACHINES) {
         let w = o.total + extras(o, false);
         if (o.scatter.fs) w += runFs(o.scatter.fs, false);
         won += w;
-        if (w > 0 || o.jackpot) streak++; else if (b !== 'hot') streak = 0;
+        if ((m.mega ? w >= BET : w > 0) || o.jackpot) streak++; else if (b !== 'hot') streak = 0;
       }
       return won / (n * BET);
     };

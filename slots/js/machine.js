@@ -2,6 +2,8 @@
 import { betsOf, JACKPOT_SEED, JACKPOT_SHARE, JACKPOTS, BUY_BONUS, COMMON, asset, GIFT_WILD_CHANCE, BOOSTERS, RAIN_WILD, GRAND_MIN } from './machines.js';
 import { buildStrips, resolveSpin, fsMultipliers, streakMultiplier, LINES, REELS } from './engine.js';
 import { ReelView, LINE_COLORS } from './reels.js';
+import * as MEGA from './mega.js';
+import { MegaReelView } from './megareels.js';
 import { state, save, betFor } from './state.js';
 import { sfx } from './audio.js';
 import { fmt, sleep, esc, plural, Counter, pic, symPic, logoPic, wireAll, layer, modal, anyModal, toast, coinShower, hud, topRight, wireTop, giftModal } from './ui.js';
@@ -23,9 +25,11 @@ const JP = Object.fromEntries(JACKPOTS.map((j) => [j.id, j]));
 const jpValue = (tier, bet) => (tier === 'grand' ? Math.max(Math.floor(state.jackpot), GRAND_MIN * bet) : JP[tier].bet * bet);
 
 export function machineScreen(app, m, { onLevel }) {
-  const strips = buildStrips(m);
-  const fsStrips = buildStrips(m, true);
-  const magStrips = buildStrips(m, 'magnet'); // под усилителем «Магнит бонусов»
+  // «Королевский покер» (m.mega) — 6 барабанов разной высоты и каскады: свой движок и свои барабаны
+  const E = m.mega ? MEGA : { buildStrips, resolveSpin, REELS };
+  const strips = E.buildStrips(m);
+  const fsStrips = E.buildStrips(m, true);
+  const magStrips = E.buildStrips(m, 'magnet'); // под усилителем «Магнит бонусов»
   const BETS = betsOf(m);
   let bet = betFor(m.id);
   let busy = false;          // крутятся барабаны или открыто окно, которое надо досмотреть
@@ -34,6 +38,7 @@ export function machineScreen(app, m, { onLevel }) {
   let cycle = null;          // показ выигрышных линий по очереди
   let pending = null;        // отложенный следующий шаг (авто/бесплатные)
   let fsHidden = false;
+  let fsMultShown = null;    // множитель каскадов, пока идёт показ вращения («Королевский покер»)
   let lastRandom = 0;        // случайный множитель последнего бесплатного вращения («Сладкая страна»)      // бесплатные вращения уже выиграны, но барабаны ещё крутятся — не подсказывать
   const F = () => state.fs[m.id];  // бесплатные вращения этого автомата
   // усилитель действует в обычных вращениях при ставке не выше той, при которой куплен
@@ -54,6 +59,7 @@ export function machineScreen(app, m, { onLevel }) {
         <div class="jp-row">${JACKPOTS.map((j) => `<div class="jp-pill" data-t="${j.id}" style="--c:${j.color}"><b>${j.name}</b><span>0</span></div>`).join('')}</div>
         <div class="boost-row"></div>
         <div class="fs-banner" hidden></div>
+        ${m.mega ? '<div class="ways-row"><b class="ways-n">117 649</b><span>способов выиграть</span></div>' : ''}
         <div class="reels-wrap"><div class="frame"><canvas class="reels"></canvas></div><div class="fx-layer"></div></div>
         <div class="under">
           <div class="streak" hidden></div>
@@ -80,7 +86,8 @@ export function machineScreen(app, m, { onLevel }) {
   wireAll(app);
   wireTop(app, { levelInfo, onLevel });
   const $ = (s) => app.querySelector(s);
-  const view = new ReelView($('.reels'), m, strips, $('.reels-wrap'));
+  const view = new (m.mega ? MegaReelView : ReelView)($('.reels'), m, strips, $('.reels-wrap'));
+  const waysEl = $('.ways-n');
   const winCounter = new Counter($('.win'), 0);
   const msg = $('.msg'), banner = $('.fs-banner'), spinBtn = $('.spin'), autoBtn = $('.auto'), buyBtn = $('.buy');
   const streakEl = $('.streak'), fxLayer = $('.fx-layer');
@@ -107,7 +114,7 @@ export function machineScreen(app, m, { onLevel }) {
         fr.style.borderWidth = `${top * s}px ${right * s}px ${bottom * s}px ${left * s}px`;
       };
       // ширина всей рамки — iw/ww ширин окна; высота — окно (3/5 ширины) плюс верх и низ рамки
-      view.setFrameArt({ kx: f.iw / ww, ky: 1 + ((top + bottom) / ww) * (5 / 3) });
+      view.setFrameArt({ kx: f.iw / ww, ky: 1 + ((top + bottom) / ww) * (view.aspect || 5 / 3) });
     };
     img.src = src;
   });
@@ -199,7 +206,8 @@ export function machineScreen(app, m, { onLevel }) {
       // пока идёт показ — множитель этого вращения, после — следующего
       const { fsMult } = fsMultipliers(m, Math.max(0, F().i - (busy ? 1 : 0)));
       const multTxt = (m.fs.mode === 'wildMult' ? `WILD в линии ×${m.fs.mult}` : m.fs.mode === 'random' ? (busy && lastRandom ? `×${lastRandom}` : 'случайный ×1–×25')
-        : m.fs.mode === 'collect' ? `×${Math.min(m.fs.max, 1 + (F().collected || 0))}` : `×${fsMult}`) + (m.features.sticky ? ` · липких: ${F().sticky.length}` : '');
+        : m.fs.mode === 'collect' ? `×${Math.min(m.fs.max, 1 + (F().collected || 0))}`
+        : m.fs.mode === 'cascade' ? `множитель ×${fsMultShown ?? (F().mult || 1)}` : `×${fsMult}`) + (m.features.sticky ? ` · липких: ${F().sticky.length}` : '');
       banner.hidden = false;
       banner.innerHTML = `<b>Бесплатные вращения</b><span>осталось <b>${F().left}</b></span><span class="mult">${multTxt}</span><span>выигрыш <b>${fmt(F().total)}</b></span>`;
     } else banner.hidden = true;
@@ -257,7 +265,7 @@ export function machineScreen(app, m, { onLevel }) {
       busy = true;
       state.balance -= cost;
       state.stats.wagered += cost; state.stats.buys++; state.stats.fsRounds++;
-      state.fs[m.id] = { left: count, count, i: 0, bet, total: 0, sticky: [], bought: true };
+      state.fs[m.id] = { left: count, count, i: 0, bet, total: 0, sticky: [], mult: 1, bought: true };
       save();
       track({ type: 'buy', cost, machine: m.id });
       flush();
@@ -313,9 +321,11 @@ export function machineScreen(app, m, { onLevel }) {
     o.lineWins.forEach((w) => all.push(...w.cells));
     if (o.scatter.amount || o.scatter.fs) all.push(...o.scatter.cells);
     if (!win && !o.scatter.fs) { msg.innerHTML = fs || o.jackpot || o.pick ? '' : 'Ещё разок?'; return; }
-    view.showWins(all, o.lineWins.map((w) => w.line));
+    if (all.length) view.showWins(all, o.lineWins.map((w) => w.line));
     const parts = [];
     if (o.lineWins.length) parts.push(`${o.lineWins.length} ${plural(o.lineWins.length, 'линия', 'линии', 'линий')}`);
+    if (o.steps?.length > 1) parts.push(`${o.steps.length - 1} ${plural(o.steps.length - 1, 'каскад', 'каскада', 'каскадов')}`);
+    if (o.royal) parts.push('роял-флеш');
     if (o.scatter.amount) parts.push(`бонус ${fmt(o.scatter.amount)}`);
     if (o.mult.all > 1) parts.push(`×${o.mult.all}`);
     msg.innerHTML = win ? `Выигрыш <b>${fmt(win)}</b>${parts.length ? ' · ' + parts.join(' · ') : ''}` : '';
@@ -354,6 +364,43 @@ export function machineScreen(app, m, { onLevel }) {
     }
   }
   let shown = state.balance; // сколько монет сейчас показано в кошельке (во время показа выигрыша)
+
+  // «Королевский покер»: каждый шаг каскада — выигравшие карты, сумма, сгорание и падение новых
+  async function presentSteps(o, stake, fs) {
+    let acc = 0;
+    for (let i = 0; i < o.steps.length; i++) {
+      const st = o.steps[i];
+      const cells = st.wins.flatMap((w) => w.cells);
+      if (st.royal) cells.push(...st.royal.cells);
+      view.showWins(cells);
+      acc += st.total;
+      winCounter.set(acc, 350);
+      const best = st.wins.slice().sort((a, b) => b.amount - a.amount);
+      const txt = best.slice(0, 2).map((w) => `${w.count} × ${esc(m.symbols[w.sym].name)} · ${fmt(w.ways)} ${plural(w.ways, 'способ', 'способа', 'способов')}${w.jokerMult > 1 ? ' · Джокер с множителем' : ''}`).join('; ')
+        + (best.length > 2 ? ` и ещё ${best.length - 2}` : '');
+      msg.innerHTML = `${i ? `Каскад ${i}: ` : ''}${txt || 'Роял-флеш'}${st.mult > 1 ? ` · ×${st.mult}` : ''} — <b>${fmt(st.total)}</b>`;
+      if (st.royal) {
+        sfx.jackpot();
+        view.showWins(st.royal.cells);
+        fxBanner(`Роял-флеш ${MEGA.SUIT_SIGN[st.royal.suit]}! <b>+${fmt(Math.round(st.royal.amount))}</b>`, 'streak');
+        await sleep(1800);
+        view.showWins(cells);
+      } else sfx.win(st.total / stake >= 5 ? 1 : 0);
+      await sleep(state.turbo ? 450 : 850);
+      if (!alive) return;
+      if (!st.next) break;
+      sfx.reveal();
+      await view.cascade(st.removed, st.next, { turbo: state.turbo });
+      if (!alive) return;
+      if (fs && m.fs.mode === 'cascade') {
+        fsMultShown = st.mult + 1;
+        refreshControls();
+        sfx.mult(fsMultShown);
+        fxBanner(`Множитель <b>×${fsMultShown}</b>`, 'mult');
+      }
+    }
+    view.clearWins();
+  }
 
   async function bigWin(win, level, balanceAfter) {
     const title = level >= 100 ? 'Мега выигрыш!' : level >= 40 ? 'Огромный выигрыш!' : 'Крупный выигрыш!';
@@ -460,12 +507,12 @@ export function machineScreen(app, m, { onLevel }) {
     const on = Object.fromEntries(BOOSTERS.map((b) => [b.id, boostOn(b.id, stake)]));
     const stripsNow = fs ? fsStrips : on.magnet ? magStrips : strips;
     if (view.strips !== stripsNow) view.setStrips(stripsNow);
-    const o = resolveSpin(m, stripsNow, {
+    const o = E.resolveSpin(m, stripsNow, {
       boostMult: on.x2 ? 2 : 1,
       giftChance: on.wilds ? GIFT_WILD_CHANCE * RAIN_WILD : GIFT_WILD_CHANCE,
       stops: (TEST && window.slots.force) || null,
       bet: stake,
-      fs: fs ? { i: f.i, sticky: f.sticky } : null,
+      fs: fs ? { i: f.i, sticky: f.sticky, mult: f.mult || 1 } : null,
       streak: streakBefore,
       noGift: TEST && window.slots.noGift,
       forceGift: TEST && window.slots.forceGift,
@@ -485,7 +532,10 @@ export function machineScreen(app, m, { onLevel }) {
       state.jackpot += stake * JACKPOT_SHARE;
       state.stats.spins++; state.stats.wagered += stake;
       if (auto > 0 && auto !== Infinity) auto--;
-    } else { f.left--; f.i++; f.sticky = o.fx.sticky; f.collected = (f.collected || 0) + (o.fx.collected || 0); }
+    } else {
+      f.left--; f.i++; f.sticky = o.fx.sticky; f.collected = (f.collected || 0) + (o.fx.collected || 0);
+      if (m.mega) f.mult = o.fsMultEnd; // множитель каскадов не сбрасывается до конца раунда
+    }
     if (tier) { state.stats.jp[tier]++; state.stats.jackpots++; if (tier === 'grand') state.jackpot = JACKPOT_SEED; }
     if (o.pick) state.stats.picks++;
     if (o.fx.gift.length) state.stats.giftWilds++;
@@ -494,7 +544,9 @@ export function machineScreen(app, m, { onLevel }) {
     state.balance += sum;
     state.stats.won += sum;
     // «Горячая рука»: проигрыш серию не сбрасывает
-    if (!fs) state.streak[m.id] = sum > 0 ? streakBefore + 1 : on.hot ? streakBefore : 0;
+    // у «Королевского покера» мелкие выигрыши почти в каждом вращении — серию продолжает выигрыш не меньше ставки
+    const hit = m.mega ? sum >= stake : sum > 0;
+    if (!fs) state.streak[m.id] = hit ? streakBefore + 1 : on.hot ? streakBefore : 0;
     const boostsEnded = [];
     for (const b of BOOSTERS) {
       if (!on[b.id]) continue;
@@ -505,7 +557,7 @@ export function machineScreen(app, m, { onLevel }) {
       f.total += sum;
       if (o.scatter.fs) { f.left += o.scatter.fs; f.count += o.scatter.fs; fsAdded = o.scatter.fs; }
     } else if (o.scatter.fs) {
-      state.fs[m.id] = { left: o.scatter.fs, count: o.scatter.fs, i: 0, bet: stake, total: 0, sticky: [] };
+      state.fs[m.id] = { left: o.scatter.fs, count: o.scatter.fs, i: 0, bet: stake, total: 0, sticky: [], mult: 1 };
       state.stats.fsRounds++;
       fsStarted = o.scatter.fs;
       fsHidden = true;
@@ -516,7 +568,7 @@ export function machineScreen(app, m, { onLevel }) {
     // «ожидание»: на первых барабанах уже 2 бонуса, 2 короны или 2 сундука
     const anticipation = [];
     let sc = 0, cr = 0, pk = 0;
-    for (let r = 0; r < REELS; r++) {
+    for (let r = 0; r < E.REELS; r++) {
       anticipation[r] = r >= 2 && (sc >= 2 || cr >= 2 || (pk >= 2 && r === 4));
       if (o.raw[r].includes('scatter')) sc++;
       if (o.raw[r].includes('jackpot')) cr++;
@@ -528,9 +580,9 @@ export function machineScreen(app, m, { onLevel }) {
       if (o.raw[r].includes('scatter')) sfx.scatterLand(++landSc);
       if (o.raw[r].includes('jackpot')) sfx.jackpotLand(++landCr);
       if (o.raw[r].includes('pick')) sfx.chest();
-      const nextAnt = r + 1 < REELS && anticipation[r + 1] && view.reel[r + 1].ant;
+      const nextAnt = r + 1 < E.REELS && anticipation[r + 1] && view.reel[r + 1].ant;
       sfx.anticipation(nextAnt);
-      if (r === REELS - 1) sfx.spinStop();
+      if (r === E.REELS - 1) sfx.spinStop();
     };
     view.clearWins();
     winCounter.set(0, 0);
@@ -538,11 +590,13 @@ export function machineScreen(app, m, { onLevel }) {
     if (!fs) hud.bal.set(shown, 250);
     jpCounters.grand.set(tier === 'grand' ? jpWin : state.jackpot, 400); // при Гранде сумма держится до праздника
     sfx.spinStart(state.turbo);
-    const p = view.spin(o.stops, { turbo: state.turbo, anticipation });
+    if (m.mega) { fsMultShown = fs ? o.mult.fs : null; waysEl.textContent = '…'; }
+    const p = view.spin(o.stops, { turbo: state.turbo, anticipation, heights: o.heights });
     refreshControls();
     await p;
     sfx.spinStop(); sfx.anticipation(false);
     if (!alive) return;
+    if (m.mega) { waysEl.textContent = fmt(o.ways); waysEl.parentElement.classList.toggle('max', o.ways >= 46656); }
     refreshControls();
 
     // ----- помощники -----
@@ -583,6 +637,8 @@ export function machineScreen(app, m, { onLevel }) {
     if (win && on.x2) { fxBanner(`${pic(COMMON.boostX2, '💰', 'fx-ico')} Двойной выигрыш <b>×2</b>`, 'mult'); await sleep(250); }
     if (win && o.mult.streak > 1) { sfx.mult(o.mult.streak); fxBanner(`${pic(COMMON.fire, '🔥', 'fx-ico')} Горячая серия <b>×${o.mult.streak}</b>`, 'streak'); await sleep(300); }
 
+    if (m.mega && o.steps.length) { await presentSteps(o, stake, fs); if (!alive) return; }
+    fsMultShown = null;
     await present(o, win, stake, fs);
     if (!alive) return;
 
@@ -668,6 +724,7 @@ export function machineScreen(app, m, { onLevel }) {
 
 // ---------- выплаты и правила ----------
 function paytable(m, bet) {
+  if (m.mega) return megaPaytable(m, bet);
   const lb = bet / 20;
   const row = (id) => {
     const p = m.pay[id];
@@ -708,5 +765,41 @@ function paytable(m, bet) {
     <div class="pt-grid">${['h1', 'h2', 'h3', 'l1', 'l2', 'l3', 'l4'].map(row).join('')}</div>
     <h3>20 линий</h3>
     <div class="pt-lines">${lines}</div>`, { cls: 'paytable', closeOnBg: true });
+  return el;
+}
+
+// «Королевский покер»: способы вместо линий, каскад, Джокеры с множителем, роял-флеш
+function megaPaytable(m, bet) {
+  const f2 = (v) => fmt(Math.max(1, Math.round(v)));
+  const row = (id) => {
+    const p = m.pay[id];
+    return `<div class="pt-item">${symPic(m, id)}<div><b>${esc(m.symbols[id].name)}</b>
+      <span>6 — ${f2(p[6] * bet)}</span><span>5 — ${f2(p[5] * bet)}</span><span>4 — ${f2(p[4] * bet)}</span><span>3 — ${f2(p[3] * bet)}</span></div></div>`;
+  };
+  const item = (picHtml, title, text) => `<div class="pt-item wide">${picHtml}<div><b>${title}</b><span>${text}</span></div></div>`;
+  const fs = m.freeSpins, sp = m.scatterPay;
+  const { el } = modal(`
+    <button class="x">✕</button>
+    <h2>${m.title}: правила и выплаты</h2>
+    <p class="sub">Шесть барабанов, на каждом при каждом вращении от 2 до 7 карт. Способов выиграть — произведение высот барабанов, до 117 649.
+      Выигрыш — одинаковые карты на соседних барабанах начиная с левого, в любых рядах; масть не важна.</p>
+    <h3>Фишки автомата</h3>
+    <div class="pt-specials">
+      ${item(symPic(m, 'h2'), 'Каскад', 'Выигравшие карты сгорают, оставшиеся падают вниз, сверху приходят новые — и можно выиграть ещё раз, сколько угодно раз подряд.')}
+      ${item(symPic(m, 'w3'), 'Джокер с множителем', 'Джокер заменяет любую карту. Бывает с множителем ×2, ×3 или ×5 — каждый способ через такого Джокера умножается. На первом барабане Джокеров нет.')}
+      ${item(symPic(m, 'l3'), 'Роял-флеш', `10, валет, дама, король и туз одной масти на пяти барабанах подряд слева направо — ${fmt(m.royal * bet)} монет (${m.royal} ставок). Может сложиться и после каскада.`)}
+      ${item(symPic(m, 'scatter'), `${esc(m.symbols.scatter.name)} — БОНУС`, `3, 4, 5 или 6 в любом месте: ${fs[3]}, ${fs[4]}, ${fs[5]} или ${fs[6]} бесплатных вращений и ${fmt(sp[3] * bet)} / ${fmt(sp[4] * bet)} / ${fmt(sp[5] * bet)} / ${fmt(sp[6] * bet)} монет. ${esc(m.fs.text)}. В бесплатных вращениях можно выиграть ещё вращения.`)}
+      ${item(symPic(m, 'jackpot'), 'Корона — ДЖЕКПОТЫ', `3 или 4 короны в любом месте открывают джекпот-игру: Мини (${fmt(3 * bet)}), Малый (${fmt(10 * bet)}), Большой (${fmt(50 * bet)}) или Гранд (сейчас ${fmt(Math.max(state.jackpot, GRAND_MIN * bet))}). Пять корон — сразу Гранд.`)}
+      ${item(symPic(m, 'pick'), 'Сундук — «Выбери сундук»', 'Три сундука на барабанах 1, 3 и 5 открывают игру с сундуками.')}
+    </div>
+    <h3>Помощники для всех</h3>
+    <div class="pt-specials">
+      ${item(pic(COMMON.gift, '🎁'), 'Подарок', `Примерно раз в ${Math.round(1 / GIFT_WILD_CHANCE)} вращений на барабаны 2–6 прилетают 2–4 Джокера.`)}
+      ${item(pic(COMMON.fire, '🔥'), 'Горячая серия', 'Два выигрыша подряд не меньше ставки — дальше выигрыши ×2, четыре подряд — ×3.')}
+      ${item(pic(COMMON.bolt, '⚡'), 'Купить бонус', `За ${BUY_BONUS} ставок — сразу ${fs[3]} бесплатных вращений.`)}
+    </div>
+    <h3>Выплаты за один способ при ставке ${fmt(bet)}</h3>
+    <p class="sub">Сумма умножается на число способов: например, 2 туза на первом барабане, 3 на втором и 1 на третьем — это 2 × 3 × 1 = 6 способов.</p>
+    <div class="pt-grid">${MEGA.PAYING.map(row).join('')}</div>`, { cls: 'paytable', closeOnBg: true });
   return el;
 }
