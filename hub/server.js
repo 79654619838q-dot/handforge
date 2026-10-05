@@ -1,7 +1,8 @@
 // Единая точка входа под одну публичную ссылку. Ничего не переписывает изнутри
 // Poker и PhotoQuest — просто раскладывает трафик по путям: "/" — меню выбора,
 // "/poker" — HandForge Poker, "/quest" — PhotoQuest, "/cell" — Cell Survival, "/dressup" — «Наряди принцессу»,
-// "/journal" — журнал покерной сессии, "/slots" — игровые автоматы на ненастоящие монеты.
+// "/journal" — журнал покерной сессии, "/slots" — игровые автоматы на ненастоящие монеты,
+// "/detective" — игра-расследование «АРХИВ».
 // PhotoQuest отдаёт готовую сборку (npm run build), Poker работает как обычно.
 
 import express from "express";
@@ -12,6 +13,7 @@ import { attachCellServer } from "./cell-server.js";
 import { attachRatingRoutes } from "./cell-rating.js";
 import { attachSchoolAccounts } from "./school-accounts.js";
 import { attachSlotsRating } from "./slots-rating.js";
+import { attachDetectiveRating } from "./detective-rating.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8877;
@@ -23,6 +25,7 @@ const DRESSUP_DIR = path.join(__dirname, "..", "dressup");
 const JOURNAL_DIR = path.join(__dirname, "..", "journal");
 const SCHOOL_DIR = path.join(__dirname, "..", "school");
 const SLOTS_DIR = path.join(__dirname, "..", "slots");
+const DETECTIVE_DIR = path.join(__dirname, "..", "detective");
 
 const app = express();
 
@@ -144,6 +147,22 @@ app.use("/slots", express.static(SLOTS_DIR, {
   },
 }));
 
+// «АРХИВ» — игра-расследование, статическая, без сборки. Общий рейтинг — /detective/api/rating.
+// tools/ и docs/ (сюжет с разгадками) наружу не отдаём.
+attachDetectiveRating(app);
+app.get("/detective", (req, res, next) => {
+  if (req.path === "/detective") return res.redirect(301, "/detective/");
+  next();
+});
+app.get(["/detective/tools/*", "/detective/docs/*"], (_req, res) => res.sendStatus(404));
+app.use("/detective", express.static(DETECTIVE_DIR, {
+  index: "index.html",
+  setHeaders: (res, file) => {
+    if (/\.(html|js|css|json)$/.test(file)) res.setHeader("Cache-Control", "no-cache");
+    else res.setHeader("Cache-Control", "public, max-age=604800");
+  },
+}));
+
 // Журнал покерной сессии — одна статическая страница, данные только в браузере игрока.
 app.get("/journal", (req, res, next) => {
   if (req.path === "/journal") return res.redirect(301, "/journal/");
@@ -170,6 +189,7 @@ const server = app.listen(PORT, () => {
   console.log(`  /journal → ${JOURNAL_DIR}`);
   console.log(`  /school  → ${SCHOOL_DIR}`);
   console.log(`  /slots   → ${SLOTS_DIR}`);
+  console.log(`  /detective → ${DETECTIVE_DIR}`);
   console.log(`  /api     → ${QUEST_API_TARGET}`);
 });
 
