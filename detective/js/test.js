@@ -171,11 +171,15 @@ window.__autoplay = async (caseId, mode = {}) => {
   MODE = mode;
   const C = CASES.find((c) => c.id === caseId);
   // memo — подставить решения прошлых дел; choice — какой вариант выбрать в выборах
+  // без mode.memo — настоящий профиль (проверка, что решения прошлых дел действительно доходят)
   const st = window.__game.load();
-  st.memo = { __test: (mode.memo || []).filter((a) => !a.startsWith('g:vk')) };
-  st.secrets = (mode.memo || []).filter((a) => a.startsWith('g:vk')).map((a) => 'f:' + a.slice(2));
+  if (mode.memo) {
+    st.memo = { __test: mode.memo.filter((a) => !a.startsWith('g:vk')) };
+    st.secrets = mode.memo.filter((a) => a.startsWith('g:vk')).map((a) => 'f:' + a.slice(2));
+  }
+  const memo = Object.values(st.memo).flat().concat(st.secrets.map((a) => 'g:' + a.slice(2)));
   window.__choiceOverride = mode.choice || {};
-  const plan = solve(C, PEOPLE, mode.choice || {}, mode.memo || []);
+  const plan = solve(C, PEOPLE, mode.choice || {}, memo);
   const log = [];
   try {
     window.__game.openCase(C);
@@ -194,7 +198,8 @@ window.__autoplay = async (caseId, mode = {}) => {
       await doStep(C, st);
     }
     const res = $('.results-box')?.innerText || '';
-    return { ok: true, steps: plan.steps.length, expect: plan.score, results: res, errors, voiceMissing: window.__voiceMissing };
+    return { ok: true, steps: plan.steps.length, expect: plan.score, results: res, errors, voiceMissing: window.__voiceMissing,
+      carried: [...(window.__game.run()?.carried || [])], memo: window.__game.load().memo, secrets: window.__game.load().secrets };
   } catch (e) {
     return { ok: false, error: e.message, at: log.slice(-3), errors, screen: document.querySelector('#app').innerText.slice(0, 400) };
   }

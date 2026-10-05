@@ -112,8 +112,9 @@ async function waitImage(before, snippet, maxMs = 9 * 60000) {
     const busy = await js(`!!document.querySelector('[data-testid="stop-button"], button[aria-label*="Остановить"], button[aria-label*="Stop"]')`).catch(() => true);
     if (fresh.length && !busy) { await sleep(3000); return fresh[fresh.length - 1]; }
     const tail = await js(`(() => { const m = [...document.querySelectorAll('main [data-message-author-role="assistant"]')].pop(); return m ? m.innerText.slice(-500) : ''; })()`).catch(() => '');
-    // 05.10: ChatGPT иногда оставляет вечную заглушку без картинки и без «стоп» — не ждём 9 минут
-    if (!busy) { idle ??= Date.now(); if (Date.now() - idle > 240000) return { stuck: true }; } else idle = null;
+    // 05.10: ChatGPT иногда оставляет вечную заглушку без картинки и без «стоп» — не ждём 9 минут.
+    // 06.10: ночью картинки рисуются дольше 4 минут без кнопки «стоп» — ждём 7
+    if (!busy) { idle ??= Date.now(); if (Date.now() - idle > 420000) return { stuck: true }; } else idle = null;
     if (!busy && tail && Date.now() - t0 > 30000) {
       quiet ??= Date.now();
       if (Date.now() - quiet > 20000) return { text: tail };

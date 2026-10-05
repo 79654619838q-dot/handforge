@@ -308,7 +308,9 @@ function results() {
   recordCase(C.id, { score, stars, ending: run.ending, tokens,
     memo: [...run.atoms].filter((a) => a.startsWith('g:')), secrets: [...run.atoms].filter((a) => /^f:vk\d+$/.test(a)) });
   sendRating();
-  const found = run.evidence().length, totalEv = Object.keys(C.ev).length;
+  // улики веток выбора (optional) все сразу не собрать — в «из скольких» считаем одну ветку (bonusEv)
+  const found = run.evidence().length;
+  const totalEv = Math.max(found, Object.values(C.ev).filter((e) => !e.optional).length + (C.bonusEv || 0));
   const claims = Object.values(run.claims);
   const claimsDone = claims.filter((c) => run.has('c:' + c.id)).length;
   const nextC = CASES.find((c) => c.no === C.no + 1);
