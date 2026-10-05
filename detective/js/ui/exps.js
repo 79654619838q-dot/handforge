@@ -393,7 +393,7 @@ TYPES.choice = (x, area, report, { done, run }) => {
     d.facts ? h('ul.facts', d.facts.map((f) => h('li', f))) : null,
     h('div.q-text', d.q),
     h('div.choice-cards', d.opts.map((o, i) => h('button.choice-card' + (done && run.test(o.gives?.[0]) ? '.right' : ''), {
-      'data-right': i === (d.best ?? 0) ? '1' : '0',
+      'data-right': i === (window.__choiceOverride?.[x.id] ?? d.best ?? 0) ? '1' : '0',
       onclick: async (e) => {
         if (picked) return;
         picked = true; sfx.stamp();
@@ -402,5 +402,144 @@ TYPES.choice = (x, area, report, { done, run }) => {
       },
     }, h('b', o.text), o.sub ? h('span', o.sub) : null))),
     h('div.q-tip', 'Решение одно. Отменить его будет нельзя.'),
+  ));
+};
+
+// ——— наложение подписей: спорную подпись кладут поверх образцов и смотрят, насколько совпадает ———
+// Живая рука каждый раз пишет чуть иначе (наклон, ширина, высота букв); обведённая копия совпадает до волоска.
+function rnd(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function drawSig(cv, name, seed, color) {
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  const r = rnd(seed);
+  g.fillStyle = color;
+  g.font = '46px "Bad Script", cursive';
+  let x = 24;
+  for (const ch of name) {
+    g.save();
+    g.translate(x, 70 + (r() - 0.5) * 8);
+    g.rotate((r() - 0.5) * 0.16);
+    g.scale(0.92 + r() * 0.16, 0.92 + r() * 0.16);
+    g.fillText(ch, 0, 0);
+    g.restore();
+    x += g.measureText(ch).width * (0.9 + r() * 0.2);
+  }
+}
+function matchPct(a, b) {
+  const A = a.getContext('2d').getImageData(0, 0, a.width, a.height).data;
+  const B = b.getContext('2d').getImageData(0, 0, b.width, b.height).data;
+  let both = 0, any = 0;
+  for (let i = 3; i < A.length; i += 4) { const p = A[i] > 60, q = B[i] > 60; if (p || q) any++; if (p && q) both++; }
+  return any ? Math.round(both / any * 100) : 0;
+}
+TYPES.overlay = (x, area, report, { done }) => {
+  const d = x.data;
+  const W = 420, H = 110;
+  let solved = done, sel = 0;
+  const q = h('canvas.sig-cv', { width: W, height: H });
+  const base = h('canvas.sig-cv', { width: W, height: H });
+  const top = h('canvas.sig-cv.top', { width: W, height: H });
+  const pct = h('div.ov-pct');
+  const op = h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: 0.5, oninput: (e) => { top.style.opacity = e.target.value; } });
+  const sampleBtns = h('div.ov-samples', d.samples.map((s, i) => h('button.btn.small', { onclick: () => pick(i) }, s.label)));
+  function pick(i) {
+    sel = i; sfx.click();
+    drawSig(base, d.name, d.samples[i].seed, '#1b3fa0');
+    drawSig(top, d.name, d.samples[d.traced].seed, '#c0262b');
+    sampleBtns.querySelectorAll('button').forEach((b, k) => b.classList.toggle('primary', k === i));
+    // процент считаем по чистым копиям одного цвета
+    const a = document.createElement('canvas'); a.width = W; a.height = H; drawSig(a, d.name, d.samples[i].seed, '#000');
+    const b = document.createElement('canvas'); b.width = W; b.height = H; drawSig(b, d.name, d.samples[d.traced].seed, '#000');
+    const m = matchPct(a, b);
+    pct.textContent = `Совпадение линий: ${m}%`;
+    pct.classList.toggle('full', m >= 99);
+  }
+  const opts = h('div.opts', d.opts.map((o, i) => h('button.opt', { 'data-right': i === d.ok ? '1' : '0', onclick: async (e) => {
+    if (solved) return;
+    const b = e.currentTarget;
+    if (i === d.ok) { solved = true; sfx.right(); b.classList.add('right'); await report(true); }
+    else { sfx.wrong(); b.classList.add('wrong'); setTimeout(() => b.classList.remove('wrong'), 600); await report(false); }
+  } }, o)));
+  area.append(h('div.records-box',
+    h('div.rec-title', 'Наложение подписей'),
+    h('div.hand-label', 'Подпись под «признанием»'), h('div.sig-paper', q),
+    h('div.hand-label', 'Положить на образец:'), sampleBtns,
+    h('div.ov-stage', base, top),
+    h('label.ov-op', 'Прозрачность верхней (красной) подписи ', op),
+    pct,
+    h('div.q-text', d.q), opts));
+  const go = () => { drawSig(q, d.name, d.samples[d.traced].seed, '#1b2a6b'); pick(0); };
+  // шрифт подписи может ещё грузиться — перерисуем, когда загрузится
+  (document.fonts?.load ? document.fonts.load('46px "Bad Script"') : Promise.resolve()).then(go, go);
+  if (done) opts.children[d.ok].classList.add('right');
+};
+
+// общий блок «вопрос с вариантами» для новых типов
+function askOpts(d, report, done) {
+  let solved = done;
+  const opts = h('div.opts', d.opts.map((o, i) => h('button.opt', { 'data-right': i === d.ok ? '1' : '0', onclick: async (e) => {
+    if (solved) return;
+    const b = e.currentTarget;
+    if (i === d.ok) { solved = true; sfx.right(); b.classList.add('right'); await report(true); }
+    else { sfx.wrong(); b.classList.add('wrong'); setTimeout(() => b.classList.remove('wrong'), 600); await report(false); }
+  } }, o)));
+  if (done) opts.children[d.ok].classList.add('right');
+  return opts;
+}
+
+// ——— магнитофон: старая кассета с допросом, слушать можно сколько угодно ———
+TYPES.tape = (x, area, report, { done }) => {
+  const d = x.data;
+  const counter = h('div.tape-count', '000');
+  const reels = h('div.tape-reels', h('i'), h('i'));
+  let playing = false, tick = null;
+  const play = h('button.btn.primary', { onclick: async () => {
+    if (playing) { stopSpeech(); return; }
+    playing = true; play.textContent = '■ Стоп'; reels.classList.add('spin'); sfx.click();
+    let n = 0; tick = setInterval(() => { n++; counter.textContent = String(n).padStart(3, '0'); }, 400);
+    await say(d.lines);
+    clearInterval(tick); playing = false; play.textContent = '▶ Слушать ещё раз'; reels.classList.remove('spin');
+  } }, '▶ Включить запись');
+  area.append(h('div.records-box',
+    h('div.rec-title', d.title),
+    h('div.tape', h('div.tape-label', d.label), reels, counter),
+    h('div.tape-ctl', play),
+    h('div.q-text', d.q),
+    askOpts(d, report, done),
+  ));
+};
+
+// ——— сравнение ДНК: у ребёнка в каждой паре одно число — от матери, другое — от отца ———
+TYPES.dna = (x, area, report, { done }) => {
+  const d = x.data;
+  let sel = -1;
+  const table = h('div.dna-table');
+  const verdict = h('div.dna-verdict');
+  function draw() {
+    const ref = d.refs[sel];
+    table.replaceChildren(
+      h('div.dna-row.head', h('span', 'Участок'), h('span', d.sample.label), h('span', ref ? ref.label : 'выберите образец')),
+      ...d.loci.map((name, i) => {
+        const s = d.sample.a[i], r = ref ? ref.a[i] : null;
+        const shared = r ? s.filter((v) => r.includes(v)) : [];
+        const mark = (arr, own) => h('span.dna-al', arr.map((v) => h('b' + (r && (own ? r : s).includes(v) ? '.hit' : ''), v)));
+        return h('div.dna-row' + (r ? (shared.length ? '.ok' : '.no') : ''), h('span.dna-locus', name), mark(s, true), r ? mark(r, false) : h('span'));
+      }),
+    );
+    if (ref) {
+      const n = d.loci.filter((_, i) => d.sample.a[i].some((v) => ref.a[i].includes(v))).length;
+      verdict.textContent = `Общее число хотя бы в одной паре: ${n} из ${d.loci.length} участков`;
+      verdict.className = 'dna-verdict ' + (n === d.loci.length ? 'full' : '');
+    }
+  }
+  const btns = h('div.ov-samples', d.refs.map((r, i) => h('button.btn.small', { onclick: () => { sel = i; sfx.click(); btns.querySelectorAll('button').forEach((b, k) => b.classList.toggle('primary', k === i)); draw(); } }, r.label)));
+  draw();
+  area.append(h('div.records-box',
+    h('div.rec-title', d.title),
+    h('div.q-tip', d.tip || 'Ребёнок получает по одному числу в каждой паре от матери и от отца. Родство — когда общее число есть на КАЖДОМ участке.'),
+    h('div.hand-label', 'Сравнить с:'), btns,
+    table, verdict,
+    h('div.q-text', d.q),
+    askOpts(d, report, done),
   ));
 };

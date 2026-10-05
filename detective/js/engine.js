@@ -7,9 +7,10 @@
 //   l:<id>         экспертиза сделана         x:<id>   эксперимент пройден
 //   b:<id>         вопрос доски решён         s:<место>.<точка>  точка на месте осмотрена
 //   v:<место>      место посещено             end      дело закрыто
+//   g:<id>         решение, которое помнят следующие дела (сохраняется в профиле, см. carry)
 // Условия в данных: строка-атом, массив (всё сразу), {any:[…]} (хоть одно), {not: …}.
 
-import { LINES } from './data/common.js';
+import { LINES, asPartner } from './data/common.js';
 
 export const PTS = {
   ev: 20, evHidden: 30,
@@ -26,10 +27,17 @@ export const REBUFF = {
   f: { trueDoubted: 'Я говорю правду. Мне скрывать нечего.', lieDoubted: 'Я всё сказала. Есть доказательства — показывайте.', wrongShow: 'И что это доказывает?', fooled: 'Вот и договорились.' },
 };
 
+// carry — сценарии того, что дело может унаследовать от прошлых дел: [[], ['g:hairind'], …].
+// Дело читает только перечисленные там атомы; проверка решаемости идёт по каждому сценарию.
+export function carryAtoms(def) { return new Set((def.carry || []).flat()); }
+
 export class CaseRun {
-  constructor(def, people, saved) {
+  // memo — атомы g:… из профиля игрока (решения в прошлых делах)
+  constructor(def, people, saved, memo = []) {
     this.d = def;
     this.people = people;
+    const ca = carryAtoms(def);
+    this.carried = new Set(memo.filter((a) => ca.has(a)));
     this.atoms = new Set(saved?.atoms || []);
     this.evOrder = saved?.evOrder || [];
     this.gain = saved?.gain || 0;       // заработано
@@ -38,6 +46,7 @@ export class CaseRun {
     this.hintsBought = saved?.hintsBought || {}; // номер шага → сколько уровней куплено
     this.mistakes = saved?.mistakes || 0;
     this.ending = saved?.ending || null;
+    this.endTitle = saved?.endTitle || null;
     this.claims = {};
     for (const [pid, p] of Object.entries(def.people || {})) {
       for (const t of p.topics || []) if (t.claim) this.claims[t.claim.id] = { ...t.claim, pid, topic: t.id };
@@ -46,10 +55,10 @@ export class CaseRun {
 
   save() {
     return { atoms: [...this.atoms], evOrder: this.evOrder, gain: this.gain, loss: this.loss, hintCost: this.hintCost,
-      hintsBought: this.hintsBought, mistakes: this.mistakes, ending: this.ending };
+      hintsBought: this.hintsBought, mistakes: this.mistakes, ending: this.ending, endTitle: this.endTitle };
   }
 
-  has(a) { return a === 'start' || this.atoms.has(a); }
+  has(a) { return a === 'start' || this.atoms.has(a) || this.carried.has(a); }
 
   test(c) {
     if (c == null || c === true) return true;
@@ -186,7 +195,7 @@ export class CaseRun {
   lab(evId) {
     const out = this.outcome();
     const l = this.labs().find((x) => x.ev === evId);
-    if (!l) { out.ok = false; out.lines.push(LINES.labNothing); return out; }
+    if (!l) { out.ok = false; out.lines.push(this.d.labBy === 'shtern' ? LINES.labNothingShtern : LINES.labNothing); return out; }
     out.lines.push(...l.say);
     out.again = this.has('l:' + l.id);
     this.add(['l:' + l.id, ...(l.gives || [])], out);
@@ -221,7 +230,7 @@ export class CaseRun {
     const right = opt === q.ok && (!q.proof || q.proof.includes(proofEv));
     if (!right) {
       this.loss += PTS.wrongBoard; out.score -= PTS.wrongBoard; this.mistakes++; out.ok = false;
-      out.lines.push(...(opt === q.ok ? (q.badProof || [LINES.boardBadProof]) : (q.fail || [LINES.boardFail])));
+      out.lines.push(...(opt === q.ok ? (q.badProof || [asPartner(LINES.boardBadProof, this.d.partner)]) : (q.fail || [asPartner(LINES.boardFail, this.d.partner)])));
       return out;
     }
     this.gain += PTS.board; out.score += PTS.board;
@@ -245,9 +254,13 @@ export class CaseRun {
     const lines = kind === 'wrong' ? (A.endings.wrong.by?.[who] || A.endings.wrong.lines) : end.lines;
     out.lines.push(...lines);
     out.kind = kind;
+    out.img = end.img;
+    // дополнения концовки, зависящие от прошлых решений (extra: [{ need, lines, title, img }])
+    for (const x of end.extra || []) if (this.test(x.need)) { out.lines.push(...x.lines); if (x.title) out.title = x.title; if (x.img) out.img = x.img; }
     this.gain += PTS.end[kind]; out.score += PTS.end[kind];
     this.ending = kind;
-    this.add(['end'], out);
+    this.endTitle = out.title || null;
+    this.add(['end', ...(end.gives || [])], out);
     return out;
   }
 

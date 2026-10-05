@@ -26,7 +26,7 @@ const voiceKey = (who, text) => who + '|' + text;
 
 function atomsOf(c) {
   // какие атомы вообще могут появиться в деле
-  const A = new Set(['start', 'end']);
+  const A = new Set(['start', 'end', ...(c.carry || []).flat()]);
   const addGives = (g) => (g || []).forEach((a) => A.add(a));
   for (const [pl, p] of Object.entries(c.places)) {
     A.add('v:' + pl);
@@ -39,6 +39,7 @@ function atomsOf(c) {
   for (const l of c.lab || []) { A.add('l:' + l.id); addGives(l.gives); }
   for (const x of c.exp || []) { A.add('x:' + x.id); addGives(x.gives); if (x.type === 'choice') x.data.opts.forEach((o) => addGives(o.gives)); }
   for (const q of c.board || []) { A.add('b:' + q.id); addGives(q.gives); }
+  for (const e of Object.values(c.accuse.endings)) addGives(e.gives);
   return A;
 }
 
@@ -54,16 +55,18 @@ function condAtoms(cond, out = []) {
 function eachLine(c, fn) {
   const L = (arr, where) => (arr || []).forEach((l) => fn(l, where));
   L(c.brief, 'brief');
+  for (const b of c.briefExtra || []) L(b.lines, 'brief+');
   for (const [pl, p] of Object.entries(c.places)) { L(p.enter, pl); for (const s of p.spots || []) { L(s.say, `${pl}.${s.id}`); L(s.again, `${pl}.${s.id}`); } }
   for (const [pid, p] of Object.entries(c.people || {})) {
     for (const k of Object.keys(p.rebuff || {})) fn([pid, p.rebuff[k]], `${pid}.rebuff`);
     for (const t of p.topics || []) { L(t.a, `${pid}.${t.id}`); if (t.claim) { L(t.claim.ok, t.claim.id); } }
   }
   for (const l of c.lab || []) L(l.say, 'lab.' + l.id);
-  for (const x of c.exp || []) { L(x.say, 'exp.' + x.id); L(x.fail, 'exp.' + x.id); L(x.intro, 'exp.' + x.id); }
+  for (const x of c.exp || []) { L(x.say, 'exp.' + x.id); L(x.fail, 'exp.' + x.id); L(x.intro, 'exp.' + x.id); if (x.type === 'tape') L(x.data.lines, 'tape.' + x.id); }
   for (const q of c.board || []) { L(q.say, 'board.' + q.id); L(q.fail, 'board.' + q.id); L(q.badProof, 'board.' + q.id); }
   const E = c.accuse.endings;
   L(E.true.lines, 'end.true'); L(E.partial.lines, 'end.partial'); L(E.wrong.lines, 'end.wrong');
+  for (const k of ['true', 'partial', 'wrong']) for (const x of E[k].extra || []) L(x.lines, `end.${k}+`);
   for (const [k, v] of Object.entries(E.wrong.by || {})) L(v, 'end.wrong.' + k);
   for (const [a, v] of Object.entries(c.on || {})) L(v, 'on.' + a);
 }
@@ -74,7 +77,7 @@ for (const c of CASES) {
   const A = atomsOf(c);
   const evIds = new Set(Object.keys(c.ev));
   const chkCond = (cond, where) => { for (const a of condAtoms(cond)) if (!A.has(a)) err(c.id, `${where}: условие «${a}» никогда не выполнится`); };
-  const chkGives = (g, where) => { for (const a of g || []) { if (a.startsWith('ev:') && !evIds.has(a.slice(3))) err(c.id, `${where}: даёт несуществующую улику ${a}`); if (!/^(ev|f):/.test(a)) err(c.id, `${where}: даёт «${a}» — можно только ev:/f:`); } };
+  const chkGives = (g, where) => { for (const a of g || []) { if (a.startsWith('ev:') && !evIds.has(a.slice(3))) err(c.id, `${where}: даёт несуществующую улику ${a}`); if (!/^(ev|f|g):/.test(a)) err(c.id, `${where}: даёт «${a}» — можно только ev:/f:/g:`); } };
 
   // места и точки
   for (const [pl, p] of Object.entries(c.places)) {
@@ -102,7 +105,7 @@ for (const c of CASES) {
   const allGives = [];
   for (const p of Object.values(c.people || {})) for (const t of p.topics || []) { allGives.push(...(t.gives || []), ...(t.claim?.gives || [])); }
   for (const l of c.lab || []) allGives.push(...(l.gives || []));
-  for (const x of c.exp || []) allGives.push(...(x.gives || []));
+  for (const x of c.exp || []) { allGives.push(...(x.gives || [])); if (x.type === 'choice') x.data.opts.forEach((o) => allGives.push(...(o.gives || []))); }
   for (const q of c.board || []) allGives.push(...(q.gives || []));
   allGives.filter((a) => a.startsWith('ev:')).forEach((a) => evSource.add(a.slice(3)));
   for (const [id, e] of Object.entries(c.ev)) {
@@ -134,6 +137,9 @@ for (const c of CASES) {
     if (x.type === 'cctv') {
       for (const f of d.frames) if (!imgExists(f.img)) warn(c.id, `нет кадра ${f.img}`);
       for (const t of d.tasks) { const n = t.pick === 'frame' ? d.frames.length : t.opts.length; if (!(t.ok >= 0 && t.ok < n)) err(c.id, `exp.${x.id}: ok вне списка`); }
+    } else if (x.type === 'overlay') {
+      if (!(d.ok >= 0 && d.ok < d.opts.length)) err(c.id, `exp.${x.id}: ok вне вариантов`);
+      if (!d.samples[d.traced]) err(c.id, `exp.${x.id}: нет образца, с которого обведено`);
     } else if (x.type === 'route') {
       if (!(d.ok >= 0 && d.ok < d.opts.length)) err(c.id, `exp.${x.id}: ok вне вариантов`);
       const fit = d.routes.filter((r) => r.min * 2 + d.work <= d.window).length;
@@ -158,6 +164,12 @@ for (const c of CASES) {
       if (!d.people.some((p) => p.id === d.ok)) err(c.id, `exp.${x.id}: верный ответ не среди людей`);
       for (const p of d.people) if (!PEOPLE[p.id]) err(c.id, `exp.${x.id}: нет персонажа ${p.id}`);
       if (!imgExists(d.img)) warn(c.id, `нет кадра ${d.img}`);
+    } else if (x.type === 'tape') {
+      if (!(d.ok >= 0 && d.ok < d.opts.length)) err(c.id, `exp.${x.id}: ok вне вариантов`);
+      if (!d.lines?.length) err(c.id, `exp.${x.id}: пустая кассета`);
+    } else if (x.type === 'dna') {
+      if (!(d.ok >= 0 && d.ok < d.opts.length)) err(c.id, `exp.${x.id}: ok вне вариантов`);
+      for (const r of [d.sample, ...d.refs]) if (r.a.length !== d.loci.length || r.a.some((p) => p.length !== 2)) err(c.id, `exp.${x.id}: у «${r.label}» не по паре на участок`);
     } else if (x.type === 'records') {
       if (!(d.ok >= 0 && d.ok < d.rows.length)) err(c.id, `exp.${x.id}: ok вне таблицы`);
       for (const r of d.rows) if (r.length !== d.cols.length) err(c.id, `exp.${x.id}: строка ${r[0]} — не то число столбцов`);
@@ -177,6 +189,9 @@ for (const c of CASES) {
   if (!(AC.endings.true.what >= 0 && AC.endings.true.what < AC.what.length)) err(c.id, 'истинная версия вне списка');
   for (const k of Object.keys(AC.endings.wrong.by || {})) if (!sIds.includes(k)) err(c.id, `концовка для ${k} — его нет в подозреваемых`);
   for (const g of c.goals || []) chkCond(g.until, 'цель');
+  for (const b of c.briefExtra || []) chkCond(b.need, 'вводная+');
+  for (const k of ['true', 'partial', 'wrong']) { chkGives(AC.endings[k].gives, 'концовка ' + k); for (const x of AC.endings[k].extra || []) chkCond(x.need, 'концовка+ ' + k); }
+  if (c.labBy && !PEOPLE[c.labBy]) err(c.id, `лаборатория: нет персонажа ${c.labBy}`);
   for (const h of c.hints || []) { chkCond(h.until, 'подсказка'); if (h.h?.length !== 3) err(c.id, 'подсказка без трёх уровней'); }
   for (const a of Object.keys(c.on || {})) if (!A.has(a)) err(c.id, `on: «${a}» никогда не случится`);
 
@@ -197,9 +212,18 @@ for (const c of CASES) {
       else console.log(`  ветка «${o.text.slice(0, 40)}»: решается, очки ${rb.score}`);
     });
   }
+  // и при каждом наследстве прошлых дел
+  for (const memo of c.carry || []) {
+    const rm = solve(c, PEOPLE, {}, memo);
+    if (!rm.solved) err(c.id, `наследство [${memo.join(', ')}]: НЕ РЕШАЕТСЯ — ${rm.reason}`);
+    else console.log(`  наследство [${memo.join(', ') || 'ничего'}]: решается, очки ${rm.score}, звёзд ${rm.stars}`);
+  }
   const r = solve(c, PEOPLE);
   if (!r.solved) err(c.id, `НЕ РЕШАЕТСЯ: ${r.reason}`);
-  for (const u of r.unreached) warn(c.id, `недостижимо: ${u}`);
+  // недостижимо — только то, чего не открыть ни при каком наследстве
+  let unreached = (c.carry || []).reduce((u, memo) => { const rm = solve(c, PEOPLE, {}, memo); return u.filter((x) => rm.unreached.includes(x)); }, r.unreached);
+  for (const x of (c.exp || []).filter((e) => e.type === 'choice')) x.data.opts.forEach((o, i) => { const rb = solve(c, PEOPLE, { [x.id]: i }); unreached = unreached.filter((u) => rb.unreached.includes(u)); });
+  for (const u of unreached) warn(c.id, `недостижимо: ${u}`);
   const max = maxScore(c);
   console.log(`  решение: ${r.steps.length} действий, очки ${r.score} из ${max} (${Math.round(r.score / max * 100)}%), звёзд ${r.stars}`);
   // все подсказки по порядку должны закрываться на пути решения

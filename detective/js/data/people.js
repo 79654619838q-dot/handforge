@@ -101,6 +101,28 @@ export const PEOPLE = {
   // ——— Дело 19 ———
   inna: { name: 'Инна', role: 'соседка', sex: 'f', voice: v('ava', '-2Hz', '+4%') },
   zamkov: { name: 'Виктор Замков', role: 'слесарь управляющей компании', sex: 'm', voice: v('william', '+0Hz', '+2%') },
+
+  // ——— Дело 20 и далее ———
+  zeynalov: { name: 'Марат Зейналов', role: 'владелец порта', sex: 'm', voice: v('giuseppe', '-14Hz', '-8%') },
+  gvozdev: { name: 'Юрий Гвоздев', role: 'начальник охраны порта', sex: 'm', voice: v('brian', '-16Hz', '-6%') },
+  bragin: { name: 'Леонид Брагин', role: 'адвокат Зейналова', sex: 'm', voice: v('andrew', '-4Hz', '+0%') },
+  efimov: { name: 'Борис Ефимов', role: 'бывший начальник бюро экспертиз', sex: 'm', voice: v('william', '-14Hz', '-10%') },
+  rostov: { name: 'Кирилл Ростов', role: 'врач, друг Артёма', sex: 'm', voice: v('dmitry', '+4Hz', '+2%') },
+
+  // ——— Глава III ———
+  shtern: { name: 'Анна Штерн', role: 'независимая лаборатория, Петербург', sex: 'f', voice: v('emma', '-6Hz', '-2%') },
+  penkov: { name: 'Дмитрий Пеньков', role: 'водитель эвакуатора', sex: 'm', voice: v('hyunsu', '-8Hz', '+2%') },
+  borodin: { name: 'Николай Бородин', role: 'сторож спецстоянки', sex: 'm', voice: v('giuseppe', '-12Hz', '-12%') },
+  belkina: { name: 'Зоя Белкина', role: 'архивариус бюро экспертиз', sex: 'f', voice: v('seraphina', '-10Hz', '-10%') },
+  sviridov: { name: 'Тимофей Свиридов', role: 'лаборант бюро экспертиз', sex: 'm', voice: v('dmitry', '+10Hz', '+8%') },
+  lipatov: { name: 'Эдуард Липатов', role: 'водитель скорой помощи', sex: 'm', voice: v('brian', '-10Hz', '+0%') },
+  grishin: { name: 'Вячеслав Гришин', role: 'охранник больницы', sex: 'm', voice: v('hyunsu', '-2Hz', '-4%') },
+  zotov: { name: 'Аркадий Зотов', role: 'председатель гаражного кооператива', sex: 'm', voice: v('andrew', '+2Hz', '-2%') },
+  gusak: { name: 'Валерий Гусак', role: 'хозяин перевозки «МедТранс»', sex: 'm', voice: v('brian', '+6Hz', '+6%') },
+  raisa: { name: 'Раиса Ильина', role: 'домработница Ефимова', sex: 'f', voice: v('emma', '+0Hz', '-8%') },
+  stas: { name: 'Станислав Ефимов', role: 'племянник Ефимова', sex: 'm', voice: v('hyunsu', '+2Hz', '+8%') },
+  kotova: { name: 'Марина Котова', role: 'проводница', sex: 'f', voice: v('ava', '+0Hz', '+0%') },
+  lavrentyev: { name: 'Игнат Лаврентьев', role: 'сторож яхт-клуба «Норд»', sex: 'm', voice: v('william', '-4Hz', '-6%') },
 };
 
 // портреты «людей», которых нет в списке (например, «неизвестный в капюшоне») — силуэт

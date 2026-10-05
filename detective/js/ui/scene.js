@@ -3,7 +3,7 @@
 import { h, pic, sleep, toast } from '../util.js';
 import { say, sfx, ambient } from '../audio.js';
 import { screen } from '../main.js';
-import { LINES } from '../data/common.js';
+import { LINES, asPartner } from '../data/common.js';
 
 export function sceneView({ C, run, placeId, onBack, onEnter, onSearch }) {
   const P = C.places[placeId];
@@ -106,7 +106,7 @@ export function sceneView({ C, run, placeId, onBack, onEnter, onSearch }) {
       drawMarks();
       if (run.spotsLeft(placeId) === 0 && run.spotsTotal(placeId) > 0) {
         await sleep(600);
-        say([LINES.allFound]);
+        say([asPartner(LINES.allFound, run.d.partner)]);
       }
     }
   });

@@ -1,7 +1,7 @@
 // Расследование одного дела: вводная → штаб дела (места, люди, улики, лаборатория, эксперименты,
 // доска, отдел помощи, обвинение) → концовка и итог.
 import { h, pic, img, modal, toast, points, sleep, plural, qs } from '../util.js';
-import { load, save, recordCase } from '../store.js';
+import { load, save, recordCase, memoAtoms } from '../store.js';
 import { CaseRun, PTS } from '../engine.js';
 import { PEOPLE, person } from '../data/people.js';
 import { CASES, CHAPTERS } from '../data/cases.js';
@@ -12,7 +12,7 @@ import { talkView } from './talk.js';
 import { boardView, accuseFlow } from './board.js';
 import { runExperiment } from './exps.js';
 import { sendRating } from '../rating.js';
-import { LINES } from '../data/common.js';
+import { LINES, asPartner } from '../data/common.js';
 
 export let C = null;     // данные дела
 export let run = null;   // ход расследования
@@ -45,7 +45,7 @@ export function openCase(c) {
 
 function begin(c, saved, withBrief) {
   C = c;
-  run = new CaseRun(c, PEOPLE, saved);
+  run = new CaseRun(c, PEOPLE, saved, memoAtoms());
   seen = new Set(saved ? load().seen[c.id] || [] : []);
   persist();
   if (withBrief) brief(); else hub();
@@ -78,7 +78,8 @@ async function brief() {
   sfx.stamp();
   await sleep(700);
   setTimeout(() => go.classList.remove('hidden'), 1500);
-  await say(C.brief);
+  // вводная может зависеть от решений в прошлых делах
+  await say([...C.brief, ...(C.briefExtra || []).filter((b) => run.test(b.need)).flatMap((b) => b.lines)]);
 }
 
 // ——— штаб дела ———
@@ -199,7 +200,7 @@ function openPlace(id) {
     onSearch: async (x, y) => {
       const r = run.search(id, x, y);
       if (r.miss) { sfx.miss(); return r; }
-      if (r.already) { say(r.lines.length ? r.lines : [LINES.seen]); return r; }
+      if (r.already) { say(r.lines.length ? r.lines : [asPartner(LINES.seen, C.partner)]); return r; }
       play(r);
       return r;
     },
@@ -223,13 +224,14 @@ async function labView() {
     body.replaceChildren(grid());
   }, { badge: (id) => (doneMark(id) ? '✓ исследовано' : '') });
   const body = h('div.lab-body', grid());
+  const labWho = C.labBy || 'granin';
   screen(h('div.lab',
     pic('ui/lab', 'hub-bg'),
     h('div.topbar', h('button.btn.ghost.back', { onclick: () => hub() }, '← Назад'), h('div.top-title', 'Лаборатория'), h('div.top-score', run.score() + ' очков')),
-    h('div.lab-head', pic('p/granin', 'lab-portrait'), h('div', h('div.lab-name', 'Лев Борисович Гранин'), h('div.lab-role', 'главный эксперт-криминалист'), h('div.lab-say', 'Выберите улику для экспертизы.'))),
+    h('div.lab-head', pic('p/' + labWho, 'lab-portrait'), h('div', h('div.lab-name', labWho === 'granin' ? 'Лев Борисович Гранин' : person(labWho).name), h('div.lab-role', labWho === 'granin' ? 'главный эксперт-криминалист' : person(labWho).role), h('div.lab-say', 'Выберите улику для экспертизы.'))),
     body,
   ));
-  if (!run.has('f:_labhello')) { run.atoms.add('f:_labhello'); persist(); say([LINES.labHello]); }
+  if (!run.has('f:_labhello')) { run.atoms.add('f:_labhello'); persist(); say([labWho === 'shtern' ? LINES.labHelloShtern : LINES.labHello]); }
 }
 
 // ——— эксперименты ———
@@ -284,9 +286,10 @@ export async function ending(out) {
   const stamp = h('div.end-stamp.' + kind, kind === 'true' ? 'РАСКРЫТО' : kind === 'partial' ? 'ЧАСТИЧНО' : 'ОШИБКА');
   const next = h('button.btn.primary.big.hidden', { onclick: () => { stopSpeech(); results(); } }, 'Итоги дела');
   screen(h('div.brief.ending',
-    pic(E.img || 'ui/end' + kind, 'brief-bg kenburns'),
+    pic(out.img || E.img || 'ui/end' + kind, 'brief-bg kenburns'),
     h('div.brief-shade'),
     stamp,
+    out.title ? h('div.end-title', out.title) : null,
     h('div.brief-bottom', next),
   ));
   await sleep(400);
@@ -302,7 +305,8 @@ function results() {
   const score = run.score();
   const max = run.maxScore();
   const tokens = run.evidence().filter((e) => e.token).map((e) => e.token);
-  recordCase(C.id, { score, stars, ending: run.ending, tokens });
+  recordCase(C.id, { score, stars, ending: run.ending, tokens,
+    memo: [...run.atoms].filter((a) => a.startsWith('g:')), secrets: [...run.atoms].filter((a) => /^f:vk\d+$/.test(a)) });
   sendRating();
   const found = run.evidence().length, totalEv = Object.keys(C.ev).length;
   const claims = Object.values(run.claims);
@@ -315,6 +319,7 @@ function results() {
     pic('ui/office', 'hub-bg'),
     h('div.results-box',
       h('div.res-kind.' + run.ending, kindText),
+      run.endTitle ? h('div.res-title', run.endTitle) : null,
       h('div.res-stars', [0, 1, 2].map((i) => h('span' + (i < stars ? '.on' : ''), '★'))),
       h('div.res-score', `${score} очков из ${max}`),
       h('div.res-rows',
@@ -322,6 +327,7 @@ function results() {
         h('div', h('span', 'Показаний разобрано'), h('b', `${claimsDone} из ${claims.length}`)),
         h('div', h('span', 'Промахов'), h('b', run.mistakes)),
         h('div', h('span', 'Подсказок'), h('b', run.hintCost ? `−${run.hintCost}` : 'ни одной')),
+        C.secrets ? h('div', h('span', 'Тайных признаний найдено'), h('b', `${memoAtoms().filter((a) => /^g:vk\d+$/.test(a)).length} из ${C.secrets}`)) : null,
       ),
       run.ending !== 'true' ? h('div.res-tip', 'Дело можно переиграть — лучший результат сохранится.') : null,
       L ? h('div.link-card',

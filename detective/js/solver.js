@@ -17,8 +17,9 @@ export function applyStep(run, s) {
 }
 
 // choice — какой вариант выбирать в экспериментах-выборах: { id: номер }, по умолчанию лучший (data.best ?? 0)
-export function solve(c, people, choice = {}) {
-  const run = new CaseRun(c, people);
+// memo — унаследованные решения прошлых дел (один из сценариев c.carry)
+export function solve(c, people, choice = {}, memo = []) {
+  const run = new CaseRun(c, people, null, memo);
   const steps = [];
   const doStep = (s) => { const out = applyStep(run, s); steps.push({ ...s, apply: (r) => applyStep(r, s) }); return out; };
   let progress = true, guard = 0;

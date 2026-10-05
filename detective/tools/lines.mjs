@@ -1,19 +1,21 @@
 // Все реплики, которые может произнести игра: из дел, общие, отговорки персонажей, подсказки Майи.
 import { REBUFF } from '../js/engine.js';
-import { LINES } from '../js/data/common.js';
+import { LINES, asPartner } from '../js/data/common.js';
 
 export function eachLine(c, fn) {
   const L = (arr, where) => (arr || []).forEach((l) => fn(l, where));
   L(c.brief, 'brief');
+  for (const b of c.briefExtra || []) L(b.lines, 'brief+');
   for (const [pl, p] of Object.entries(c.places)) { L(p.enter, pl); for (const s of p.spots || []) { L(s.say, `${pl}.${s.id}`); L(s.again, `${pl}.${s.id}`); } }
   for (const [pid, p] of Object.entries(c.people || {})) {
     for (const t of p.topics || []) { L(t.a, `${pid}.${t.id}`); if (t.claim) L(t.claim.ok, t.claim.id); }
   }
   for (const l of c.lab || []) L(l.say, 'lab.' + l.id);
-  for (const x of c.exp || []) { L(x.say, 'exp.' + x.id); L(x.fail, 'exp.' + x.id); L(x.intro, 'exp.' + x.id); }
+  for (const x of c.exp || []) { L(x.say, 'exp.' + x.id); L(x.fail, 'exp.' + x.id); L(x.intro, 'exp.' + x.id); if (x.type === 'tape') L(x.data.lines, 'tape.' + x.id); }
   for (const q of c.board || []) { L(q.say, 'board.' + q.id); L(q.fail, 'board.' + q.id); L(q.badProof, 'board.' + q.id); }
   const E = c.accuse.endings;
   L(E.true.lines, 'end.true'); L(E.partial.lines, 'end.partial'); L(E.wrong.lines, 'end.wrong');
+  for (const k of ['true', 'partial', 'wrong']) for (const x of E[k].extra || []) L(x.lines, `end.${k}+`);
   for (const [k, v] of Object.entries(E.wrong.by || {})) L(v, 'end.wrong.' + k);
   for (const [a, v] of Object.entries(c.on || {})) L(v, 'on.' + a);
   // отговорки на промахи при допросе
@@ -35,7 +37,10 @@ export function collectLines(cases, people) {
     const key = who + '|' + text;
     if (!map.has(key)) map.set(key, { key, who, text, mood: mood || 'calm', where });
   };
-  for (const c of cases) eachLine(c, add);
+  for (const c of cases) {
+    eachLine(c, add);
+    if (c.partner) for (const k of ['seen', 'allFound', 'boardBadProof', 'boardFail']) add(asPartner(LINES[k], c.partner), 'partner');
+  }
   for (const l of Object.values(LINES)) add(l, 'common');
   return [...map.values()];
 }

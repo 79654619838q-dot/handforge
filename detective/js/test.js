@@ -110,7 +110,7 @@ async function doStep(C, s) {
       const x = C.exp.find((e) => e.id === s.exp);
       (await until(() => byIncl('.exp-card', x.name), 'эксперимент')).click();
       await until(() => $('.exp-area'), 'поле эксперимента');
-      if (MODE.mistakes) {
+      if (MODE.mistakes && x.type !== 'choice') {
         const w = $$('.exp-area [data-right="0"]').find((e) => e.offsetParent !== null && !e.classList.contains('hidden'));
         if (w) { w.click(); await sleep(200); await settle(); }
       }
@@ -170,7 +170,12 @@ const run = () => window.__game.run();
 window.__autoplay = async (caseId, mode = {}) => {
   MODE = mode;
   const C = CASES.find((c) => c.id === caseId);
-  const plan = solve(C, PEOPLE);
+  // memo — подставить решения прошлых дел; choice — какой вариант выбрать в выборах
+  const st = window.__game.load();
+  st.memo = { __test: (mode.memo || []).filter((a) => !a.startsWith('g:vk')) };
+  st.secrets = (mode.memo || []).filter((a) => a.startsWith('g:vk')).map((a) => 'f:' + a.slice(2));
+  window.__choiceOverride = mode.choice || {};
+  const plan = solve(C, PEOPLE, mode.choice || {}, mode.memo || []);
   const log = [];
   try {
     window.__game.openCase(C);
