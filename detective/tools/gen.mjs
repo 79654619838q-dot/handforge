@@ -89,6 +89,8 @@ async function attach(file) {
 }
 
 async function ask(text) {
+  // 06.10: после перезапуска поле ввода иногда появляется позже, чем страница «готова» — ждём его
+  for (let i = 0; i < 30; i++) { if (await js(`!![...document.querySelectorAll('.ProseMirror')].find(e => e.offsetParent !== null)`).catch(() => false)) break; await sleep(1000); }
   await js(`(() => { const ed = [...document.querySelectorAll('.ProseMirror')].find(e => e.offsetParent !== null); ed.focus(); document.execCommand('insertText', false, ${JSON.stringify(text)}); return true; })()`);
   await sleep(1200);
   for (let i = 0; i < 60; i++) {

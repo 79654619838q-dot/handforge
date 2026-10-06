@@ -19,6 +19,16 @@ import c17 from '../cases/c17.js';
 import c18 from '../cases/c18.js';
 import c19 from '../cases/c19.js';
 import c20 from '../cases/c20.js';
+import c21 from '../cases/c21.js';
+import c22 from '../cases/c22.js';
+import c23 from '../cases/c23.js';
+import c24 from '../cases/c24.js';
+import c25 from '../cases/c25.js';
+import c26 from '../cases/c26.js';
+import c27 from '../cases/c27.js';
+import c28 from '../cases/c28.js';
+import c29 from '../cases/c29.js';
+import c30 from '../cases/c30.js';
 
 export const CHAPTERS = [
   { no: 1, title: 'Первый след', sub: 'Глава I', img: 'ui/ch1' },
@@ -27,7 +37,8 @@ export const CHAPTERS = [
 ];
 
 export const CASES = [c01, c02, c03, c04, c05, c06, c07, c08, c09, c10,
-  c11, c12, c13, c14, c15, c16, c17, c18, c19, c20];
+  c11, c12, c13, c14, c15, c16, c17, c18, c19, c20,
+  c21, c22, c23, c24, c25, c26, c27, c28, c29, c30];
 
 // сколько дел будет в главе всего (ещё не написанные показываются закрытыми «скоро»)
 export const PLANNED = 30;
