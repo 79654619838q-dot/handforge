@@ -21,7 +21,7 @@ const add = (...xs) => xs.flat(Infinity).forEach((x) => { if (typeof x === 'stri
 
 // 1. голос заданий: каждый вид на каждом уровне — по 30000 раз (истории дают сотни сочетаний)
 for (const lv of Object.values(LEVELS).flat()) {
-  for (const [fn, opts] of lv.games) for (let i = 0; i < 30000; i++) add(fn(opts).voice);
+  for (const [fn, opts] of lv.games) for (let i = 0; i < (opts && opts.target ? 3000 : 30000); i++) add(fn(opts).voice);
   add(titleSpeech(lv.title));
 }
 // 2. то, что звучит по нажатию
@@ -40,6 +40,8 @@ add(['Привет! Я совёнок Умка. Выбирай, во что бу
   'Это вся азбука. Нажми на любую букву!', 'твёрдый знак', 'Он не звучит, а разделяет.', 'мягкий знак', 'Он не звучит, а смягчает:',
   'На ы слова не начинаются. Ы есть в слове', 'Давай познакомимся! Напиши своё имя и придумай пароль.', 'Привет! Напиши своё имя и пароль.', 'Буквы похожи. Смотри внимательно!']);
 for (let n = 1; n <= 20; n++) add(`Уровень ${n}.`);
+add('Сначала выучи прошлую букву!');
+for (const lv of LEVELS.alpha) add(`Ура! ${lv.title} — ${/^Буква/.test(lv.title) ? 'выучена' : 'выучен'}!`);
 add(D.ALPHABET.map((L) => letterPhrase(L)));
 add(D.ITEMS.map((i) => `Держи наклейку: ${i.word}!`));
 for (const s of D.SECTIONS) add(`Держи кубок за раздел ${s.title}!`, `Кубок за раздел ${s.title}!`, `Пройди все уровни в разделе ${s.title}, и получишь кубок!`);

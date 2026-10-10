@@ -409,3 +409,25 @@ img { -webkit-user-drag: none; }
 .poster-grid .letter-card img { width: calc(var(--cell) * 0.5); }
 .poster-grid .letter-card span { font-size: clamp(9px, calc(var(--cell) * 0.12), 14px); }
 .poster-grid.tiny .letter-card span { display: none; }
+
+/* ================= алфавит по порядку ================= */
+.node.letter-node b { font-size: 40px; }
+.node.letter-goal { width: 110px; height: 110px; border-radius: 28px; display: grid; place-items: center; background: #fff; border: 6px solid var(--c); box-shadow: 0 7px 0 var(--c); }
+.node.letter-goal b { font-size: 64px; color: var(--c); }
+.node.letter-goal.locked { opacity: 0.55; }
+.node.letter-goal.done { background: var(--c); }
+.node.letter-goal.done b { color: #fff; }
+.sticker.letter-won { width: clamp(150px, 30vmin, 240px); aspect-ratio: 1; justify-content: center; }
+.sticker.letter-won b { font-size: clamp(80px, 16vmin, 140px); color: #0aa5a0; line-height: 1; }
+.sticker.letter-won b small { font-size: 0.55em; margin-left: 6px; opacity: 0.8; }
+.tile.static { pointer-events: none; min-width: clamp(44px, 8vmin, 70px); }
+.tile.mark { background: #ffd23c; border-color: #e0a800; color: #6b4a00; box-shadow: 0 7px 0 #c99400; }
+.answers.letters.many .answer { min-width: clamp(70px, 12vmin, 110px); height: clamp(70px, 12vmin, 110px); font-size: clamp(36px, 7vmin, 60px); }
+
+/* меню из 8 разделов — на планшете целиком на одном экране */
+.sections { padding: 6px 0; gap: clamp(10px, 2vmin, 20px); }
+.section-card img { max-width: min(150px, 16vh); }
+.section-card span { font-size: clamp(18px, min(3.4vmin, 3.6vh), 32px); line-height: 1.1; }
+@media (min-aspect-ratio: 1/1) { .sections { grid-template-columns: repeat(4, minmax(0, 220px)); } }
+@media (max-aspect-ratio: 1/1) and (min-width: 600px) { .sections { grid-template-columns: repeat(3, minmax(0, 220px)); } }
+.screen.menu { padding-bottom: 12px; }

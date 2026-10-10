@@ -25,7 +25,7 @@ def load(name):
 
 
 # предметы с замкнутыми «окнами» фона (петля нитки, ручка чайника): белое внутри тоже убираем
-HOLES = {'s12_3', 's12_6'}
+HOLES = {'s12_3', 's12_6', 's16_6'}
 
 
 def cut_out(cell, holes=False):
@@ -38,7 +38,7 @@ def cut_out(cell, holes=False):
     if holes:  # крупные чисто-белые острова внутри — тоже фон
         for k in range(1, lab.max() + 1):
             m = lab == k
-            if m.sum() > 400 and a[m].min() > 238: bg |= m
+            if m.sum() > 400 and a[m].mean() > 246: bg |= m  # края пятна чуть сероватые — смотрим среднюю яркость
     # мягкий край: полупрозрачная кайма в 2 px вместо «лесенки»
     solid = ~bg
     soft = ndimage.gaussian_filter(solid.astype(np.float32), 1.0)
@@ -73,16 +73,17 @@ def grid(img, n, prefix, folder, names=None, size=360):
             im.save(os.path.join(OUT, folder, name + '.webp'), quality=88, method=6)
 
 
-for s in range(1, 13):
+for s in range(1, 17):
     grid(load(f'sheet{s}'), 3, f's{s}', 'items')
 grid(load('mascot'), 2, '', 'owl', ['hello', 'joy', 'think', 'cheer'], size=520)
 grid(load('cups'), 2, '', 'cups', ['math', 'sounds', 'syllables', 'words'], size=420)
 grid(load('cup_abc'), 1, '', 'cups', ['abc'], size=420)
 grid(load('cup_build'), 1, '', 'cups', ['build'], size=420)
 grid(load('cup_letters'), 1, '', 'cups', ['letters'], size=420)
+grid(load('cup_alpha'), 1, '', 'cups', ['alpha'], size=420)
 
 os.makedirs(os.path.join(OUT, 'bg'), exist_ok=True)
-for b in ['bg_menu', 'bg_math', 'bg_sounds', 'bg_syllables', 'bg_words', 'bg_reward', 'bg_abc', 'bg_build', 'bg_letters']:
+for b in ['bg_menu', 'bg_math', 'bg_sounds', 'bg_syllables', 'bg_words', 'bg_reward', 'bg_abc', 'bg_build', 'bg_letters', 'bg_alpha']:
     im = load(b)
     im.thumbnail((1920, 1920), Image.LANCZOS)
     im.save(os.path.join(OUT, 'bg', b[3:] + '.jpg'), quality=84, optimize=True, progressive=True)

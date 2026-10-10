@@ -1,7 +1,7 @@
 // «Школа Умки» — экраны: заставка → меню → карта уровней раздела → уровень (8 заданий) → награда; альбом.
 import { ITEMS, SECTIONS, PRAISE, TRY_AGAIN, ALPHABET } from './data.js';
 import { h, pick, shuffle, sayL, letterWord, letterPhrase, titleSpeech } from './games.js';
-import { LEVELS, TASKS_PER_LEVEL, starsFor } from './levels.js';
+import { LEVELS, tasksFor, starsFor } from './levels.js';
 import { say, hush, sfx, startAudio, setMusic, isMusicOn } from './audio.js';
 import { account, signIn, signOut, pull, loaded, schedulePush } from './account.js';
 import { ls, storageWorks } from './storage.js';
@@ -12,7 +12,11 @@ const store = {
   set(k, v) { ls.setItem('school.' + k, JSON.stringify(v)); schedulePush(); },
 };
 // Прогресс: по разделу — массив звёзд за уровни (0 — не пройден).
-const prog = (id) => { const p = store.get('prog.' + id, []); return LEVELS[id].map((_, i) => p[i] || 0); };
+const progRaw = (id) => { const p = store.get('prog.' + id, []); return LEVELS[id].map((_, i) => p[i] || 0); };
+// «Алфавит по порядку»: буква пройдена, когда пройдены все её 15 подуровней; звёзды буквы — наименьшие из них
+const prog = (id) => (id === 'alpha'
+  ? LEVELS.alpha.map((lv) => { const p = progRaw(lv.sub); return p.every((x) => x > 0) ? Math.min(...p) : 0; })
+  : progRaw(id));
 const unlocked = (id, i) => i === 0 || prog(id)[i - 1] > 0;
 const sectionDone = (id) => prog(id).every((s) => s > 0);
 
@@ -157,7 +161,7 @@ function menu(first = false) {
   const s = screen('menu');
   s.append(topBar({ title: 'Школа Умки' }));
   const grid = h('div', 'sections');
-  SECTIONS.forEach((sec, i) => {
+  SECTIONS.filter((x) => !x.hidden).forEach((sec, i) => {
     const c = h('button', 'section-card');
     c.style.setProperty('--c', sec.color);
     c.style.animationDelay = i * 90 + 'ms';
@@ -188,11 +192,18 @@ function menu(first = false) {
 }
 
 // ---------- карта уровней ----------
+// «Буква А — выучена», но «Мягкий знак — выучен»
+const learnedMsg = (title) => `${title} — ${/^Буква/.test(title) ? 'выучена' : 'выучен'}!`;
+// карта одной буквы из «Алфавита по порядку»: её 15 подуровней
+function letterSec(alpha, i) {
+  const lv = LEVELS.alpha[i];
+  return { id: lv.sub, title: lv.title, color: alpha.color, bg: alpha.bg, cup: alpha.cup, parent: alpha, letter: lv.letter, index: i };
+}
 function map(sec) {
   setBg(sec.bg);
   const s = screen('map');
   s.style.setProperty('--c', sec.color);
-  s.append(topBar({ back: menu, title: sec.title, color: sec.color }));
+  s.append(topBar({ back: sec.parent ? () => map(sec.parent) : menu, title: sec.title, color: sec.color }));
   const levels = LEVELS[sec.id], p = prog(sec.id);
   const cur = Math.min(p.findIndex((x) => x === 0) < 0 ? levels.length : p.findIndex((x) => x === 0), levels.length);
   const STEP = 128, TOP = 70;
@@ -215,21 +226,23 @@ function map(sec) {
     const open = unlocked(sec.id, i);
     const node = h('button', 'node' + (open ? '' : ' locked') + (i === cur ? ' current' : '') + (p[i] ? ' done' : ''));
     node.style.left = xs[i] + '%'; node.style.top = ys[i] + 'px';
-    node.append(h('b', '', open ? String(i + 1) : '🔒'));
+    node.append(h('b', '', open ? (lv.letter || String(i + 1)) : '🔒'));
+    if (lv.letter) node.classList.add('letter-node');
     node.append(h('span', 'node-stars', [1, 2, 3].map((k) => `<i class="${p[i] >= k ? 'on' : ''}">★</i>`).join('')));
     const label = h('span', 'node-label ' + (xs[i] > 50 ? 'left' : 'right'), lv.title);
     node.append(label);
     node.onclick = () => {
-      if (!open) { sfx.bad(); owlSay('Сначала пройди прошлый уровень!', 'Сначала пройди прошлый уровень!', 'think'); return; }
-      sfx.pop(); play(sec, i);
+      if (!open) { sfx.bad(); const t = lv.letter ? 'Сначала выучи прошлую букву!' : 'Сначала пройди прошлый уровень!'; owlSay(t, t, 'think'); return; }
+      sfx.pop();
+      if (lv.sub) map(letterSec(sec, i)); else play(sec, i);
     };
     wrap.append(node);
   });
   const done = sectionDone(sec.id);
   const cupNode = h('div', 'node cup' + (done ? ' done' : ' locked'));
   cupNode.style.left = xs[n - 1] + '%'; cupNode.style.top = ys[n - 1] + 'px';
-  const cupImg = h('img'); cupImg.src = sec.cup; cupImg.alt = 'Кубок';
-  cupNode.append(cupImg);
+  if (sec.letter) { cupNode.classList.add('letter-goal'); cupNode.append(h('b', '', sec.letter)); } // в конце карты буквы — сама буква
+  else { const cupImg = h('img'); cupImg.src = sec.cup; cupImg.alt = 'Кубок'; cupNode.append(cupImg); }
   wrap.append(cupNode);
 
   if (sec.id === 'abc') {
@@ -255,14 +268,15 @@ function play(sec, li, skipIntro = false) {
   s.style.setProperty('--c', sec.color);
   s.append(topBar({ back: () => map(sec), title: `${li + 1}. ${lv.title}`, color: sec.color }));
   const progress = h('div', 'progress');
-  const dots = Array.from({ length: TASKS_PER_LEVEL }, () => { const d = h('i'); progress.append(d); return d; });
+  const TASKS = tasksFor(sec.id);
+  const dots = Array.from({ length: TASKS }, () => { const d = h('i'); progress.append(d); return d; });
   s.append(progress);
   const stage = h('div', 'stage');
   s.append(stage);
 
   let idx = 0, mistakes = 0, last = null, locked = false;
   function next() {
-    if (idx >= TASKS_PER_LEVEL) return finish();
+    if (idx >= TASKS) return finish();
     dots.forEach((d, i) => d.classList.toggle('now', i === idx));
     // задания уровня чередуются, один вид два раза подряд не выпадает
     const choices = lv.games.length > 1 ? lv.games.filter((g) => g !== last) : lv.games;
@@ -369,14 +383,20 @@ function reward(sec, li, got, firstTime, cupNow) {
   const s = screen('reward');
   s.append(topBar({ back: () => map(sec), title: 'Награда!' }));
   const card = h('div', 'reward-card');
-  card.append(h('h2', '', cupNow ? 'Кубок!' : `Уровень ${li + 1} пройден!`));
+  card.append(h('h2', '', cupNow && sec.parent && !sectionDone('alpha') ? learnedMsg(sec.title) : cupNow ? 'Кубок!' : `Уровень ${li + 1} пройден!`));
   const stars = h('div', 'big-stars');
   [1, 2, 3].forEach((k) => { const st = h('i', k <= got ? 'on' : '', '★'); st.style.animationDelay = 0.3 + k * 0.35 + 's'; stars.append(st); });
   card.append(stars);
   let fresh = null;
-  if (cupNow) {
-    const cup = h('div', 'sticker new cup'); const im = h('img'); im.src = sec.cup; cup.append(im);
-    card.append(h('p', '', `Весь раздел «${sec.title}» пройден!`), cup);
+  const alphaDone = sec.parent && cupNow && sectionDone('alpha');
+  if (cupNow && sec.parent && !alphaDone) {
+    // все 15 подуровней буквы пройдены — буква выучена
+    const big = h('div', 'sticker new letter-won', `<b>${sec.letter}<small>${sec.letter.toLowerCase()}</small></b>`);
+    card.append(h('p', '', 'Все 15 заданий пройдены!'), big);
+  } else if (cupNow) {
+    const cupSec = sec.parent || sec;
+    const cup = h('div', 'sticker new cup'); const im = h('img'); im.src = cupSec.cup; cup.append(im);
+    card.append(h('p', '', `Весь раздел «${cupSec.title}» пройден!`), cup);
   } else if (firstTime) {
     const owned = store.get('stickers', []);
     fresh = shuffle(ITEMS.filter((i) => !owned.includes(i.word)))[0];
@@ -392,6 +412,10 @@ function reward(sec, li, got, firstTime, cupNow) {
     const nx = h('button', 'play-btn small', 'Дальше ▶');
     nx.onclick = () => { sfx.pop(); play(sec, li + 1); };
     row.append(nx);
+  } else if (sec.parent && LEVELS.alpha[sec.index + 1] && prog('alpha')[sec.index] > 0) {
+    const nx = h('button', 'play-btn small', 'Следующая буква ▶');
+    nx.onclick = () => { sfx.pop(); map(letterSec(sec.parent, sec.index + 1)); };
+    row.append(nx);
   }
   const again = h('button', 'play-btn small alt', '🔁 Ещё раз');
   again.onclick = () => { sfx.pop(); play(sec, li, true); };
@@ -402,7 +426,9 @@ function reward(sec, li, got, firstTime, cupNow) {
   s.append(card);
   sfx.fanfare(); confetti(120); setTimeout(() => confetti(80), 1200);
   const praise = got === 3 ? 'Три звезды! Ты молодец!' : got === 2 ? 'Две звезды! Здорово!' : 'Уровень пройден! Молодец!';
-  owlSay(praise, [praise, cupNow ? `Держи кубок за раздел ${sec.title}!` : fresh ? `Держи наклейку: ${fresh.word}!` : ''], 'joy');
+  const cupTitle = (sec.parent || sec).title;
+  const extra = cupNow && sec.parent && !sectionDone('alpha') ? `Ура! ${learnedMsg(sec.title)}` : cupNow ? `Держи кубок за раздел ${cupTitle}!` : fresh ? `Держи наклейку: ${fresh.word}!` : '';
+  owlSay(praise, [praise, extra], 'joy');
 }
 
 // ---------- альбом наклеек ----------
@@ -439,7 +465,7 @@ function stickers() {
   s.append(topBar({ back: menu, title: `Мои наклейки ${owned.length} / ${ITEMS.length}` }));
   // кубки и наклейки — одна сетка, всё видно сразу, без прокрутки
   const grid = h('div', 'sticker-grid');
-  SECTIONS.forEach((sec) => {
+  SECTIONS.filter((x) => !x.hidden).forEach((sec) => {
     const has = sectionDone(sec.id);
     const c = h('button', 'sticker cup' + (has ? '' : ' locked'));
     const im = h('img'); im.src = sec.cup; im.alt = sec.title; c.append(im);
@@ -472,5 +498,9 @@ setTimeout(() => ITEMS.forEach((it) => { const i = new Image(); i.src = it.img; 
 if (q.get('level')) {
   const [sid, n] = q.get('level').split('.');
   const sec = SECTIONS.find((x) => x.id === sid);
-  if (sec && LEVELS[sid][+n]) { startAudio(); play(sec, +n); } else { pull(); splash(); } // заставка сразу, прохождение с сервера грузится в фоне (меню его дождётся)
+  const alpha = SECTIONS.find((x) => x.id === 'alpha');
+  if (sid === 'alpha' && LEVELS.alpha[+n]) { startAudio(); map(letterSec(alpha, +n)); }          // ?level=alpha.5 — карта буквы
+  else if (/^al\d\d$/.test(sid) && LEVELS[sid]?.[+n]) { startAudio(); play(letterSec(alpha, +sid.slice(2)), +n); } // ?level=al05.3 — подуровень буквы
+  else if (sec && LEVELS[sid][+n]) { startAudio(); play(sec, +n); }
+  else { pull(); splash(); }
 } else { pull(); splash(); } // заставка сразу, прохождение с сервера грузится в фоне (меню его дождётся)

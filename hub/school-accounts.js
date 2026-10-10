@@ -57,7 +57,7 @@ function mergeProgress(a = {}, b = {}) {
     for (const [k, v] of Object.entries(src || {})) {
       if (k === "stars") out.stars = Math.max(out.stars || 0, Math.max(0, Math.min(1e6, Math.round(+v || 0))));
       else if (k === "stickers" && Array.isArray(v)) out.stickers = [...new Set([...(out.stickers || []), ...v.filter((x) => typeof x === "string").map((x) => x.slice(0, 30))])].slice(0, 500);
-      else if (/^prog\.[a-z]{1,20}$/.test(k) && Array.isArray(v)) {
+      else if (/^prog\.[a-z0-9]{1,20}$/.test(k) && Array.isArray(v)) { // al00…al32 — подуровни букв
         const w = out[k] || [];
         out[k] = Array.from({ length: Math.min(200, Math.max(w.length, v.length)) }, (_, i) => Math.max(w[i] || 0, Math.max(0, Math.min(3, Math.round(+v[i] || 0)))));
       }

@@ -40,7 +40,7 @@ def speakable(text):
     def q(v):
         v = v.lower()
         return '«о-о»' if v == 'о' else ('«у-у»' if v == 'у' else ('«э-э»' if v == 'э' else f'«{v}»'))
-    ctx = r'(букв[ауы]|звук:?)'
+    ctx = r'(букв(?:а|у|ы|ой)?|звук:?)'  # буква, букву, буквы, буквой, букв («Сколько букв мэ…»), звук
     t = re.sub(ctx + r' ы(?= в )', lambda m: f'{m[1]} «ы»', t)  # «ы в слове сыр» — слово уже есть, подсказка не нужна
     t = re.sub(ctx + r' ы(?=[.,!?]|$)', lambda m: f'{m[1]} «ы», как в слове мы', t)
     # согласная-буква без кавычек сливается со словом («Буква дэ» → «бук воды», «букву нэ в слове» → «на условии»)
@@ -89,7 +89,7 @@ async def one(text, sem, index):
 async def main():
     os.makedirs(OUT, exist_ok=True)
     phrases = json.load(open(PHRASES, encoding='utf-8'))
-    index, sem = {}, asyncio.Semaphore(8)
+    index, sem = {}, asyncio.Semaphore(4)  # 8 потоков сервис синтеза начал отклонять
     made = sum(await asyncio.gather(*(one(t, sem, index) for t in phrases)))
     # лишние файлы от старых фраз — убрать
     keep = set(index.values())

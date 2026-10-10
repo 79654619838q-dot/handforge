@@ -125,6 +125,39 @@ GROUPS.forEach((group, k) => {
 });
 LEVELS.letters.push(L('Весь алфавит', [G.findLetter, {}], [G.picToLetter, {}], [G.letterToPic, {}], [G.letterInWord, {}], [G.lowerCase, {}], [G.similarLetters, {}], [G.abcGap, {}], [G.abcTrain, {}]));
 
+// «Алфавит по порядку»: 33 уровня — буквы А…Я, у каждой своя карта из 15 подуровней
+// (LEVELS.alNN), на каждом подуровне — 5 заданий про эту букву. Следующая буква открывается,
+// когда пройдены все 15 подуровней предыдущей.
+const NAME2 = { Ь: 'Мягкий знак', Ъ: 'Твёрдый знак' };
+const hasPic2 = (ch) => ITEMS.some((i) => i.letter === ch);
+const inWords2 = (ch) => ITEMS.some((i) => i.word.toUpperCase().includes(ch));
+export const alphaId = (i) => 'al' + String(i).padStart(2, '0');
+function alphaSub(ch, i) {
+  const near = ALPHABET.slice(Math.max(0, i - 2), i + 3);   // соседи по алфавиту — для выбора из похожего ряда
+  const pic = hasPic2(ch), words = inWords2(ch);
+  const subs = [
+    { title: 'Знакомство', intro: [ch], games: [[G.findLetter, { target: ch, set: [ch] }]] },
+    L('Найди букву', [G.findLetter, { target: ch, set: near }]),
+    L('Среди многих букв', [G.findLetter, { target: ch, set: ALPHABET, n: 6 }]),
+    L('Большая и маленькая', [G.lowerCase, { target: ch }]),
+    L('Похожие буквы', [G.similarLetters, { target: ch }]),
+    pic ? L('Картинка на букву', [G.letterToPic, { target: ch }]) : L('В каком слове есть буква', [G.picHasLetter, { target: ch }]),
+    pic ? L('С какой буквы слово', [G.picToLetter, { target: ch, set: near }]) : L('Слог с буквой', [G.sylWithLetter, { target: ch }]),
+    words ? L('Буква в слове', [G.letterInWord, { target: ch }]) : L('Найди среди всех', [G.findLetter, { target: ch, set: ALPHABET, n: 8 }]),
+    words ? L('Сколько раз в слове', [G.letterCount, { target: ch }]) : L('Найди быстро', [G.findLetter, { target: ch, set: near, n: 5 }]),
+    words ? L('Где буква в слове', [G.letterPlace, { target: ch }]) : L('Похожие буквы ещё раз', [G.similarLetters, { target: ch }]),
+    L('Соседи в алфавите', [G.neighborLetter, { target: ch }]),
+    words ? L('В каком слове есть буква', [G.picHasLetter, { target: ch }]) : L('Большая и маленькая ещё раз', [G.lowerCase, { target: ch }]),
+    words ? L('Слог с буквой', [G.sylWithLetter, { target: ch }]) : L('Соседи ещё раз', [G.neighborLetter, { target: ch }]),
+    words ? L('Собери слово', [G.buildWord, { min: 2, max: 7, extra: 2, hint: true, withLetter: ch }]) : L('Найди среди всех ещё раз', [G.findLetter, { target: ch, set: ALPHABET, n: 8 }]),
+  ];
+  subs.push(L('Всё вместе', ...subs.slice(1).flatMap((x) => x.games)));
+  return subs;
+}
+LEVELS.alpha = ALPHABET.map((ch, i) => ({ title: NAME2[ch] || `Буква ${ch}`, letter: ch, sub: alphaId(i), games: [] }));
+ALPHABET.forEach((ch, i) => { LEVELS[alphaId(i)] = alphaSub(ch, i); });
+
 export const TASKS_PER_LEVEL = 8;
+export const tasksFor = (id) => (/^al\d\d$/.test(id) ? 5 : TASKS_PER_LEVEL); // подуровней много — заданий в каждом меньше
 // звёзды за уровень по числу ошибок
 export const starsFor = (mistakes) => (mistakes <= 1 ? 3 : mistakes <= 4 ? 2 : 1);
