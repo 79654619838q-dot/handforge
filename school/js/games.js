@@ -4,7 +4,7 @@
 import {
   ITEMS, COUNTABLE, SOUND_SAY, NUM, numWord, plural, isVowel, byWord,
   STORY_THINGS, STORY_HEROES, countPhrase, YES_NO, RIDDLES, SYL_CONS, SYL_VOW,
-  ALPHABET, LETTER_SAY, letterWord, lettersWithPics, alike,
+  ALPHABET, LETTER_SAY, letterWord, lettersWithPics, alike, ALPHA_READY,
 } from './data.js';
 import { say, sfx } from './audio.js';
 
@@ -918,7 +918,7 @@ export const buildWord = ({ min = 3, max = 3, extra = 2, hint = false, ear = fal
 
 // что совёнок говорит про букву: одной фразой, с примером слова
 export function letterPhrase(L, it = letterWord(L)) {
-  if (L === 'Ъ') return 'Это твёрдый знак. Он не звучит, а разделяет звуки, как в слове объятия.';
+  if (L === 'Ъ') return ALPHA_READY ? 'Это твёрдый знак. Он не звучит, а разделяет звуки, как в слове объятия.' : 'Это твёрдый знак. Он не звучит, а разделяет звуки.';
   if (L === 'Ь') return 'Это мягкий знак. Он не звучит, а смягчает, как в слове конь.';
   if (L === 'Ы') return 'Это буква ы. На ы слова не начинаются, но она есть в слове сыр.';
   const n = sayL(L);
