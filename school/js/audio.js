@@ -193,7 +193,7 @@ export function say(parts, { rate = 0.9, pitch = 1.1 } = {}) {
   duck(true);
   return list.reduce((p, part) => p.then(() => {
     if (!isMine()) return;
-    return Promise.race([indexReady, new Promise((r) => setTimeout(r, 3000))]);
+    return Promise.race([indexReady, new Promise((r) => setTimeout(r, 12000))]); // список записей ~420 КБ — на медленном интернете ждём дольше
   }).then(() => {
     if (!isMine()) return;
     if (typeof part === 'number') return new Promise((r) => setTimeout(r, part));

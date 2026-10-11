@@ -78,6 +78,7 @@ async def one(text, sem, index):
             try:
                 await edge_tts.Communicate(spoken, VOICE, rate=rate, pitch=pitch).save(path)
                 await asyncio.to_thread(trim, path)
+                await asyncio.sleep(0.4)  # не частить — иначе сервис блокирует адрес
                 return 1
             except Exception as e:  # сеть/лимит — пробуем ещё
                 await asyncio.sleep(2 + attempt * 3)
@@ -89,13 +90,18 @@ async def one(text, sem, index):
 async def main():
     os.makedirs(OUT, exist_ok=True)
     phrases = json.load(open(PHRASES, encoding='utf-8'))
-    index, sem = {}, asyncio.Semaphore(4)  # 8 потоков сервис синтеза начал отклонять
+    index, sem = {}, asyncio.Semaphore(3)  # 8 потоков — сервис синтеза блокировал адрес (403); 3 с паузами
     made = sum(await asyncio.gather(*(one(t, sem, index) for t in phrases)))
-    # лишние файлы от старых фраз — убрать
+    # лишние файлы от старых фраз — убрать, но только если записалось всё: при сбоях синтеза старые
+    # записи могут ещё понадобиться (11.10 так пропали фразы знакомства с буквами)
+    failed = len(phrases) - len(index)
     keep = set(index.values())
-    for f in os.listdir(OUT):
-        if f.endswith('.mp3') and f not in keep:
-            os.remove(os.path.join(OUT, f))
+    if failed == 0:
+        for f in os.listdir(OUT):
+            if f.endswith('.mp3') and f not in keep:
+                os.remove(os.path.join(OUT, f))
+    else:
+        print(f'не записано {failed} — старые файлы не удаляю', file=sys.stderr)
     json.dump(index, open(os.path.join(OUT, 'index.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     print(f'фраз {len(index)}, записано новых {made}')
 
