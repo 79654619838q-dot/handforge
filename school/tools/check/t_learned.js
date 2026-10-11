@@ -3,7 +3,7 @@
 const E = globalThis.__env; const BASE = E.BASE || 'http://localhost:8890/school/';
 const B = BASE + '?check=1';
 const pad = (i) => String(i).padStart(2, '0');
-let bad = 0;
+let bad = 0, n = 0;
 for (let i = +(E.FROM || 0); i < +(E.TO || 33); i++) {
   const id = 'al' + pad(i);
   await go(B); await sleep(500);
@@ -28,7 +28,7 @@ for (let i = +(E.FROM || 0); i < +(E.TO || 33); i++) {
     return JSON.stringify({ h2, tr });
   })()`));
   const ok = /выучен/.test(r.h2) && r.tr.length && r.tr.every((t) => t.how === 'ok');
-  if (!ok) bad++;
+  n++; if (!ok) bad++;
   console.log(`${ok ? 'ok    ' : 'ПЛОХО '} ${id} ${r.h2} | ${r.tr.map((t) => `${t.part} — ${t.how} ${t.extra ?? ''}`).join('; ') || 'фраза не сказана'}`);
 }
-console.log(`ИТОГО: букв 33, с ошибкой ${bad}`);
+console.log(`ИТОГО: букв ${n}, с ошибкой ${bad}`);
