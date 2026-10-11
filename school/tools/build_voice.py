@@ -47,6 +47,9 @@ def speakable(text):
     t = re.sub(ctx + r' ([бвгджзклмнпрстфхцчшщ]э)(?=[.,!?:]| в |$)', lambda m: f'{m[1]} «{m[2]}»', t)
     t = re.sub(ctx + r' ([' + VOW + r'])(?=[.,!?]| в |$)', lambda m: f'{m[1]} {q(m[2])}', t)
     t = re.sub(r'(^|\. )([ОУЭАИЕЁЮЯ]) —', lambda m: f'{m[1]}{q(m[2]).strip("«»").capitalize()} —', t)
+    # «Ура! Буква С — выучена!»: заглавная буква без кавычек — Whisper слышал «Буква О» как «А», «Буква С» как «буквоз»
+    t = re.sub(r'Буква ([А-ЯЁ]) —', lambda m: 'Буква «ы», как в слове мы, —' if m[1] == 'Ы' else (m[0] if m[1] == 'Й' else
+               f'Буква {q(m[1]) if m[1].lower() in VOW else "«" + m[1].lower() + "э»"} —'), t)
     t = re.sub(r'(слог )([а-яё]{1,4})(?=[.,!?]|$)', lambda m: f'{m[1]}«{SYL_FIX.get(m[2], m[2])}»', t)
     t = re.sub(r'(?i)йогурт', lambda m: 'ёгурт' if m[0][0] == 'й' else 'Ёгурт', t)
     return t
@@ -110,5 +113,5 @@ if __name__ == '__main__' and '--trim-all' in sys.argv:  # один раз: об
     files = [os.path.join(OUT, f) for f in os.listdir(OUT) if f.endswith('.mp3')]
     with cf.ThreadPoolExecutor(8) as ex: list(ex.map(trim, files))
     print('обрезано', len(files))
-else:
+elif __name__ == '__main__':  # при import (проверки берут speakable) — ничего не записывать и не удалять
     asyncio.run(main())
