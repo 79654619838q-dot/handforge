@@ -1,10 +1,10 @@
 // Похвала «Ура! Буква … — выучена!» для каждой из 33 букв: 14 подуровней уже пройдены, проходим 15-й
-// и смотрим экран награды и путь записи голоса (?check=1, без звука). FROM=N — начать с N-й буквы.
+// и смотрим экран награды и путь записи голоса (?check=1, без звука). FROM=N, TO=M — только буквы с N по M-1.
 const E = globalThis.__env; const BASE = E.BASE || 'http://localhost:8890/school/';
 const B = BASE + '?check=1';
 const pad = (i) => String(i).padStart(2, '0');
 let bad = 0;
-for (let i = +(E.FROM || 0); i < 33; i++) {
+for (let i = +(E.FROM || 0); i < +(E.TO || 33); i++) {
   const id = 'al' + pad(i);
   await go(B); await sleep(500);
   await js(`localStorage.clear(); localStorage.setItem('school.prog.${id}', JSON.stringify([...Array(14).fill(3), 0]))`);
