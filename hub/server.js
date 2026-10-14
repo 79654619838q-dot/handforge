@@ -2,7 +2,7 @@
 // Poker и PhotoQuest — просто раскладывает трафик по путям: "/" — меню выбора,
 // "/poker" — HandForge Poker, "/quest" — PhotoQuest, "/cell" — Cell Survival, "/dressup" — «Наряди принцессу»,
 // "/journal" — журнал покерной сессии, "/slots" — игровые автоматы на ненастоящие монеты,
-// "/detective" — игра-расследование «АРХИВ».
+// "/detective" — игра-расследование «АРХИВ», "/realm" — «Сокрытая сила» (герои с тайной силой, бои, находки).
 // PhotoQuest отдаёт готовую сборку (npm run build), Poker работает как обычно.
 
 import express from "express";
@@ -14,6 +14,7 @@ import { attachRatingRoutes } from "./cell-rating.js";
 import { attachSchoolAccounts } from "./school-accounts.js";
 import { attachSlotsRating } from "./slots-rating.js";
 import { attachDetectiveRating } from "./detective-rating.js";
+import { attachRealmAccounts } from "./realm-accounts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8877;
@@ -26,6 +27,7 @@ const JOURNAL_DIR = path.join(__dirname, "..", "journal");
 const SCHOOL_DIR = path.join(__dirname, "..", "school");
 const SLOTS_DIR = path.join(__dirname, "..", "slots");
 const DETECTIVE_DIR = path.join(__dirname, "..", "detective");
+const REALM_DIR = path.join(__dirname, "..", "realm");
 
 const app = express();
 
@@ -163,6 +165,22 @@ app.use("/detective", express.static(DETECTIVE_DIR, {
   },
 }));
 
+// «Сокрытая сила» — статическая, без сборки. Вход по нику и паролю, сохранение на сервере — /realm/api (realm-accounts.js).
+// tools/ наружу не отдаём.
+attachRealmAccounts(app);
+app.get("/realm", (req, res, next) => {
+  if (req.path === "/realm") return res.redirect(301, "/realm/");
+  next();
+});
+app.get("/realm/tools/*", (_req, res) => res.sendStatus(404));
+app.use("/realm", express.static(REALM_DIR, {
+  index: "index.html",
+  setHeaders: (res, file) => {
+    if (/\.(html|js|css|json)$/.test(file)) res.setHeader("Cache-Control", "no-cache");
+    else res.setHeader("Cache-Control", "public, max-age=604800");
+  },
+}));
+
 // Журнал покерной сессии — одна статическая страница, данные только в браузере игрока.
 app.get("/journal", (req, res, next) => {
   if (req.path === "/journal") return res.redirect(301, "/journal/");
@@ -190,6 +208,7 @@ const server = app.listen(PORT, () => {
   console.log(`  /school  → ${SCHOOL_DIR}`);
   console.log(`  /slots   → ${SLOTS_DIR}`);
   console.log(`  /detective → ${DETECTIVE_DIR}`);
+  console.log(`  /realm   → ${REALM_DIR}`);
   console.log(`  /api     → ${QUEST_API_TARGET}`);
 });
 

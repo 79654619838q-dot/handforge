@@ -23,6 +23,7 @@ hub/.cell-rating.json
 # исходники картинок и список фраз «Школы Умки» (из ChatGPT, большие)
 school-art/
 hub/.school-accounts.json
+hub/.realm-accounts.json
 
 # исходники картинок «Золотых барабанов» (из ChatGPT, большие)
 slots-art/
@@ -31,3 +32,10 @@ hub/.slots-rating.json
 # исходники картинок игры-расследования (из ChatGPT, большие)
 detective-art/
 hub/.detective-rating.json
+
+# 3D-сканер: окружение, сертификаты, записи с телефона (большие видео)
+scanner3d/.venv/
+scanner3d/certs/
+scanner3d/data/
+scanner3d/__pycache__/
+realm-art/
