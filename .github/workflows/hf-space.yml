@@ -1,0 +1,33 @@
+# Второй сайт на Hugging Face Spaces: каждый push в main копирует проект в Space, и он пересобирается сам
+# (Dockerfile в корне). Нужны: секрет репозитория HF_TOKEN (токен Hugging Face с правом записи) и
+# переменная репозитория HF_SPACE вида «имя/handforge». Пока их нет — шаг пропускается.
+name: Второй сайт (Hugging Face)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: hf-space
+  cancel-in-progress: true
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: ${{ vars.HF_SPACE != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Отправить в Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          set -e
+          git config --global user.email "actions@github.com"
+          git config --global user.name "github-actions"
+          # одна свежая версия без истории: Hugging Face принимает картинки и звук только через LFS
+          rm -rf .git && git init -q -b main && git lfs install --local
+          git lfs track "*.png" "*.jpg" "*.jpeg" "*.webp" "*.gif" "*.ico" "*.mp3" "*.wav" "*.ogg" "*.mp4" "*.glb" "*.gltf" "*.bin" "*.ttf" "*.woff" "*.woff2" "*.pdf" "*.zip" "*.fbx" "*.hdr" "*.pyc"
+          # Space читает настройки из шапки README
+          printf -- '---\ntitle: HandForge\nemoji: 🎲\ncolorFrom: yellow\ncolorTo: red\nsdk: docker\napp_port: 7860\npinned: true\n---\n\n' | cat - README.md > README.tmp && mv README.tmp README.md
+          git add -A
+          git commit -qm "Синхронизация с GitHub ${GITHUB_SHA::7}"
+          git push -f "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" main

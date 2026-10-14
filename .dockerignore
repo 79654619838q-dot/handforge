@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+.git
+*-art
+scanner3d
+Assets
+Scripts
+docs
+claude-skills
+cleanup_disk_*
+hub/.*.json
+server/storage
+**/.env
