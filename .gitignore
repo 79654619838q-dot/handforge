@@ -39,3 +39,5 @@ scanner3d/certs/
 scanner3d/data/
 scanner3d/__pycache__/
 realm-art/
+access/access.db
+access/.env

@@ -1,0 +1,82 @@
+/* Общий вид обеих страниц: тёмный фон и золото -- как в самой программе
+   и в трансляции, чтобы клуб видел одно и то же оформление. */
+:root{
+  --bg:#0E0B12; --panel:#171320; --panel2:#1E1828; --line:#2C2438;
+  --ink:#EDE9F5; --muted:#9C93AE; --gold:#E8B84B; --mag:#C64BE8;
+  --ok:#3FBF6A; --warn:#E8B84B; --bad:#E2584D;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Segoe UI",system-ui,-apple-system,sans-serif;padding:20px 16px 40px}
+
+/* Картинка входа -- на весь экран, под вуалью: поверх неё лежит форма, и
+   текст обязан читаться. Если файла нет, остаётся обычный тёмный фон. */
+body.has-hero{min-height:100vh;background:
+  linear-gradient(100deg, rgba(14,11,18,.94) 0%, rgba(14,11,18,.72) 42%, rgba(14,11,18,.45) 100%),
+  url("login-bg.jpg") center 62%/cover no-repeat fixed var(--bg);
+  display:flex;align-items:center}
+/* Сам блок на картинке не нужен -- карточки лежат прямо поверх зала. */
+body.has-hero .screen{background:transparent;border:0;padding:0;margin:0}
+body.has-hero .card{background:rgba(23,19,32,.86);backdrop-filter:blur(8px);
+  box-shadow:0 24px 60px rgba(0,0,0,.45)}
+/* Правую карточку не растягиваем во всю ширину -- иначе зал за ней не
+   виден, а ради него картинка и рисовалась. */
+body.has-hero .col{max-width:470px}
+a{color:var(--gold)}
+.wrap{max-width:1180px;margin:0 auto}
+.logo{font-size:22px;font-weight:800;letter-spacing:1px}
+.logo span{color:var(--gold)}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+h1{font-size:14px;letter-spacing:2px;color:var(--muted);font-weight:600;
+  text-transform:uppercase;margin:0 0 14px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:20px}
+.screen{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:22px;margin-bottom:24px}
+.row{display:flex;gap:20px;flex-wrap:wrap}
+.col{flex:1;min-width:300px}
+label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px}
+input,select,textarea{width:100%;background:#120F1A;border:1px solid var(--line);
+  border-radius:8px;color:var(--ink);padding:10px 12px;font-size:14px;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
+.btn{background:linear-gradient(180deg,#F0C65C,#D7A332);color:#1A1208;border:0;
+  border-radius:9px;padding:12px 20px;font-weight:700;font-size:14px;cursor:pointer;
+  font-family:inherit}
+.btn:hover{filter:brightness(1.07)}
+.btn:disabled{opacity:.5;cursor:default;filter:none}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.small{padding:7px 12px;font-size:12px}
+.btn.big{width:100%;text-align:center;font-size:16px;padding:16px}
+.hint{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.6}
+.note{color:var(--muted);font-size:12px;line-height:1.6;margin-top:12px}
+.meta{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--muted);margin-top:12px;
+  flex-wrap:wrap}
+.pill{font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px;letter-spacing:.5px;
+  display:inline-block}
+.pill.ok{background:rgba(63,191,106,.15);color:var(--ok);border:1px solid rgba(63,191,106,.4)}
+.pill.warn{background:rgba(232,184,75,.15);color:var(--warn);border:1px solid rgba(232,184,75,.4)}
+.pill.bad{background:rgba(226,88,77,.15);color:var(--bad);border:1px solid rgba(226,88,77,.4)}
+.err{color:var(--bad);font-size:13px;margin-top:12px;min-height:18px}
+.ok-text{color:var(--ok);font-size:13px;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+  text-align:left;padding:10px 10px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:11px 10px;border-bottom:1px solid #241D30;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tr.dim{opacity:.55}
+code{background:#120F1A;border:1px solid var(--line);border-radius:6px;padding:2px 7px;
+  font-family:Consolas,monospace;font-size:12.5px;color:var(--gold)}
+.grid-terms{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:6px}
+.term{background:#120F1A;border:1px solid var(--line);border-radius:10px;padding:12px;
+  text-align:center;cursor:pointer}
+.term b{display:block;font-size:14px}
+.term small{color:var(--muted);font-size:11px}
+.term.sel{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(232,184,75,.35)}
+.steps{margin:12px 0 0;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.9}
+.hidden{display:none}
+.msgbox{white-space:pre-wrap;background:#120F1A;border:1px solid var(--line);border-radius:10px;
+  padding:14px;font-size:12.5px;line-height:1.7;margin-top:12px}
+.table-wrap{overflow-x:auto}
+@media (max-width:720px){
+  body{padding:14px 12px 30px}
+  .col{min-width:100%}
+}

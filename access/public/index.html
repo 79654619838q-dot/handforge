@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HandForge Manager — доступ для клубов</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="has-hero">
+<div class="wrap">
+
+  <!-- вход -->
+  <div class="screen" id="loginScreen">
+    <div class="row">
+      <div class="card" style="width:340px">
+        <div class="logo">HAND<span>FORGE</span></div>
+        <div class="sub">Доступ для клубов</div>
+        <form id="loginForm" autocomplete="off">
+          <label for="login">Логин</label>
+          <input id="login" name="login" autocapitalize="off" spellcheck="false" required>
+          <label for="password">Пароль</label>
+          <input id="password" name="password" type="password" required>
+          <div style="margin-top:18px">
+            <button class="btn big" type="submit" id="loginBtn">Войти</button>
+          </div>
+        </form>
+        <div class="err" id="loginError"></div>
+        <div class="hint">Логин и пароль выдаёт HandForge. Если срок закончился —
+          напишите нам, чтобы продлить.</div>
+      </div>
+
+      <div class="col card">
+        <div style="font-size:15px;font-weight:700">Что это</div>
+        <div class="note" style="margin-top:8px">
+          HandForge Manager ведёт покерный турнир: рассадка и стеки, блайнды и
+          уровни, банк и сайд-поты, карты с камеры, экран дилера на планшете,
+          плашки игроков в эфире и голосовое управление.
+        </div>
+        <div class="note">
+          Программа работает на компьютере клуба — её нужно скачать и запустить.
+          Все данные (турниры, игроки, рейтинги) хранятся только у вас, на вашем
+          компьютере, и никуда не передаются.
+        </div>
+        <div class="note">
+          <b style="color:var(--ink)">Без логина</b> доступны проверки оборудования:
+          камеры (видит ли она карты и какие), микрофоны дилера и зала, голосовые
+          команды. Турниры, стол, экран дилера и трансляция открываются по логину.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- кабинет клуба -->
+  <div class="screen hidden" id="clubScreen">
+    <div class="row">
+      <div class="col card">
+        <div class="sub" id="clubName">—</div>
+        <div style="font-size:19px;font-weight:700;margin-top:4px" id="clubAccess">—</div>
+        <div class="meta" id="clubMeta"></div>
+
+        <div id="downloadBox" style="margin-top:18px">
+          <button class="btn big" id="downloadBtn">Скачать программу</button>
+          <div class="hint" id="releaseHint"></div>
+          <ol class="steps">
+            <li>Распакуйте архив в любую папку.</li>
+            <li>Запустите «HandForge Manager.exe».</li>
+            <li>Войдите теми же логином и паролем.</li>
+            <li>Подключите камеру и микрофон, откройте «Настройки» → «Проверка камеры».</li>
+          </ol>
+        </div>
+
+        <div id="deniedBox" class="hidden">
+          <div class="note" id="deniedText" style="color:var(--bad)"></div>
+        </div>
+
+        <div style="margin-top:20px">
+          <button class="btn ghost small" id="logoutBtn">Выйти</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="club.js"></script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HandForge — учёт клубов</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- вход оператора -->
+  <div class="screen" id="authScreen">
+    <div class="card" style="max-width:340px">
+      <div class="logo">HAND<span>FORGE</span></div>
+      <div class="sub">Учёт клубов — только для оператора</div>
+      <form id="authForm" autocomplete="off">
+        <label for="adminPassword">Пароль управления</label>
+        <input id="adminPassword" type="password" required>
+        <div style="margin-top:18px"><button class="btn big" type="submit">Войти</button></div>
+      </form>
+      <div class="err" id="authError"></div>
+    </div>
+  </div>
+
+  <div class="hidden" id="workScreen">
+
+    <!-- новый клуб -->
+    <h1>Новый клуб</h1>
+    <div class="screen">
+      <div class="row">
+        <div class="card" style="width:340px">
+          <form id="createForm" autocomplete="off">
+            <label for="clubNameInput">Название клуба и город</label>
+            <input id="clubNameInput" placeholder="Клуб «Империал», Москва" required>
+            <label for="contactInput">Контакт — кому выдали</label>
+            <input id="contactInput" placeholder="Сергей, +7 999 123-45-67">
+            <label>Срок</label>
+            <div class="grid-terms" id="terms">
+              <div class="term" data-plan="test3"><b>3 дня</b><small>тест</small></div>
+              <div class="term sel" data-plan="month"><b>1 месяц</b><small>подписка</small></div>
+              <div class="term" data-plan="months3"><b>3 месяца</b><small>подписка</small></div>
+              <div class="term" data-plan="year"><b>1 год</b><small>подписка</small></div>
+              <div class="term" data-plan="custom" style="grid-column:1/3"><b>Свой срок</b><small>число дней</small></div>
+            </div>
+            <div id="customBox" class="hidden">
+              <label for="customDays">Сколько дней</label>
+              <input id="customDays" type="number" min="1" max="3650" value="45">
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn big" type="submit" id="createBtn">Создать логин и пароль</button>
+            </div>
+          </form>
+          <div class="err" id="createError"></div>
+        </div>
+
+        <div class="col card" id="resultCard">
+          <div style="font-size:15px;font-weight:700">Что отправить клубу</div>
+          <div class="note" id="resultEmpty">Заполните форму слева и нажмите «Создать».
+            Пароль показывается <b style="color:var(--ink)">один раз</b> — в базе хранится
+            только его отпечаток. Если потеряли — выдайте новый кнопкой в списке.</div>
+          <div class="hidden" id="resultBox">
+            <div class="msgbox" id="resultMessage"></div>
+            <div style="margin-top:12px">
+              <button class="btn" id="copyBtn">Скопировать сообщение</button>
+              <button class="btn ghost" id="closeResultBtn">Готово</button>
+            </div>
+            <div class="ok-text hidden" id="copiedText">Скопировано — вставьте в переписку с клубом</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- список клубов -->
+    <h1>Клубы <span id="clubsCount" style="color:var(--gold)"></span></h1>
+    <div class="screen">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <input id="search" placeholder="Поиск по названию или логину" style="max-width:280px">
+        <button class="btn ghost small" id="refreshBtn">Обновить</button>
+        <span class="hint" id="listHint" style="margin:0"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="clubsTable">
+          <thead>
+            <tr>
+              <th>Клуб</th><th>Логин</th><th>Срок</th><th>Кончается</th>
+              <th>Вход / скачано</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="clubsBody"></tbody>
+        </table>
+      </div>
+      <div class="note">«Продлить» добавляет срок, не меняя логин: действующему клубу —
+        к остатку, просроченному — от сегодня. «Закрыть» выключает вход сразу, не
+        дожидаясь конца срока.</div>
+    </div>
+  </div>
+
+</div>
+<script src="admin.js"></script>
+</body>
+</html>
