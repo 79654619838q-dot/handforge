@@ -55,7 +55,8 @@ const loginLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHead
 // заведённые клубы пропали бы при первом же перезапуске. Пока
 // DATABASE_URL не задан, честно отвечаем «не настроен» -- это лучше, чем
 // принять клуб и потерять его вместе с оплаченным сроком.
-const needsDatabase = store.driver === "sqlite" && process.env.RENDER === "true";
+const needsDatabase = store.driver === "none"
+  || (store.driver === "sqlite" && process.env.RENDER === "true");
 if (needsDatabase) {
   app.use("/api", (_req, res) => res.status(503).json({
     error: "Сайт ещё не настроен: нет постоянной базы (DATABASE_URL)",
@@ -285,7 +286,11 @@ app.get("/health", (_req, res) => res.json({
 }));
 
 const start = async () => {
-  await store.init();
+  try {
+    await store.init();
+  } catch (error) {
+    console.log(`[access] база недоступна: ${error.message}`);
+  }
   app.listen(PORT, () => {
     console.log(`[access] сайт доступа на ${SITE_URL} (хранилище: ${store.driver})`);
     if (!ADMIN_PASSWORD) console.log("[access] ВНИМАНИЕ: ADMIN_PASSWORD не задан, вход оператора закрыт");

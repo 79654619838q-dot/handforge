@@ -23,6 +23,7 @@ const url = process.env.DATABASE_URL || "";
 const isPostgres = url.startsWith("postgres://") || url.startsWith("postgresql://");
 
 let query; // (sql, params) -> { rows }
+let driverName = "none";
 
 if (isPostgres) {
   const { default: pg } = await import("pg");
@@ -32,23 +33,41 @@ if (isPostgres) {
     max: 4,
   });
   query = async (sql, params = []) => pool.query(sql, params);
+  driverName = "postgres";
 } else {
-  const { DatabaseSync } = await import("node:sqlite");
-  const file = url || path.join(__dirname, "..", "access.db");
-  const db = new DatabaseSync(file);
-  // $1, $2 ... -> ?, ? ... : переписываем на лету, чтобы запросы в коде
-  // оставались одни и те же для обоих драйверов.
-  query = async (sql, params = []) => {
-    const text = sql.replace(/\$(\d+)/g, "?");
-    const statement = db.prepare(text);
-    if (/^\s*(select|with)/i.test(text)) return { rows: statement.all(...params) };
-    if (/returning/i.test(text)) return { rows: statement.all(...params) };
-    statement.run(...params);
-    return { rows: [] };
-  };
+  // node:sqlite -- драйвер ТОЛЬКО для местной проверки. В Node 22 он ещё
+  // под флагом (`--experimental-sqlite`), и на Render сайт из-за этого
+  // падал при запуске. Рабочему сайту он не нужен вовсе: там Postgres,
+  // поэтому его отсутствие -- не беда, а повод честно сказать, что
+  // постоянной базы нет.
+  let DatabaseSync = null;
+  try {
+    ({ DatabaseSync } = await import("node:sqlite"));
+  } catch {
+    DatabaseSync = null;
+  }
+  if (DatabaseSync) {
+    const file = url || path.join(__dirname, "..", "access.db");
+    const db = new DatabaseSync(file);
+    // $1, $2 ... -> ?, ? ... : переписываем на лету, чтобы запросы в коде
+    // оставались одни и те же для обоих драйверов.
+    query = async (sql, params = []) => {
+      const text = sql.replace(/\$(\d+)/g, "?");
+      const statement = db.prepare(text);
+      if (/^\s*(select|with)/i.test(text)) return { rows: statement.all(...params) };
+      if (/returning/i.test(text)) return { rows: statement.all(...params) };
+      statement.run(...params);
+      return { rows: [] };
+    };
+    driverName = "sqlite";
+  } else {
+    query = async () => {
+      throw new Error("нет хранилища: задайте DATABASE_URL (Postgres)");
+    };
+  }
 }
 
-export const driver = isPostgres ? "postgres" : "sqlite";
+export const driver = driverName;
 
 // Время держим строкой ISO в обоих драйверах: SQLite своего типа даты не
 // имеет, а сравнение строк ISO совпадает со сравнением самих дат.
