@@ -53,7 +53,7 @@ export const driver = isPostgres ? "postgres" : "sqlite";
 // Время держим строкой ISO в обоих драйверах: SQLite своего типа даты не
 // имеет, а сравнение строк ISO совпадает со сравнением самих дат.
 export async function init() {
-  await query(`CREATE TABLE IF NOT EXISTS clubs (
+  await query(`CREATE TABLE IF NOT EXISTS access_clubs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     contact TEXT,
@@ -69,14 +69,14 @@ export async function init() {
     note TEXT,
     created_at TEXT NOT NULL
   )`);
-  await query(`CREATE TABLE IF NOT EXISTS events (
+  await query(`CREATE TABLE IF NOT EXISTS access_events (
     id TEXT PRIMARY KEY,
     club_id TEXT,
     kind TEXT NOT NULL,
     detail TEXT,
     at TEXT NOT NULL
   )`);
-  await query(`CREATE INDEX IF NOT EXISTS events_club_at ON events (club_id, at)`);
+  await query(`CREATE INDEX IF NOT EXISTS access_events_club_at ON access_events (club_id, at)`);
 }
 
 const rowToClub = (row) => row && ({
@@ -97,23 +97,23 @@ const rowToClub = (row) => row && ({
 });
 
 export async function listClubs() {
-  const { rows } = await query(`SELECT * FROM clubs ORDER BY created_at DESC`);
+  const { rows } = await query(`SELECT * FROM access_clubs ORDER BY created_at DESC`);
   return rows.map(rowToClub);
 }
 
 export async function clubById(id) {
-  const { rows } = await query(`SELECT * FROM clubs WHERE id = $1`, [id]);
+  const { rows } = await query(`SELECT * FROM access_clubs WHERE id = $1`, [id]);
   return rowToClub(rows[0]);
 }
 
 export async function clubByLogin(login) {
-  const { rows } = await query(`SELECT * FROM clubs WHERE login = $1`, [login]);
+  const { rows } = await query(`SELECT * FROM access_clubs WHERE login = $1`, [login]);
   return rowToClub(rows[0]);
 }
 
 export async function createClub(club) {
   await query(
-    `INSERT INTO clubs (id, name, contact, login, password_hash, plan, starts_at,
+    `INSERT INTO access_clubs (id, name, contact, login, password_hash, plan, starts_at,
                         expires_at, blocked, login_count, download_count, note, created_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,0,0,$9,$10)`,
     [club.id, club.name, club.contact || null, club.login, club.passwordHash, club.plan,
@@ -138,23 +138,23 @@ export async function updateClub(id, fields) {
   }
   if (!sets.length) return clubById(id);
   params.push(id);
-  await query(`UPDATE clubs SET ${sets.join(", ")} WHERE id = $${params.length}`, params);
+  await query(`UPDATE access_clubs SET ${sets.join(", ")} WHERE id = $${params.length}`, params);
   return clubById(id);
 }
 
 export async function deleteClub(id) {
-  await query(`DELETE FROM events WHERE club_id = $1`, [id]);
-  await query(`DELETE FROM clubs WHERE id = $1`, [id]);
+  await query(`DELETE FROM access_events WHERE club_id = $1`, [id]);
+  await query(`DELETE FROM access_clubs WHERE id = $1`, [id]);
 }
 
 export async function addEvent(clubId, kind, detail) {
-  await query(`INSERT INTO events (id, club_id, kind, detail, at) VALUES ($1,$2,$3,$4,$5)`,
+  await query(`INSERT INTO access_events (id, club_id, kind, detail, at) VALUES ($1,$2,$3,$4,$5)`,
     [crypto.randomUUID(), clubId, kind, detail || null, new Date().toISOString()]);
 }
 
 export async function clubEvents(clubId, limit = 50) {
   const { rows } = await query(
-    `SELECT kind, detail, at FROM events WHERE club_id = $1 ORDER BY at DESC LIMIT $2`,
+    `SELECT kind, detail, at FROM access_events WHERE club_id = $1 ORDER BY at DESC LIMIT $2`,
     [clubId, limit]);
   return rows;
 }
