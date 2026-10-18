@@ -51,6 +51,17 @@ app.use(express.json({ limit: "64kb" }));
 
 const loginLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true });
 
+// На рабочем сайте файловая база не годится: диск там эфемерный, и
+// заведённые клубы пропали бы при первом же перезапуске. Пока
+// DATABASE_URL не задан, честно отвечаем «не настроен» -- это лучше, чем
+// принять клуб и потерять его вместе с оплаченным сроком.
+const needsDatabase = store.driver === "sqlite" && process.env.RENDER === "true";
+if (needsDatabase) {
+  app.use("/api", (_req, res) => res.status(503).json({
+    error: "Сайт ещё не настроен: нет постоянной базы (DATABASE_URL)",
+  }));
+}
+
 // --- входы ------------------------------------------------------------------
 const signClub = (club) => jwt.sign({ kind: "club", id: club.id }, JWT_SECRET, { expiresIn: "12h" });
 const signAdmin = () => jwt.sign({ kind: "admin" }, JWT_SECRET, { expiresIn: "12h" });
@@ -269,7 +280,9 @@ app.delete("/api/admin/clubs/:id", requireAdmin, async (req, res) => {
 
 // --- страницы -------------------------------------------------------------------
 app.use(express.static(path.join(__dirname, "..", "public"), { extensions: ["html"] }));
-app.get("/health", (_req, res) => res.json({ ok: true, driver: store.driver }));
+app.get("/health", (_req, res) => res.json({
+  ok: !needsDatabase, driver: store.driver, needsDatabase,
+}));
 
 const start = async () => {
   await store.init();
