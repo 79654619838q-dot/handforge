@@ -141,7 +141,7 @@ select{border-radius:14px}
 .spade-rule span{font-size:20px;line-height:1}
 
 /* Фишка в карточке скачивания (вырезана из того же макета) */
-.chip-hero{display:block;width:100%;max-width:360px;margin:2px auto 10px}
+.chip-hero{display:block;width:100%;max-width:168px;height:auto;margin:-2px auto 6px}
 
 /* Строка-подпись под кнопкой скачивания */
 .trio{display:flex;align-items:center;justify-content:center;gap:10px;
