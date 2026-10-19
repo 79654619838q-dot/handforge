@@ -101,6 +101,24 @@ $("logoutBtn").addEventListener("click", () => {
   showScreen("login");
 });
 
+// Кнопка «Скачать» на первой странице работает БЕЗ входа: клуб обязан
+// иметь возможность проверить свои камеры до покупки (решение оператора
+// 20.10.2026). Логин нужен в самой программе -- для турниров.
+fetch("/api/release").then((r) => r.json()).then((release) => {
+  const button = $("publicDownloadBtn");
+  const hint = $("publicReleaseHint");
+  if (release.available) {
+    hint.textContent = `Версия ${release.version || "—"}`
+      + (release.size ? `, ${release.size}` : "") + ". Windows 10/11, 64 бита.";
+    button.addEventListener("click", () => { window.location.href = "/api/download"; });
+  } else {
+    button.disabled = true;
+    hint.textContent = "Сборка ещё выкладывается — зайдите чуть позже.";
+  }
+}).catch(() => {
+  $("publicReleaseHint").textContent = "Не удалось проверить сборку, обновите страницу.";
+});
+
 // Вернулись на страницу с живым входом -- показываем кабинет сразу.
 if (sessionStorage.getItem("clubToken")) {
   api("/api/me").then(render).catch(() => {

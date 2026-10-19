@@ -117,14 +117,26 @@ test("чужой пароль не пускает и запоминается в
   assert.ok(data.events.some((e) => e.kind === "denied"), "отказ записан");
 });
 
-test("скачивание -- только вошедшему клубу и считается", async () => {
-  const { token: admin, club, password } = await newClub({ name: "Клуб «Волна», Тверь" });
-  assert.equal((await call("/api/download")).status, 401, "без входа скачать нельзя");
+test("скачивание открыто всем -- клуб проверяет камеры до покупки", async () => {
+  // Решение оператора 20.10.2026: «делаем Б». Логин нужен в программе, а
+  // не для скачивания -- иначе клуб не сможет проверить свои камеры,
+  // пока не получит доступ.
+  const anybody = await call("/api/download");
 
+  assert.equal(anybody.status, 302, "без входа скачивание тоже работает");
+  assert.equal(anybody.location, "https://example.com/handforge.zip");
+
+  const release = await call("/api/release");
+  assert.equal(release.data.available, true);
+  assert.equal(release.data.version, "18.10.2026");
+});
+
+test("скачивание вошедшего клуба считается в его строке", async () => {
+  const { token: admin, club, password } = await newClub({ name: "Клуб «Волна», Тверь" });
   const { data } = await call("/api/login", { body: { login: club.login, password } });
+
   const download = await call("/api/download", { token: data.token });
   assert.equal(download.status, 302);
-  assert.equal(download.location, "https://example.com/handforge.zip");
 
   const list = await call("/api/admin/clubs", { token: admin });
   assert.equal(list.data.clubs.find((c) => c.id === club.id).downloadCount, 1);

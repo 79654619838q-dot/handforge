@@ -152,12 +152,27 @@ app.get("/api/me", requireClub, async (req, res) => {
   });
 });
 
-app.get("/api/download", requireClub, async (req, res) => {
-  const state = accessState(req.club);
-  if (!state.ok) return res.status(403).json({ error: state.text });
+// Что за сборка лежит -- спрашивает первая страница, ещё до всякого входа.
+app.get("/api/release", (_req, res) => {
+  res.json(RELEASE_URL
+    ? { available: true, version: RELEASE_VERSION, size: RELEASE_SIZE }
+    : { available: false });
+});
+
+// Скачивание ОТКРЫТО ВСЕМ: клуб должен иметь возможность проверить свои
+// камеры до покупки. Логин нужен в самой программе -- без него не
+// создать турнир.
+app.get("/api/download", async (req, res) => {
   if (!RELEASE_URL) return res.status(503).json({ error: "Сборка ещё не выложена" });
-  await store.updateClub(req.club.id, { downloadCount: req.club.downloadCount + 1 });
-  await store.addEvent(req.club.id, "download", RELEASE_VERSION || "");
+  const payload = readToken(req, "club");
+  const club = payload ? await store.clubById(payload.id) : null;
+  if (club) {
+    await store.updateClub(club.id, { downloadCount: club.downloadCount + 1 });
+    await store.addEvent(club.id, "download", RELEASE_VERSION || "");
+  } else {
+    // Скачал кто-то без входа -- тоже запись, чтобы было видно спрос.
+    await store.addEvent(null, "download", `без входа ${RELEASE_VERSION || ""}`.trim());
+  }
   res.redirect(302, RELEASE_URL);
 });
 
