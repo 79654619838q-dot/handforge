@@ -119,5 +119,6 @@ test("сообщение клубу содержит всё, что нужно �
   assert.match(message, /ABCDEFGHJK/);
   assert.match(message, /17\.11\.2026/);
   assert.match(message, /https:\/\/access\.example/);
-  assert.match(message, /камер и микрофонов/, "клуб должен знать, что работает без логина");
+  assert.match(message, /создать турнир/, "клуб должен понять, зачем ему логин");
+  assert.match(message, /без них/, "и что остальное работает без логина");
 });
