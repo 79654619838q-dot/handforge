@@ -21,6 +21,15 @@ function showScreen(name) {
   $("clubScreen").classList.toggle("hidden", name !== "club");
 }
 
+// Дату показываем по часам того, кто смотрит -- ровно как её покажет сама
+// программа на компьютере клуба (сервер живёт по Гринвичу, и без этого
+// числа расходились на сутки).
+function localDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
 function daysWord(days) {
   const n = Math.abs(days) % 100;
   const last = n % 10;
@@ -37,7 +46,7 @@ function render(data) {
   if (access.reason === "active") {
     const pill = club.daysLeft <= 5 ? "warn" : "ok";
     $("clubAccess").innerHTML =
-      `Доступ до ${club.expiresAtText} <span class="pill ${pill}">осталось ${club.daysLeft} ${daysWord(club.daysLeft)}</span>`;
+      `Доступ до ${localDate(club.expiresAt)} <span class="pill ${pill}">осталось ${club.daysLeft} ${daysWord(club.daysLeft)}</span>`;
     $("clubMeta").innerHTML = `Срок: <b style="color:var(--ink)">${club.planTitle}</b>`;
     $("downloadBox").classList.remove("hidden");
     $("deniedBox").classList.add("hidden");

@@ -19,6 +19,15 @@ const api = async (url, options = {}) => {
   return data;
 };
 
+// Дату показываем по часам того, кто смотрит -- ровно как её покажет сама
+// программа на компьютере клуба (сервер живёт по Гринвичу, и без этого
+// числа расходились на сутки).
+function localDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
 function daysWord(days) {
   const n = Math.abs(days) % 100;
   const last = n % 10;
@@ -52,7 +61,7 @@ function renderClubs() {
       <td><b>${club.name}</b>${club.contact ? `<div class="hint" style="margin:2px 0 0">${club.contact}</div>` : ""}</td>
       <td><code>${club.login}</code></td>
       <td>${club.planTitle}</td>
-      <td>${club.expiresAtText} ${statePill(club)}</td>
+      <td>${localDate(club.expiresAt)} ${statePill(club)}</td>
       <td>${whenText(club.lastLoginAt)}<div class="hint" style="margin:2px 0 0">скачано ${club.downloadCount}</div></td>
       <td style="white-space:nowrap">
         <button class="btn ghost small" data-act="extend" data-id="${club.id}">Продлить</button>

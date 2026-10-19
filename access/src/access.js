@@ -52,9 +52,17 @@ export function accessState(club, now = new Date()) {
   return { ok: true, reason: "active", text: "Доступ открыт" };
 }
 
-export function formatDate(iso) {
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+// Часовой пояс для человеческих дат. Сервер Render живёт по Гринвичу, и
+// без этого сайт писал «до 22.10», а программа на компьютере клуба -- «до
+// 23.10» (нашлось 20.10.2026 при проходе пути клуба целиком).
+export const TIMEZONE = process.env.TIMEZONE || "Europe/Moscow";
+
+export function formatDate(iso, timeZone = TIMEZONE) {
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone, day: "2-digit", month: "2-digit", year: "numeric",
+  }).formatToParts(new Date(iso));
+  const get = (type) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("day")}.${get("month")}.${get("year")}`;
 }
 
 // --- логин и пароль ---------------------------------------------------------
