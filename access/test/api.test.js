@@ -14,6 +14,7 @@ process.env.JWT_SECRET = "test-secret";
 process.env.RELEASE_URL = "https://example.com/handforge.zip";
 process.env.RELEASE_VERSION = "18.10.2026";
 process.env.NODE_ENV = "test";
+process.env.LOGIN_LIMIT = "500";   // прогон делает десятки входов подряд
 
 const { app, } = await import("../src/index.js");
 const store = await import("../src/store.js");
@@ -184,4 +185,44 @@ test("новый пароль отменяет старый", async () => {
   assert.equal((await call("/api/login", { body: { login: club.login, password } })).status, 401);
   assert.equal((await call("/api/login",
     { body: { login: club.login, password: fresh.data.password } })).status, 200);
+});
+
+// --- тихая перепроверка по токену устройства -------------------------------------
+//
+// Пароль программа не хранит: при удачном входе сайт выдаёт токен, и
+// дальше срок проверяется им -- молча, при каждом запуске.
+
+test("успешная проверка выдаёт программе токен устройства", async () => {
+  const { club, password } = await newClub({ name: "Клуб «Токен», Курск" });
+  const { data } = await call("/api/program/check", { body: { login: club.login, password } });
+
+  assert.ok(data.token, "токен выдан");
+
+  const refreshed = await call("/api/program/refresh", { body: { token: data.token } });
+  assert.equal(refreshed.status, 200);
+  assert.equal(refreshed.data.ok, true);
+  assert.equal(refreshed.data.club, "Клуб «Токен», Курск");
+  assert.equal(refreshed.data.daysLeft, 3);
+});
+
+test("по токену видно, что доступ закрыли или срок вышел", async () => {
+  const { token, club, password } = await newClub({ name: "Клуб «Срок», Брянск" });
+  const { data } = await call("/api/program/check", { body: { login: club.login, password } });
+  const device = data.token;
+
+  await call(`/api/admin/clubs/${club.id}/block`, { token, body: { blocked: true } });
+  const blocked = await call("/api/program/refresh", { body: { token: device } });
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.data.reason, "blocked");
+
+  await call(`/api/admin/clubs/${club.id}/block`, { token, body: { blocked: false } });
+  await store.updateClub(club.id, { expiresAt: new Date(Date.now() - 1000).toISOString() });
+  const expired = await call("/api/program/refresh", { body: { token: device } });
+  assert.equal(expired.status, 403);
+  assert.equal(expired.data.reason, "expired");
+});
+
+test("чужой или поддельный токен не пускает", async () => {
+  assert.equal((await call("/api/program/refresh", { body: { token: "подделка" } })).status, 401);
+  assert.equal((await call("/api/program/refresh", { body: {} })).status, 401);
 });

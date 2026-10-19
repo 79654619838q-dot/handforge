@@ -49,7 +49,11 @@ app.set("trust proxy", 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: "64kb" }));
 
-const loginLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true });
+// Предел попыток входа с одного адреса за 10 минут -- и от подбора
+// пароля, и от зациклившейся программы. Настраивается: в проверках он
+// поднимается, иначе сам прогон упирается в него и начинает врать.
+const LOGIN_LIMIT = Number(process.env.LOGIN_LIMIT || 30);
+const loginLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: LOGIN_LIMIT, standardHeaders: true });
 
 // На рабочем сайте файловая база не годится: диск там эфемерный, и
 // заведённые клубы пропали бы при первом же перезапуске. Пока
@@ -65,6 +69,11 @@ if (needsDatabase) {
 
 // --- входы ------------------------------------------------------------------
 const signClub = (club) => jwt.sign({ kind: "club", id: club.id }, JWT_SECRET, { expiresIn: "12h" });
+// Токен устройства: программа хранит его вместо пароля и спрашивает им
+// срок при каждом запуске. Живёт дольше любого срока подписки -- сам по
+// себе он доступа не даёт, доступ решает срок клуба на этой стороне.
+const signProgram = (club) => jwt.sign({ kind: "program", id: club.id }, JWT_SECRET,
+  { expiresIn: "400d" });
 const signAdmin = () => jwt.sign({ kind: "admin" }, JWT_SECRET, { expiresIn: "12h" });
 
 function tokenFrom(req) {
@@ -169,6 +178,40 @@ app.post("/api/program/check", loginLimit, async (req, res) => {
   await store.addEvent(club.id, state.ok ? "program" : "denied",
     state.ok ? "программа" : `программа: ${state.reason}`);
   if (!state.ok) return res.status(403).json({ ok: false, reason: state.reason, text: state.text });
+  res.json({
+    ok: true,
+    club: club.name,
+    plan: club.plan,
+    expiresAt: club.expiresAt,
+    expiresAtText: formatDate(club.expiresAt),
+    daysLeft: daysLeft(club.expiresAt),
+    offlineGraceDays: OFFLINE_GRACE_DAYS,
+    token: signProgram(club),
+  });
+});
+
+// Та же проверка, но без пароля -- по токену устройства. Программа зовёт
+// её при каждом запуске, чтобы молча узнать срок (и узнать, что доступ
+// закрыли), не спрашивая у дилера логин заново.
+app.post("/api/program/refresh", loginLimit, async (req, res) => {
+  let payload;
+  try {
+    payload = jwt.verify(String(req.body?.token || ""), JWT_SECRET);
+  } catch {
+    return res.status(401).json({ ok: false, reason: "unknown",
+      text: "Нужно войти логином и паролем клуба" });
+  }
+  if (payload.kind !== "program") {
+    return res.status(401).json({ ok: false, reason: "unknown",
+      text: "Нужно войти логином и паролем клуба" });
+  }
+  const club = await store.clubById(payload.id);
+  const state = accessState(club);
+  if (!state.ok) {
+    if (club) await store.addEvent(club.id, "denied", `программа: ${state.reason}`);
+    return res.status(403).json({ ok: false, reason: state.reason, text: state.text });
+  }
+  await store.addEvent(club.id, "program", "программа: проверка срока");
   res.json({
     ok: true,
     club: club.name,
