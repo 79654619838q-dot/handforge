@@ -45,7 +45,7 @@ function statePill(club) {
 }
 
 function whenText(iso) {
-  if (!iso) return "не заходил";
+  if (!iso) return "ещё не запускал";
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")} в `
     + `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -62,7 +62,7 @@ function renderClubs() {
       <td><code>${club.login}</code></td>
       <td>${club.planTitle}</td>
       <td>${localDate(club.expiresAt)} ${statePill(club)}</td>
-      <td>${whenText(club.lastLoginAt)}<div class="hint" style="margin:2px 0 0">скачано ${club.downloadCount}</div></td>
+      <td>${whenText(club.lastLoginAt)}<div class="hint" style="margin:2px 0 0">${club.loginCount ? `запусков ${club.loginCount}` : "логин ещё не вводили"}</div></td>
       <td style="white-space:nowrap">
         <button class="btn ghost small" data-act="extend" data-id="${club.id}">Продлить</button>
         <button class="btn ghost small" data-act="password" data-id="${club.id}">Пароль</button>
@@ -74,6 +74,9 @@ function renderClubs() {
 async function loadClubs() {
   const data = await api("/api/admin/clubs");
   clubs = data.clubs;
+  // Скачивают без входа, поэтому клуб у скачивания неизвестен -- считаем
+  // общим числом: видно, есть ли спрос.
+  $("downloadsTotal").textContent = `· скачиваний программы: ${data.downloadsTotal ?? 0}`;
   renderClubs();
 }
 

@@ -3,31 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HandForge Manager — доступ для клубов</title>
+<title>HandForge Manager — скачать для клуба</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="has-hero">
+<!--
+  Только скачивание (решение оператора 20.10.2026: «они зашли, кнопку
+  скачали, скачали программу, и всё, и в самой программе вводят логин и
+  пароль, который я им отправил»). Входа на сайте нет: клубы путались бы,
+  куда вводить логин -- сюда или в программу. Логин вводится ТОЛЬКО в
+  программе, в окне, которое появляется при «Создать турнир».
+-->
 <div class="wrap">
-
-  <!-- вход -->
-  <div class="screen" id="loginScreen">
+  <div class="screen">
     <div class="row">
+
       <div class="card" style="width:340px">
         <img class="brand" src="logo.png" alt="HandForge" width="460" height="460">
-        <div class="sub" style="text-align:center">Доступ для клубов</div>
+        <div class="sub" style="text-align:center">Программа для покерных клубов</div>
         <div class="spade-rule"><span>&#9824;</span></div>
-        <form id="loginForm" autocomplete="off">
-          <label for="login">Логин</label>
-          <input id="login" name="login" autocapitalize="off" spellcheck="false" required>
-          <label for="password">Пароль</label>
-          <input id="password" name="password" type="password" required>
-          <div style="margin-top:18px">
-            <button class="btn big" type="submit" id="loginBtn">Войти</button>
+
+        <div class="note" style="margin-top:10px">
+          HandForge Manager ведёт покерный турнир: рассадка и стеки, блайнды и
+          уровни, банк и сайд-поты, карты с камеры, экран дилера на планшете,
+          плашки игроков в эфире и голосовое управление.
+        </div>
+        <div class="note">
+          Все данные — турниры, игроки, рейтинги — хранятся только у вас, на вашем
+          компьютере, и никуда не передаются.
+        </div>
+
+        <div class="access-box">
+          <div class="access-title">Где вводить логин и пароль</div>
+          <div class="note" style="margin-top:6px">
+            В самой программе. Нажмите «Создать турнир» — появится окно, введите
+            туда логин и пароль, которые вам прислал HandForge. На этом сайте
+            вводить ничего не нужно.
           </div>
-        </form>
-        <div class="err" id="loginError"></div>
-        <div class="hint">Логин и пароль выдаёт HandForge. Если срок закончился —
-          напишите нам, чтобы продлить.</div>
+        </div>
       </div>
 
       <div class="col card">
@@ -35,73 +48,33 @@
         <div style="font-size:15px;font-weight:700">Скачать и попробовать</div>
         <div class="note" style="margin-top:8px">
           Скачайте, запустите и убедитесь, что ваши камеры читают карты, а микрофоны
-          слышат зал. Логин для этого не нужен.
+          слышат зал. Для этого логин не нужен.
         </div>
         <div style="margin-top:14px">
-          <button class="btn big" id="publicDownloadBtn">Скачать программу</button>
+          <button class="btn big" id="downloadBtn">Скачать программу</button>
           <div class="trio">Бесплатно<span>•</span>Без регистрации<span>•</span>Проверка камер сразу</div>
-          <div class="hint" id="publicReleaseHint">Проверяем, какая сборка выложена…</div>
+          <div class="hint" id="releaseHint">Проверяем, какая сборка выложена…</div>
         </div>
         <ol class="steps">
           <li>Распакуйте архив в любую папку.</li>
           <li>Запустите «HandForge Manager.exe».</li>
           <li>Откройте «Настройки» → «Проверка камеры» и проверьте оборудование.</li>
+          <li>Чтобы создать турнир — нажмите «Создать турнир» и введите логин и пароль
+            от HandForge.</li>
         </ol>
 
         <div style="height:1px;background:var(--line);margin:18px 0"></div>
 
-        <div style="font-size:15px;font-weight:700">Что это</div>
-        <div class="note" style="margin-top:8px">
-          HandForge Manager ведёт покерный турнир: рассадка и стеки, блайнды и
-          уровни, банк и сайд-поты, карты с камеры, экран дилера на планшете,
-          плашки игроков в эфире и голосовое управление.
-        </div>
-        <div class="note">
-          Программа работает на компьютере клуба — её нужно скачать и запустить.
-          Все данные (турниры, игроки, рейтинги) хранятся только у вас, на вашем
-          компьютере, и никуда не передаются.
-        </div>
-        <div class="note">
+        <div class="note" style="margin-top:0">
           <b style="color:var(--ink)">Без логина</b> работает почти всё: подключение и
-          проверка камер (видит ли камера карты и какие), микрофоны дилера и зала,
-          голосовые команды, регистрация игроков, архив и рейтинги. Логином
-          открываются <b style="color:var(--ink)">только турниры</b> — создание турнира
-          и работа в нём.
+          проверка камер, микрофоны дилера и зала, голосовые команды, регистрация
+          игроков, архив и рейтинги. Логином открываются
+          <b style="color:var(--ink)">только турниры</b> — создание турнира и работа в нём.
         </div>
       </div>
+
     </div>
   </div>
-
-  <!-- кабинет клуба -->
-  <div class="screen hidden" id="clubScreen">
-    <div class="row">
-      <div class="col card">
-        <div class="sub" id="clubName">—</div>
-        <div style="font-size:19px;font-weight:700;margin-top:4px" id="clubAccess">—</div>
-        <div class="meta" id="clubMeta"></div>
-
-        <div id="downloadBox" style="margin-top:18px">
-          <button class="btn big" id="downloadBtn">Скачать программу</button>
-          <div class="hint" id="releaseHint"></div>
-          <ol class="steps">
-            <li>Распакуйте архив в любую папку.</li>
-            <li>Запустите «HandForge Manager.exe».</li>
-            <li>Войдите теми же логином и паролем.</li>
-            <li>Подключите камеру и микрофон, откройте «Настройки» → «Проверка камеры».</li>
-          </ol>
-        </div>
-
-        <div id="deniedBox" class="hidden">
-          <div class="note" id="deniedText" style="color:var(--bad)"></div>
-        </div>
-
-        <div style="margin-top:20px">
-          <button class="btn ghost small" id="logoutBtn">Выйти</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
 </div>
 <script src="club.js"></script>
 </body>

@@ -152,3 +152,11 @@ select{border-radius:14px}
    нём уже есть, поэтому текстовая надпись со страницы убрана. */
 .brand{display:block;width:100%;max-width:230px;height:auto;margin:-6px auto 2px;
   filter:drop-shadow(0 10px 26px rgba(198,75,232,.25))}
+
+/* Блок «Где вводить логин» -- главный вопрос клуба, поэтому заметнее
+   обычного текста: золотая кромка слева. */
+.access-box{margin-top:16px;padding:12px 14px;border-radius:14px;
+  background:rgba(232,184,75,.07);border:1px solid rgba(232,184,75,.22);
+  border-left:3px solid var(--gold)}
+.access-title{font-weight:700;font-size:13.5px;color:var(--gold)}
+.access-box .note{margin-top:6px}

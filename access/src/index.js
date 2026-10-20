@@ -68,7 +68,6 @@ if (needsDatabase) {
 }
 
 // --- входы ------------------------------------------------------------------
-const signClub = (club) => jwt.sign({ kind: "club", id: club.id }, JWT_SECRET, { expiresIn: "12h" });
 // Токен устройства: программа хранит его вместо пароля и спрашивает им
 // срок при каждом запуске. Живёт дольше любого срока подписки -- сам по
 // себе он доступа не даёт, доступ решает срок клуба на этой стороне.
@@ -88,15 +87,6 @@ function readToken(req, kind) {
   } catch {
     return null;
   }
-}
-
-async function requireClub(req, res, next) {
-  const payload = readToken(req, "club");
-  if (!payload) return res.status(401).json({ error: "Нужен вход" });
-  const club = await store.clubById(payload.id);
-  if (!club) return res.status(401).json({ error: "Клуб не найден" });
-  req.club = club;
-  next();
 }
 
 function requireAdmin(req, res, next) {
@@ -124,35 +114,12 @@ const clubView = (club) => ({
 });
 
 // --- сторона клуба ------------------------------------------------------------
-app.post("/api/login", loginLimit, async (req, res) => {
-  const { login, password } = req.body || {};
-  const club = await store.clubByLogin(String(login || "").trim().toLowerCase());
-  const ok = club && await checkPassword(String(password || ""), club.passwordHash);
-  if (!ok) {
-    if (club) await store.addEvent(club.id, "denied", "неверный пароль");
-    return res.status(401).json({ error: "Логин или пароль не подходят" });
-  }
-  const state = accessState(club);
-  await store.updateClub(club.id, {
-    lastLoginAt: new Date().toISOString(),
-    loginCount: club.loginCount + 1,
-  });
-  await store.addEvent(club.id, state.ok ? "login" : "denied", state.ok ? "сайт" : state.reason);
-  res.json({ token: signClub(club), access: state, club: clubView(await store.clubById(club.id)) });
-});
+//
+// Входа на сайте НЕТ (решение оператора 20.10.2026: «они зашли, кнопку
+// скачали, скачали программу, и всё, и в самой программе вводят логин и
+// пароль»). Клуб тут только скачивает; логин -- в программе.
 
-app.get("/api/me", requireClub, async (req, res) => {
-  const state = accessState(req.club);
-  res.json({
-    club: clubView(req.club),
-    access: state,
-    release: state.ok && RELEASE_URL
-      ? { version: RELEASE_VERSION, size: RELEASE_SIZE }
-      : null,
-  });
-});
-
-// Что за сборка лежит -- спрашивает первая страница, ещё до всякого входа.
+// Что за сборка лежит -- спрашивает страница клуба.
 app.get("/api/release", (_req, res) => {
   res.json(RELEASE_URL
     ? { available: true, version: RELEASE_VERSION, size: RELEASE_SIZE }
@@ -162,19 +129,23 @@ app.get("/api/release", (_req, res) => {
 // Скачивание ОТКРЫТО ВСЕМ: клуб должен иметь возможность проверить свои
 // камеры до покупки. Логин нужен в самой программе -- без него не
 // создать турнир.
-app.get("/api/download", async (req, res) => {
+app.get("/api/download", async (_req, res) => {
   if (!RELEASE_URL) return res.status(503).json({ error: "Сборка ещё не выложена" });
-  const payload = readToken(req, "club");
-  const club = payload ? await store.clubById(payload.id) : null;
-  if (club) {
-    await store.updateClub(club.id, { downloadCount: club.downloadCount + 1 });
-    await store.addEvent(club.id, "download", RELEASE_VERSION || "");
-  } else {
-    // Скачал кто-то без входа -- тоже запись, чтобы было видно спрос.
-    await store.addEvent(null, "download", `без входа ${RELEASE_VERSION || ""}`.trim());
-  }
+  // Кто скачал -- неизвестно (входа нет), но счёт ведём: оператору видно,
+  // есть ли спрос.
+  await store.addEvent(null, "download", RELEASE_VERSION || "");
   res.redirect(302, RELEASE_URL);
 });
+
+// Запуск программы -- это теперь и есть «вход клуба». Без этого графа
+// «последний вход» в учёте навсегда осталась бы пустой: раньше её ставил
+// только вход на сайте, которого больше нет.
+async function markProgramRun(club) {
+  await store.updateClub(club.id, {
+    lastLoginAt: new Date().toISOString(),
+    loginCount: club.loginCount + 1,
+  });
+}
 
 // --- сторона программы ---------------------------------------------------------
 // Программа спрашивает это при запуске. Ответ короткий и машинный:
@@ -193,6 +164,7 @@ app.post("/api/program/check", loginLimit, async (req, res) => {
   await store.addEvent(club.id, state.ok ? "program" : "denied",
     state.ok ? "программа" : `программа: ${state.reason}`);
   if (!state.ok) return res.status(403).json({ ok: false, reason: state.reason, text: state.text });
+  await markProgramRun(club);
   res.json({
     ok: true,
     club: club.name,
@@ -227,6 +199,7 @@ app.post("/api/program/refresh", loginLimit, async (req, res) => {
     return res.status(403).json({ ok: false, reason: state.reason, text: state.text });
   }
   await store.addEvent(club.id, "program", "программа: проверка срока");
+  await markProgramRun(club);
   res.json({
     ok: true,
     club: club.name,
@@ -250,7 +223,11 @@ app.post("/api/admin/login", loginLimit, (req, res) => {
 
 app.get("/api/admin/clubs", requireAdmin, async (_req, res) => {
   const clubs = await store.listClubs();
-  res.json({ clubs: clubs.map(clubView), plans: PLANS });
+  res.json({
+    clubs: clubs.map(clubView),
+    plans: PLANS,
+    downloadsTotal: await store.countEvents("download"),
+  });
 });
 
 app.post("/api/admin/clubs", requireAdmin, async (req, res) => {

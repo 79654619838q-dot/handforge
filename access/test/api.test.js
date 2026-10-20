@@ -96,22 +96,36 @@ test("пароль в ответе один раз, в списке клубов
 
 // --- клуб ---------------------------------------------------------------------
 
-test("клуб входит своим паролем и видит срок", async () => {
+test("входа на сайте больше нет -- клуб входит только в программе", async () => {
+  // Решение оператора 20.10.2026: «в самой программе они вводят логин и
+  // пароль, который я им отправил». Два места для одного логина путали бы.
   const { club, password } = await newClub({ name: "Клуб «Роял», Сочи" });
-  const { status, data } = await call("/api/login", { body: { login: club.login, password } });
 
-  assert.equal(status, 200);
-  assert.equal(data.access.reason, "active");
-  assert.equal(data.club.daysLeft, 3);
+  assert.equal((await call("/api/login", { body: { login: club.login, password } })).status, 404);
+  assert.equal((await call("/api/me")).status, 404);
+  assert.equal((await call("/api/program/check",
+    { body: { login: club.login, password } })).status, 200, "в программе вход работает");
+});
 
-  const me = await call("/api/me", { token: data.token });
-  assert.equal(me.data.club.login, club.login);
-  assert.equal(me.data.release.version, "18.10.2026");
+test("запуск программы виден в учёте как последний вход клуба", async () => {
+  // Без этого графа в учёте навсегда осталась бы пустой: раньше её ставил
+  // только вход на сайте, которого теперь нет.
+  const { token, club, password } = await newClub({ name: "Клуб «Маяк», Тверь" });
+  const before = (await call("/api/admin/clubs", { token })).data.clubs.find((c) => c.id === club.id);
+  assert.equal(before.lastLoginAt, null, "до запуска программы -- пусто");
+
+  const { data } = await call("/api/program/check", { body: { login: club.login, password } });
+  await call("/api/program/refresh", { body: { token: data.token } });
+
+  const after = (await call("/api/admin/clubs", { token })).data.clubs.find((c) => c.id === club.id);
+  assert.ok(after.lastLoginAt, "время запуска записано");
+  assert.equal(after.loginCount, 2, "вход логином и тихая перепроверка -- два запуска");
 });
 
 test("чужой пароль не пускает и запоминается в событиях", async () => {
   const { token, club } = await newClub({ name: "Клуб «Эльдорадо», Казань" });
-  assert.equal((await call("/api/login", { body: { login: club.login, password: "НЕВЕРНЫЙ" } })).status, 401);
+  assert.equal((await call("/api/program/check",
+    { body: { login: club.login, password: "НЕВЕРНЫЙ" } })).status, 401);
 
   const { data } = await call(`/api/admin/clubs/${club.id}/events`, { token });
   assert.ok(data.events.some((e) => e.kind === "denied"), "отказ записан");
@@ -131,15 +145,15 @@ test("скачивание открыто всем -- клуб проверяе�
   assert.equal(release.data.version, "18.10.2026");
 });
 
-test("скачивание вошедшего клуба считается в его строке", async () => {
-  const { token: admin, club, password } = await newClub({ name: "Клуб «Волна», Тверь" });
-  const { data } = await call("/api/login", { body: { login: club.login, password } });
+test("скачивания считаются общим числом -- клуб при скачивании неизвестен", async () => {
+  const admin = await adminToken();
+  const before = (await call("/api/admin/clubs", { token: admin })).data.downloadsTotal;
 
-  const download = await call("/api/download", { token: data.token });
-  assert.equal(download.status, 302);
+  await call("/api/download");
+  await call("/api/download");
 
-  const list = await call("/api/admin/clubs", { token: admin });
-  assert.equal(list.data.clubs.find((c) => c.id === club.id).downloadCount, 1);
+  const after = (await call("/api/admin/clubs", { token: admin })).data.downloadsTotal;
+  assert.equal(after - before, 2);
 });
 
 // --- программа ------------------------------------------------------------------
@@ -165,14 +179,12 @@ test("закрытый доступ программа получает отка
   assert.match(data.text, /Свяжитесь с нами/);
 });
 
-test("истёкший срок закрывает и сайт, и программу", async () => {
+test("истёкший срок закрывает программу, продление открывает", async () => {
   const { token, club, password } = await newClub({ name: "Клуб «Тест», Орёл" });
   await store.updateClub(club.id, { expiresAt: new Date(Date.now() - 1000).toISOString() });
 
-  const site = await call("/api/login", { body: { login: club.login, password } });
   const program = await call("/api/program/check", { body: { login: club.login, password } });
 
-  assert.equal(site.data.access.reason, "expired");
   assert.equal(program.status, 403);
   assert.equal(program.data.reason, "expired");
 
@@ -194,8 +206,8 @@ test("новый пароль отменяет старый", async () => {
   const { token, club, password } = await newClub({ name: "Клуб «Азарт», Тула" });
   const fresh = await call(`/api/admin/clubs/${club.id}/password`, { token, method: "POST" });
 
-  assert.equal((await call("/api/login", { body: { login: club.login, password } })).status, 401);
-  assert.equal((await call("/api/login",
+  assert.equal((await call("/api/program/check", { body: { login: club.login, password } })).status, 401);
+  assert.equal((await call("/api/program/check",
     { body: { login: club.login, password: fresh.data.password } })).status, 200);
 });
 

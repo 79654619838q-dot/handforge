@@ -171,6 +171,12 @@ export async function addEvent(clubId, kind, detail) {
     [crypto.randomUUID(), clubId, kind, detail || null, new Date().toISOString()]);
 }
 
+export async function countEvents(kind) {
+  const { rows } = await query(`SELECT COUNT(*) AS n FROM access_events WHERE kind = $1`, [kind]);
+  // Postgres отдаёт COUNT строкой (bigint), SQLite -- числом.
+  return Number(rows[0]?.n || 0);
+}
+
 export async function clubEvents(clubId, limit = 50) {
   const { rows } = await query(
     `SELECT kind, detail, at FROM access_events WHERE club_id = $1 ORDER BY at DESC LIMIT $2`,
