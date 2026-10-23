@@ -96,6 +96,30 @@ export async function init() {
     at TEXT NOT NULL
   )`);
   await query(`CREATE INDEX IF NOT EXISTS access_events_club_at ON access_events (club_id, at)`);
+  // Посещения страницы скачивания и сами скачивания (оператор 23.10.2026:
+  // «чтоб я видел, сколько посетили и сколько скачало пользователей»).
+  // visitor -- случайный номер браузера, а не адрес и не имя: по нему
+  // считаются разные люди, и больше он ничего не говорит.
+  await query(`CREATE TABLE IF NOT EXISTS site_hits (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    visitor TEXT,
+    at TEXT NOT NULL
+  )`);
+  await query(`CREATE INDEX IF NOT EXISTS site_hits_kind_at ON site_hits (kind, at)`);
+}
+
+export async function addHit(kind, visitor) {
+  await query(`INSERT INTO site_hits (id, kind, visitor, at) VALUES ($1,$2,$3,$4)`,
+    [crypto.randomUUID(), kind, visitor || null, new Date().toISOString()]);
+}
+
+// Сколько раз и сколько разных браузеров -- с указанного момента.
+export async function hitStats(kind, sinceIso) {
+  const { rows } = await query(
+    `SELECT COUNT(*) AS total, COUNT(DISTINCT visitor) AS people
+       FROM site_hits WHERE kind = $1 AND at >= $2`, [kind, sinceIso]);
+  return { total: Number(rows[0]?.total || 0), people: Number(rows[0]?.people || 0) };
 }
 
 const rowToClub = (row) => row && ({

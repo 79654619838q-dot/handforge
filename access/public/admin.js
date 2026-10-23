@@ -77,7 +77,25 @@ async function loadClubs() {
   // Скачивают без входа, поэтому клуб у скачивания неизвестен -- считаем
   // общим числом: видно, есть ли спрос.
   $("downloadsTotal").textContent = `· скачиваний программы: ${data.downloadsTotal ?? 0}`;
+  renderStats(data.siteStats);
   renderClubs();
+}
+
+// Этот браузер -- оператора: его заходы на страницу скачивания в счёт не
+// идут (см. public/club.js).
+function markOperator() {
+  try { localStorage.setItem("hfOperator", "1"); } catch { /* закрыто настройками */ }
+}
+
+function renderStats(stats) {
+  if (!stats) return;
+  for (const kind of ["visit", "download"]) {
+    for (const period of ["day", "week", "all"]) {
+      const cell = stats[kind][period];
+      $(`stat-${kind}-${period}`).innerHTML =
+        `<b>${cell.people}</b><div class="hint" style="margin:2px 0 0">${cell.total} раз</div>`;
+    }
+  }
 }
 
 function showMessage(message) {
@@ -97,6 +115,7 @@ $("authForm").addEventListener("submit", async (event) => {
       body: JSON.stringify({ password: $("adminPassword").value }),
     });
     sessionStorage.setItem("adminToken", data.token);
+    markOperator();
     $("authScreen").classList.add("hidden");
     $("workScreen").classList.remove("hidden");
     await loadClubs();
@@ -208,6 +227,7 @@ $("refreshBtn").addEventListener("click", () => loadClubs().catch((e) => {
 
 if (sessionStorage.getItem("adminToken")) {
   loadClubs().then(() => {
+    markOperator();
     $("authScreen").classList.add("hidden");
     $("workScreen").classList.remove("hidden");
   }).catch(() => sessionStorage.removeItem("adminToken"));

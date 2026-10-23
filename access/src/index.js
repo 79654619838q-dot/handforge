@@ -129,12 +129,29 @@ app.get("/api/release", (_req, res) => {
 // Скачивание ОТКРЫТО ВСЕМ: клуб должен иметь возможность проверить свои
 // камеры до покупки. Логин нужен в самой программе -- без него не
 // создать турнир.
-app.get("/api/download", async (_req, res) => {
+app.get("/api/download", async (req, res) => {
   if (!RELEASE_URL) return res.status(503).json({ error: "Сборка ещё не выложена" });
   // Кто скачал -- неизвестно (входа нет), но счёт ведём: оператору видно,
   // есть ли спрос.
   await store.addEvent(null, "download", RELEASE_VERSION || "");
+  // Скачивание самим оператором (его браузер помечен) людей не прибавляет.
+  if (req.query.op !== "1") await store.addHit("download", visitorId(req.query.v));
   res.redirect(302, RELEASE_URL);
+});
+
+// Номер браузера приходит со страницы скачивания (см. public/club.js).
+// Принимаем только похожее на номер -- чужой мусор в базу не пишем.
+const visitorId = (value) => {
+  const text = String(value || "");
+  return /^[A-Za-z0-9-]{8,64}$/.test(text) ? text : null;
+};
+
+// Посещение считает сама страница, а не сервер на каждый запрос: роботы,
+// которые не выполняют страницу, в счёт не попадают. Предел -- от накрутки.
+const visitLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true });
+app.post("/api/visit", visitLimit, async (req, res) => {
+  await store.addHit("visit", visitorId(req.body?.visitor));
+  res.status(204).end();
 });
 
 // Запуск программы -- это теперь и есть «вход клуба». Без этого графа
@@ -227,8 +244,27 @@ app.get("/api/admin/clubs", requireAdmin, async (_req, res) => {
     clubs: clubs.map(clubView),
     plans: PLANS,
     downloadsTotal: await store.countEvents("download"),
+    siteStats: await siteStats(),
   });
 });
+
+// Посещения и скачивания: за сутки, за неделю и всего -- только оператору.
+async function siteStats() {
+  const day = 24 * 60 * 60 * 1000;
+  const periods = {
+    day: new Date(Date.now() - day).toISOString(),
+    week: new Date(Date.now() - 7 * day).toISOString(),
+    all: "",
+  };
+  const stats = {};
+  for (const kind of ["visit", "download"]) {
+    stats[kind] = {};
+    for (const [name, since] of Object.entries(periods)) {
+      stats[kind][name] = await store.hitStats(kind, since);
+    }
+  }
+  return stats;
+}
 
 app.post("/api/admin/clubs", requireAdmin, async (req, res) => {
   const { name, contact, plan, customDays, note } = req.body || {};

@@ -156,6 +156,42 @@ test("скачивания считаются общим числом -- клу�
   assert.equal(after - before, 2);
 });
 
+test("оператор видит, сколько людей зашло и скачало, остальным этого не видно", async () => {
+  const admin = await adminToken();
+  const stats = async () => (await call("/api/admin/clubs", { token: admin })).data.siteStats;
+  const before = await stats();
+
+  // Двое зашли, один из них дважды; скачал один, но два раза.
+  await call("/api/visit", { body: { visitor: "aaaaaaaa-1111" } });
+  await call("/api/visit", { body: { visitor: "aaaaaaaa-1111" } });
+  await call("/api/visit", { body: { visitor: "bbbbbbbb-2222" } });
+  await call("/api/download?v=aaaaaaaa-1111");
+  await call("/api/download?v=aaaaaaaa-1111");
+  // Сам оператор скачал -- людей не прибавилось.
+  await call("/api/download?op=1");
+
+  const after = await stats();
+  for (const period of ["day", "week", "all"]) {
+    assert.equal(after.visit[period].total - before.visit[period].total, 3, period);
+    assert.equal(after.visit[period].people - before.visit[period].people, 2, period);
+    assert.equal(after.download[period].total - before.download[period].total, 2, period);
+    assert.equal(after.download[period].people - before.download[period].people, 1, period);
+  }
+
+  assert.equal((await call("/api/admin/clubs")).status, 401, "без входа цифр не видно");
+});
+
+test("мусор вместо номера браузера в базу не пишется", async () => {
+  const admin = await adminToken();
+  const people = async () => (await call("/api/admin/clubs", { token: admin })).data.siteStats.visit.all.people;
+  const before = await people();
+
+  const answer = await call("/api/visit", { body: { visitor: "<script>alert(1)</script>" } });
+
+  assert.equal(answer.status, 204);
+  assert.equal(await people(), before, "без номера заход считается, а человек -- нет");
+});
+
 // --- программа ------------------------------------------------------------------
 
 test("программа спрашивает срок и получает дату и запас без связи", async () => {

@@ -8,13 +8,46 @@
 // выложена, и отдаём её.
 const $ = (id) => document.getElementById(id);
 
+// Номер этого браузера -- чтобы оператор видел не только заходы, но и
+// сколько разных людей зашло и скачало (оператор 23.10.2026). Случайный,
+// ничего о человеке не говорит. Браузер, в котором оператор входил в учёт
+// клубов, помечен (см. admin.js) -- его заходы в счёт не идут.
+function visitorId() {
+  try {
+    let id = localStorage.getItem("hfVisitor");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("hfVisitor", id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
+
+function isOperator() {
+  try { return localStorage.getItem("hfOperator") === "1"; } catch { return false; }
+}
+
+const visitor = isOperator() ? "" : visitorId();
+if (visitor) {
+  fetch("/api/visit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ visitor }),
+  }).catch(() => {});
+}
+
 fetch("/api/release").then((r) => r.json()).then((release) => {
   const button = $("downloadBtn");
   const hint = $("releaseHint");
   if (release.available) {
     hint.textContent = `Версия ${release.version || "—"}`
       + (release.size ? `, ${release.size}` : "") + ". Windows 10/11, 64 бита.";
-    button.addEventListener("click", () => { window.location.href = "/api/download"; });
+    button.addEventListener("click", () => {
+      window.location.href = isOperator() ? "/api/download?op=1"
+        : `/api/download?v=${encodeURIComponent(visitor)}`;
+    });
   } else {
     button.disabled = true;
     hint.textContent = "Сборка ещё выкладывается — зайдите чуть позже.";
