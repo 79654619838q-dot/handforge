@@ -120,7 +120,8 @@ export function hub() {
     ),
     h('div.goal', h('span', 'ЦЕЛЬ'), run.goal()),
     h('div.hub-grid',
-      h('section.hub-col', h('h2', 'Места'), h('div.cards', places)),
+      // в делах 16 и 24 мест в начале нет — без подсказки колонка выглядела сломанной
+      h('section.hub-col', h('h2', 'Места'), h('div.cards', places.length ? places : h('div.empty', 'Места откроются по ходу дела — смотрите цель вверху.'))),
       h('section.hub-col', h('h2', 'Люди'), h('div.cards', people.length ? people : h('div.empty', 'Пока не с кем говорить'))),
     ),
     h('div.hub-actions',
@@ -338,7 +339,7 @@ function results() {
         L.token && tokens.includes(L.token) ? h('div.link-token', h('span', 'ВМТ-9'), h('b', '№' + String(L.token).padStart(3, '0'))) : null,
       ) : null,
       h('div.res-buttons',
-        nextC ? h('button.btn.primary.big', { onclick: () => openCase(nextC) }, `Дело №${nextC.no}: ${nextC.title}`) : h('div.res-soon', 'Следующие дела скоро'),
+        nextC ? h('button.btn.primary.big', { onclick: () => openCase(nextC) }, `Дело №${nextC.no}: ${nextC.title}`) : h('div.res-soon', C.no >= CASES.length ? 'Это было последнее дело «АРХИВА». Можно переиграть любое — ради звёзд и всех концовок.' : 'Следующие дела скоро'),
         h('button.btn', { onclick: () => { delete load().runs[C.id]; openCase(C); } }, 'Переиграть дело'),
         h('button.btn.ghost', { onclick: () => cases(C.ch) }, 'К списку дел'),
       ),

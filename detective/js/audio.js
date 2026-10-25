@@ -31,7 +31,8 @@ export function stopSpeech() { token++; skipFn?.(); if (cur) { cur.pause(); cur 
 export function say(lines) {
   if (!lines?.length) return Promise.resolve();
   const my = token;
-  queue = queue.then(() => playAll(lines, my));
+  // сбой одной реплики не должен ломать всю очередь (иначе игра молчит и ждёт вечно)
+  queue = queue.then(() => playAll(lines, my)).catch(() => { subs?.classList.remove('show'); });
   return queue;
 }
 
@@ -73,6 +74,9 @@ function playOne(who, text) {
     a.onended = finish;
     a.onerror = () => { window.__voiceMissing.push('ERR ' + who + '|' + text); timed(); };
     a.play().catch(() => timed());
+    // слабый интернет: запись может «повиснуть» — не закончиться и не дать ошибку, а игра ждала бы вечно
+    // (вопросы не нажимаются). Страховка: реплика длится не дольше втрое обычного + 6 с.
+    setTimeout(finish, Math.max(1600, text.length * 62) * 3 + 6000);
   });
 }
 

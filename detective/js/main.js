@@ -33,7 +33,8 @@ export function title() {
   const t = totals();
   const r = rankOf(t.stars);
   const anyRun = Object.keys(s.runs).length > 0;
-  const nextCase = CASES.find((c) => caseOpen(c.no) && !s.done[c.id]) || CASES[0];
+  // все дела закрыты — кнопки «Следующее» нет (раньше она вела на дело №1)
+  const nextCase = CASES.find((c) => caseOpen(c.no) && !s.done[c.id]);
   screen(h('div.title-screen',
     pic('ui/menu', 'title-bg'),
     h('div.title-shade'),
@@ -43,7 +44,7 @@ export function title() {
       h('div.menu-buttons',
         h('button.btn.primary.big', { onclick: () => { sfx.click(); if (anyRun || Object.keys(s.done).length) cases(); else openCase(CASES[0]); } },
           anyRun || Object.keys(s.done).length ? 'Продолжить' : 'Начать расследование'),
-        Object.keys(s.done).length ? h('button.btn', { onclick: () => openCase(nextCase) }, `Следующее: дело №${nextCase.no}`) : null,
+        Object.keys(s.done).length && nextCase ? h('button.btn', { onclick: () => openCase(nextCase) }, `Следующее: дело №${nextCase.no}`) : null,
         h('button.btn', { onclick: () => { sfx.click(); cases(); } }, 'Все дела'),
         h('button.btn', { onclick: () => { sfx.click(); profile(); } }, 'Звание и жетоны'),
         h('button.btn', { onclick: () => { sfx.click(); rating(); } }, 'Рейтинг детективов'),
